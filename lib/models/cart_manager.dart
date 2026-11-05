@@ -294,4 +294,59 @@ class CartManager extends ChangeNotifier {
     _items.clear();
     _notifyAndSave();
   }
+  // ==========================================
+  // REFRESH CART AFTER CHECKOUT
+  // ==========================================
+
+  /// Refreshes the in-memory cart from SQLite after
+  /// successful checkout reconciliation.
+  ///
+  /// Does not write anything to SQLite.
+  ///
+  /// Requires the checkout lock to remain active so
+  /// no cart mutation can occur during synchronization.
+  Future<void> refreshAfterCheckoutReconciliation() async {
+    if (!_isInitialized || !_isCheckoutLocked) {
+      throw StateError(
+        'Cart refresh requires an initialized, '
+        'checkout-locked cart.',
+      );
+    }
+
+    // All queued cart saves must have finished before
+    // the reconciled SQLite state can be loaded.
+    await waitForPendingSaves();
+
+    final savedItems = await CartDatabaseService.instance.loadCart();
+
+    final productsById = {
+      for (final product in ProductCatalog.products) product.id: product,
+    };
+
+    final refreshedItems = <String, CartItem>{};
+
+    for (final entry in savedItems.entries) {
+      final product = productsById[entry.key];
+      final quantity = entry.value;
+
+      if (product == null || quantity < 1 || quantity > maxQuantityPerProduct) {
+        throw StateError('Cannot refresh cart: invalid persisted cart item.');
+      }
+
+      refreshedItems[entry.key] = CartItem(
+        product: product,
+        quantity: quantity,
+      );
+    }
+
+    // Only replace the in-memory cart after the entire
+    // SQLite snapshot has been loaded and validated.
+    _items
+      ..clear()
+      ..addAll(refreshedItems);
+
+    _lastPersistenceError = null;
+
+    notifyListeners();
+  }
 }
