@@ -239,10 +239,9 @@ class MilkDatabaseService {
 
   /// Version 9: Server catalog cache and app settings.
   ///
-  /// `catalog_cache` keeps the last catalog received for each
-  /// delivery area so the app works offline. `app_settings`
-  /// stores small key/value preferences such as the selected
-  /// delivery area.
+  /// `catalog_cache` keeps the last catalog received so the app
+  /// works offline. `app_settings` is a small key/value store
+  /// for app preferences.
   Future<void> _createCatalogCacheTables(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $catalogCacheTable (

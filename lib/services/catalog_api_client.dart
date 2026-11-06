@@ -13,23 +13,6 @@ import '../database/catalog_cache_service.dart';
 /// app does not contact any server.
 const String apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
-/// A delivery area offered by the server.
-class DeliveryArea {
-  final String id;
-  final String name;
-
-  const DeliveryArea({required this.id, required this.name});
-}
-
-/// One area's catalog as returned by the server.
-class AreaCatalog {
-  final DeliveryArea area;
-  final List<CatalogProductData> products;
-
-  AreaCatalog({required this.area, required List<CatalogProductData> products})
-    : products = List.unmodifiable(products);
-}
-
 class CatalogApiException implements Exception {
   final String message;
   const CatalogApiException(this.message);
@@ -38,7 +21,10 @@ class CatalogApiException implements Exception {
   String toString() => 'CatalogApiException: $message';
 }
 
-/// Reads the public catalog endpoints of the backend.
+/// Reads the public catalog endpoint of the backend.
+///
+/// Every customer sees the same products at the same prices
+/// (owner decision, 6 November 2026), so there is no area.
 class CatalogApiClient {
   CatalogApiClient({
     required String baseUrl,
@@ -57,54 +43,22 @@ class CatalogApiClient {
     return apiBaseUrl.isEmpty ? null : CatalogApiClient(baseUrl: apiBaseUrl);
   }
 
-  Future<List<DeliveryArea>> fetchAreas() async {
-    final json = await _getJson(_baseUri.resolve('v1/areas'));
+  Future<List<CatalogProductData>> fetchCatalog() async {
+    final json = await _getJson(_baseUri.resolve('v1/catalog'));
 
-    final areas = json['areas'];
-    if (areas is! List) {
-      throw const CatalogApiException('Malformed areas response.');
-    }
-
-    return [
-      for (final area in areas)
-        DeliveryArea(
-          id: (area as Map)['id'] as String,
-          name: area['name'] as String,
-        ),
-    ];
-  }
-
-  Future<AreaCatalog> fetchCatalog(String areaId) async {
-    final json = await _getJson(
-      _baseUri
-          .resolve('v1/catalog')
-          .replace(queryParameters: {'area_id': areaId}),
-    );
-
-    final area = json['area'];
     final products = json['products'];
 
-    if (area is! Map || products is! List) {
+    if (products is! List) {
       throw const CatalogApiException('Malformed catalog response.');
     }
 
-    if (area['id'] != areaId) {
-      throw const CatalogApiException('Catalog is for a different area.');
-    }
-
     try {
-      return AreaCatalog(
-        area: DeliveryArea(
-          id: area['id'] as String,
-          name: area['name'] as String,
-        ),
-        products: [
-          for (final product in products)
-            CatalogProductData.fromJson(
-              Map<String, Object?>.from(product as Map),
-            ),
-        ],
-      );
+      return [
+        for (final product in products)
+          CatalogProductData.fromJson(
+            Map<String, Object?>.from(product as Map),
+          ),
+      ];
     } on FormatException catch (error) {
       throw CatalogApiException('Invalid product data: ${error.message}');
     } on TypeError {

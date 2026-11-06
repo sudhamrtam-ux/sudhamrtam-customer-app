@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
-import '../../models/product_catalog.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
+  final String productId;
   final String productName;
   final String category;
   final IconData productIcon;
@@ -13,6 +13,7 @@ class ProductDetailsScreen extends StatefulWidget {
 
   const ProductDetailsScreen({
     super.key,
+    required this.productId,
     required this.productName,
     required this.category,
     required this.productIcon,
@@ -30,9 +31,22 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   // Add the selected product and show an accurate message.
   void _addToCart() {
-    final product = ProductCatalog.products.firstWhere(
-      (item) => item.name == widget.productName,
-    );
+    // Resolve by ID through the catalog, so area prices and
+    // server-only products (e.g. Paneer) work.
+    final product = sudhamrtamCatalog.productById(widget.productId);
+
+    if (product == null || !product.isAvailable) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              '${widget.productName} is not available in your delivery area.',
+            ),
+          ),
+        );
+      return;
+    }
 
     // Check how many units are already in the cart.
     final existingItems = sudhamrtamCart.items.where(

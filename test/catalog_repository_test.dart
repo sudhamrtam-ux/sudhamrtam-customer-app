@@ -57,49 +57,46 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  Future<void> cacheNizampet() async {
+  /// A cached server catalog without coconut oil.
+  Future<void> cacheCatalog() async {
     await cache.saveCatalog(
       CachedCatalog(
-        areaId: 'nizampet',
-        areaName: 'Nizampet',
+        areaId: CatalogRepository.cacheKey,
+        areaName: 'All areas',
         fetchedAt: DateTime.utc(2026, 11, 6, 9),
         products: [
-          item('buffalo_milk', 8500),
-          item('cow_milk', 9000),
+          item('buffalo_milk', 9000),
+          item('cow_milk', 9500),
           item('paneer', 80000, unit: '1 kg'),
         ],
       ),
     );
-    await cache.setSelectedAreaId('nizampet');
   }
 
   group('CatalogCacheService', () {
     test('Round-trips a catalog with exact paise', () async {
-      await cacheNizampet();
+      await cacheCatalog();
 
-      final loaded = await cache.loadCatalog('nizampet');
+      final loaded = await cache.loadCatalog(CatalogRepository.cacheKey);
 
-      expect(loaded!.areaName, 'Nizampet');
-      expect(loaded.products.map((p) => p.pricePaise), [8500, 9000, 80000]);
-      expect(await cache.loadCatalog('unknown_area'), isNull);
-      expect(await cache.getSelectedAreaId(), 'nizampet');
+      expect(loaded!.products.map((p) => p.pricePaise), [9000, 9500, 80000]);
+      expect(await cache.loadCatalog('unknown_key'), isNull);
     });
 
-    test('Saving an area again replaces its catalog', () async {
-      await cacheNizampet();
+    test('Saving again replaces the catalog', () async {
+      await cacheCatalog();
 
       await cache.saveCatalog(
         CachedCatalog(
-          areaId: 'nizampet',
-          areaName: 'Nizampet',
+          areaId: CatalogRepository.cacheKey,
+          areaName: 'All areas',
           fetchedAt: DateTime.utc(2026, 11, 7),
-          products: [item('cow_milk', 9500)],
+          products: [item('cow_milk', 9900)],
         ),
       );
 
-      final loaded = await cache.loadCatalog('nizampet');
-      expect(loaded!.products.single.pricePaise, 9500);
-      expect((await cache.loadAllCatalogs()), hasLength(1));
+      final loaded = await cache.loadCatalog(CatalogRepository.cacheKey);
+      expect(loaded!.products.single.pricePaise, 9900);
     });
 
     test('Rejects products without a positive price', () {
@@ -123,28 +120,28 @@ void main() {
 
       expect(repository.source, CatalogSource.builtIn);
       expect(repository.products, ProductCatalog.products);
-      expect(repository.productById('cow_milk')?.price, 85.0);
+      expect(repository.productById('cow_milk')?.price, 90.0);
+      expect(repository.productById('buffalo_ghee')?.price, 880.0);
     });
 
-    test('Uses the cached catalog of the selected area', () async {
-      await cacheNizampet();
+    test('Uses the cached catalog when there is one', () async {
+      await cacheCatalog();
 
       final repository = CatalogRepository();
       await repository.initialize();
 
       expect(repository.source, CatalogSource.cached);
-      expect(repository.selectedAreaName, 'Nizampet');
       expect(repository.products.map((p) => p.id), [
         'buffalo_milk',
         'cow_milk',
         'paneer',
       ]);
-      expect(repository.productById('cow_milk')?.price, 90.0);
+      expect(repository.productById('cow_milk')?.price, 95.0);
       expect(repository.productById('paneer')?.isAvailable, isTrue);
     });
 
-    test('Known products not sold in the area are unavailable', () async {
-      await cacheNizampet();
+    test('Known products no longer sold are unavailable', () async {
+      await cacheCatalog();
 
       final repository = CatalogRepository();
       await repository.initialize();
@@ -168,8 +165,8 @@ void main() {
   });
 
   group('Cart with catalog lookup', () {
-    test('Saved items outside the area are kept but block checkout', () async {
-      await cacheNizampet();
+    test('Unsold and unknown items are kept but block checkout', () async {
+      await cacheCatalog();
 
       await db.insert(MilkDatabaseService.cartItemsTable, {
         'product_id': 'cow_milk',
@@ -197,10 +194,10 @@ void main() {
         'retired_product',
       });
 
-      // Area price applies to available products.
+      // The catalog price applies to available products.
       expect(
         cart.items.firstWhere((i) => i.product.id == 'cow_milk').product.price,
-        90.0,
+        95.0,
       );
 
       // Unavailable products cannot be increased...
@@ -215,17 +212,14 @@ void main() {
       );
 
       expect(validation.isValid, isFalse);
-      expect(
-        validation.errors.single,
-        contains('not available in your delivery area'),
-      );
+      expect(validation.errors.single, contains('is not available'));
 
       await cart.waitForPendingSaves();
       cart.dispose();
     });
 
     test('Unavailable products cannot be added', () async {
-      await cacheNizampet();
+      await cacheCatalog();
 
       final repository = CatalogRepository();
       await repository.initialize();

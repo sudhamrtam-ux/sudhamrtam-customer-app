@@ -4,4 +4,8 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Debug builds only: allow plain HTTP to the local development
+         API (http://127.0.0.1:3000 through `adb reverse`). Release
+         builds keep Android's default of HTTPS only. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

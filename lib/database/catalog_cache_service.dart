@@ -84,18 +84,20 @@ class CachedCatalog {
   }) : products = List.unmodifiable(products);
 }
 
-/// Local SQLite storage for server catalogs and the
-/// customer's selected delivery area (schema v9).
+/// Local SQLite storage for server catalogs (schema v9).
+///
+/// Rows are keyed by `area_id`. Prices are the same in every
+/// area, so the app uses a single row
+/// (`CatalogRepository.cacheKey`); the column is kept so the
+/// schema does not need to change.
 class CatalogCacheService {
   CatalogCacheService._();
 
   static final CatalogCacheService instance = CatalogCacheService._();
 
-  static const String selectedAreaIdKey = 'selected_area_id';
-
   Future<Database> get _db => MilkDatabaseService.instance.database;
 
-  /// Replaces the cached catalog for an area.
+  /// Replaces the cached catalog stored under its key.
   Future<void> saveCatalog(CachedCatalog catalog) async {
     final db = await _db;
 
@@ -107,7 +109,7 @@ class CatalogCacheService {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  /// Returns the cached catalog for [areaId], or null.
+  /// Returns the cached catalog stored under [areaId], or null.
   Future<CachedCatalog?> loadCatalog(String areaId) async {
     final db = await _db;
 
@@ -120,41 +122,6 @@ class CatalogCacheService {
 
     if (rows.isEmpty) return null;
     return _decode(rows.first);
-  }
-
-  /// Returns every cached catalog (used to recognise cart
-  /// products that are sold in a different area).
-  Future<List<CachedCatalog>> loadAllCatalogs() async {
-    final db = await _db;
-    final rows = await db.query(MilkDatabaseService.catalogCacheTable);
-    return [for (final row in rows) _decode(row)];
-  }
-
-  Future<String?> getSelectedAreaId() async {
-    final db = await _db;
-
-    final rows = await db.query(
-      MilkDatabaseService.appSettingsTable,
-      columns: ['value'],
-      where: 'key = ?',
-      whereArgs: [selectedAreaIdKey],
-      limit: 1,
-    );
-
-    return rows.isEmpty ? null : rows.first['value'] as String;
-  }
-
-  Future<void> setSelectedAreaId(String areaId) async {
-    if (areaId.trim().isEmpty) {
-      throw ArgumentError('Area ID cannot be empty.');
-    }
-
-    final db = await _db;
-
-    await db.insert(MilkDatabaseService.appSettingsTable, {
-      'key': selectedAreaIdKey,
-      'value': areaId,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   CachedCatalog _decode(Map<String, Object?> row) {

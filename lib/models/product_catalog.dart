@@ -7,13 +7,16 @@ import 'product.dart';
 /// All product IDs must remain unique because they are
 /// used by the Shopping Cart and SQLite persistence.
 ///
-/// PRICES ARE PROVISIONAL (set 6 November 2026):
-/// - Taken from https://sudhamrtam.in/products.php for the
-///   "Praneeth Pranav Flora" delivery area. Prices differ
-///   by area on the website; the app has no areas yet.
-/// - Curd is not listed on the website. ₹120 per kg was
-///   provided directly by the business owner.
-/// - Replace with backend, area-based pricing (roadmap Phase 4).
+/// OFFLINE FALLBACK. When the app is built with API_BASE_URL,
+/// products and prices come from the backend
+/// (`GET /v1/catalog`) and this list is used only until the
+/// first catalog is received. Keep it in step with the
+/// backend's import (`sudhamrtam_backend/src/import/oldSite.ts`).
+///
+/// Prices (owner decisions, 6 November 2026): one price for
+/// every customer in every area. Milk ₹90 per litre, Buffalo
+/// Ghee ₹880 per kg, Curd ₹120 per kg; other prices from
+/// https://sudhamrtam.in.
 class ProductCatalog {
   ProductCatalog._();
 
@@ -37,7 +40,7 @@ class ProductCatalog {
       name: 'Cow Milk',
       category: 'Fresh Dairy',
       description: 'Fresh cow milk from Sudhamrtam.',
-      price: 85.0,
+      price: 90.0,
       unit: '1 L',
       icon: Icons.local_drink_outlined,
     ),
@@ -52,12 +55,45 @@ class ProductCatalog {
       icon: Icons.breakfast_dining_outlined,
     ),
 
+    Product(
+      id: 'paneer',
+      name: 'Paneer',
+      category: 'Fresh Dairy',
+      description: '',
+      price: 800.0,
+      unit: '1 kg',
+      icon: Icons.egg_alt_outlined,
+    ),
+
+    // ============================
+    // GHEE
+    // ============================
+    Product(
+      id: 'buffalo_ghee',
+      name: 'Buffalo Ghee',
+      category: 'Ghee',
+      description: '',
+      price: 880.0,
+      unit: '1 kg',
+      icon: Icons.soup_kitchen_outlined,
+    ),
+
+    Product(
+      id: 'cow_ghee',
+      name: 'Cow Ghee',
+      category: 'Ghee',
+      description: '',
+      price: 800.0,
+      unit: '1 kg',
+      icon: Icons.soup_kitchen_outlined,
+    ),
+
     // ============================
     // NATURAL GOODNESS
     // ============================
     Product(
       id: 'raw_honey',
-      name: 'Raw Honey',
+      name: 'Honey (Multi Flower)',
       category: 'Natural Goodness',
       description: 'Naturally sourced raw honey.',
       price: 550.0,

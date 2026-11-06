@@ -9,8 +9,8 @@ import 'product_catalog.dart';
 
 /// Where the current product list came from.
 enum CatalogSource {
-  /// The catalog compiled into the app (no area selected,
-  /// nothing cached, or the cache could not be read).
+  /// The catalog compiled into the app (nothing cached yet,
+  /// or the cache could not be read).
   builtIn,
 
   /// The last server catalog saved on this phone.
@@ -23,9 +23,12 @@ enum CatalogSource {
 /// Single source of products for the Shop, product details
 /// and the cart.
 ///
+/// Every customer sees the same products at the same prices
+/// (owner decision, 6 November 2026).
+///
 /// Startup reads only local data, so it never waits for the
-/// network. [refresh] then fetches the selected area's
-/// catalog in the background, when a server is configured.
+/// network. [refresh] then fetches the catalog in the
+/// background, when a server is configured.
 class CatalogRepository extends ChangeNotifier {
   CatalogRepository({
     CatalogCacheService? cache,
@@ -39,30 +42,28 @@ class CatalogRepository extends ChangeNotifier {
     _useBuiltIn();
   }
 
+  /// Cache row used for the single shared catalog.
+  static const String cacheKey = 'all';
+
   final CatalogCacheService _cache;
   final CatalogApiClient? _api;
   final List<Product> _builtIn;
 
   CatalogSource _source = CatalogSource.builtIn;
-  String? _selectedAreaId;
-  String? _selectedAreaName;
 
-  /// Products sold in the selected area, in display order.
+  /// Products shown in the Shop, in display order.
   List<Product> _products = const [];
 
-  /// Every product this phone knows about (built-in plus all
-  /// cached areas), used to recognise cart items that are
-  /// not sold in the selected area.
+  /// Every product this phone knows about (built-in plus the
+  /// cached catalog), used to recognise cart items that are
+  /// no longer sold.
   Map<String, Product> _knownProducts = const {};
 
   Future<void>? _initialization;
   Future<bool>? _refreshing;
-  String? _refreshingAreaId;
   Object? _lastRefreshError;
 
   CatalogSource get source => _source;
-  String? get selectedAreaId => _selectedAreaId;
-  String? get selectedAreaName => _selectedAreaName;
   List<Product> get products => _products;
 
   /// True when this build is configured to use the server.
@@ -77,7 +78,7 @@ class CatalogRepository extends ChangeNotifier {
   // LOCAL STARTUP
   // =====================================================
 
-  /// Loads the selected area and its cached catalog.
+  /// Loads the cached catalog, if any.
   ///
   /// Never throws: if local data cannot be read, the
   /// built-in catalog is used so the app can still start.
@@ -85,35 +86,12 @@ class CatalogRepository extends ChangeNotifier {
 
   Future<void> _loadLocal() async {
     try {
-      final areaId = await _cache.getSelectedAreaId();
-      final allCached = await _cache.loadAllCatalogs();
+      final cached = await _cache.loadCatalog(cacheKey);
 
-      final known = <String, Product>{
-        for (final product in _builtIn) product.id: product,
-      };
-
-      for (final catalog in allCached) {
-        for (final item in catalog.products) {
-          known[item.id] = item.toProduct();
-        }
-      }
-
-      _knownProducts = known;
-
-      final selected = areaId == null
-          ? null
-          : allCached.where((c) => c.areaId == areaId).firstOrNull;
-
-      if (selected == null) {
-        _useBuiltIn(keepKnown: true);
-        _selectedAreaId = areaId;
+      if (cached == null) {
+        _useBuiltIn();
       } else {
-        _apply(
-          areaId: selected.areaId,
-          areaName: selected.areaName,
-          items: selected.products,
-          source: CatalogSource.cached,
-        );
+        _apply(cached.products, CatalogSource.cached);
       }
     } catch (error) {
       debugPrint('Catalog cache could not be read: $error');
@@ -127,110 +105,44 @@ class CatalogRepository extends ChangeNotifier {
   // SERVER
   // =====================================================
 
-  /// Delivery areas offered by the server.
-  Future<List<DeliveryArea>> fetchAreas() {
-    final api = _api;
-
-    if (api == null) {
-      throw StateError('No server is configured for this build.');
-    }
-
-    return api.fetchAreas();
-  }
-
-  /// Makes [area] the customer's delivery area.
-  ///
-  /// Its cached catalog (if any) is shown immediately, then
-  /// a fresh catalog is fetched.
-  Future<bool> selectArea(DeliveryArea area) async {
-    // Record the selection before any await, so a response
-    // for the previous area arriving meanwhile is ignored.
-    _selectedAreaId = area.id;
-    _selectedAreaName = area.name;
-
-    await _cache.setSelectedAreaId(area.id);
-
-    final cached = await _cache.loadCatalog(area.id);
-
-    // A newer selection was made while this one was loading.
-    if (_selectedAreaId != area.id) return false;
-
-    if (cached != null) {
-      _apply(
-        areaId: cached.areaId,
-        areaName: cached.areaName,
-        items: cached.products,
-        source: CatalogSource.cached,
-      );
-    }
-
-    notifyListeners();
-
-    return refresh();
-  }
-
-  /// Fetches the selected area's catalog and saves it.
+  /// Fetches the catalog and saves it on the phone.
   ///
   /// Returns true when the fetched catalog was applied.
   /// Returns false (keeping the current products) when no
-  /// server or area is configured, when the fetch fails (see
-  /// [lastRefreshError]), or when the area changed meanwhile.
-  ///
-  /// Concurrent calls for the same area share one request; a
-  /// call for a newly selected area always starts its own.
+  /// server is configured or the fetch fails; the error is
+  /// available in [lastRefreshError]. Concurrent calls share
+  /// one request.
   Future<bool> refresh() {
     final api = _api;
-    final areaId = _selectedAreaId;
+    if (api == null) return Future.value(false);
 
-    if (api == null || areaId == null) return Future.value(false);
-
-    final inFlight = _refreshing;
-    if (inFlight != null && _refreshingAreaId == areaId) return inFlight;
-
-    _refreshingAreaId = areaId;
-    return _refreshing = _refresh(api, areaId);
+    return _refreshing ??= _refresh(api);
   }
 
-  Future<bool> _refresh(CatalogApiClient api, String areaId) async {
+  Future<bool> _refresh(CatalogApiClient api) async {
     notifyListeners();
 
     try {
-      final catalog = await api.fetchCatalog(areaId);
+      final products = await api.fetchCatalog();
 
       await _cache.saveCatalog(
         CachedCatalog(
-          areaId: catalog.area.id,
-          areaName: catalog.area.name,
+          areaId: cacheKey,
+          areaName: 'All areas',
           fetchedAt: DateTime.now().toUtc(),
-          products: catalog.products,
+          products: products,
         ),
       );
 
-      // The customer may have switched area while waiting:
-      // remember the products, but do not show them.
-      if (_selectedAreaId != areaId) {
-        _rememberKnown(catalog.products);
-        return false;
-      }
-
-      _apply(
-        areaId: catalog.area.id,
-        areaName: catalog.area.name,
-        items: catalog.products,
-        source: CatalogSource.server,
-      );
-
+      _apply(products, CatalogSource.server);
       _lastRefreshError = null;
       return true;
     } catch (error) {
       debugPrint('Catalog refresh failed: $error');
-      if (_selectedAreaId == areaId) _lastRefreshError = error;
+      _lastRefreshError = error;
       return false;
     } finally {
-      if (_refreshingAreaId == areaId) {
-        _refreshing = null;
-        _refreshingAreaId = null;
-      }
+      _refreshing = null;
       notifyListeners();
     }
   }
@@ -239,46 +151,23 @@ class CatalogRepository extends ChangeNotifier {
   // INTERNAL STATE
   // =====================================================
 
-  void _apply({
-    required String areaId,
-    required String areaName,
-    required List<CatalogProductData> items,
-    required CatalogSource source,
-  }) {
+  void _apply(List<CatalogProductData> items, CatalogSource source) {
     final products = [for (final item in items) item.toProduct()];
-    final known = Map<String, Product>.of(_knownProducts);
 
-    for (final product in products) {
-      known[product.id] = product;
-    }
-
-    _source = source;
-    _selectedAreaId = areaId;
-    _selectedAreaName = areaName;
+    // Keep built-in products known, so cart items for products
+    // the server no longer sells show as unavailable.
+    _knownProducts = {
+      for (final product in _builtIn) product.id: product,
+      for (final product in products) product.id: product,
+    };
     _products = List.unmodifiable(products);
-    _knownProducts = known;
+    _source = source;
   }
 
-  /// Adds products from another area's catalog to the known
-  /// products, without changing what is shown.
-  void _rememberKnown(List<CatalogProductData> items) {
-    final known = Map<String, Product>.of(_knownProducts);
-
-    for (final item in items) {
-      known.putIfAbsent(item.id, item.toProduct);
-    }
-
-    _knownProducts = known;
-  }
-
-  void _useBuiltIn({bool keepKnown = false}) {
+  void _useBuiltIn() {
     _source = CatalogSource.builtIn;
-    _selectedAreaName = null;
     _products = _builtIn;
-
-    if (!keepKnown) {
-      _knownProducts = {for (final product in _builtIn) product.id: product};
-    }
+    _knownProducts = {for (final product in _builtIn) product.id: product};
   }
 
   // =====================================================
@@ -287,8 +176,8 @@ class CatalogRepository extends ChangeNotifier {
 
   /// Resolves a product ID for the cart.
   ///
-  /// - Sold in the selected area: that area's product and price.
-  /// - Known but not sold here: the product marked unavailable.
+  /// - In the current catalog: that product and price.
+  /// - Known but no longer sold: the product marked unavailable.
   /// - Never seen: null (the cart shows a placeholder).
   Product? productById(String id) {
     for (final product in _products) {

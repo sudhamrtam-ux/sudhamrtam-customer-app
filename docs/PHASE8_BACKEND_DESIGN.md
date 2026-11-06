@@ -7,6 +7,7 @@
 - **Import** delivery areas, routes, products and prices from the old site's database. The owner has access to it.
 - **Firebase Phone Auth** for OTP login, while DLT approval for Sudhamrtam's own SMS sender is pending.
 - Place Order stays **disabled in release builds** until this backend's order API is live (Phase 1 sign-off).
+- **One price per product for every customer, in every area** (6 November 2026). There is no area picker in the app. Areas and routes are used only for delivery planning and addresses.
 
 ---
 
@@ -38,7 +39,7 @@ During development, Firebase **test phone numbers** with fixed OTPs avoid sendin
 
 ## 2. Core principles
 
-1. **The server decides prices.** The app shows prices, but the server re-prices every order from the area price list.
+1. **The server decides prices.** The app shows prices, but the server re-prices every order from the current price list. Prices are the same for all customers.
 2. **Money is stored in whole paise** (`integer`), never as decimals. ₹85.00 is stored as `8500`.
 3. **Orders are created idempotently, keyed by the app's order ID.** This keeps the Phase 1 guarantee (no duplicate orders, retries reuse the same ID) all the way to the server.
 4. **Orders are snapshots.** Product names, units, prices, the address and the recipient are copied into the order and never change afterwards. Only the order status changes.
@@ -48,13 +49,13 @@ During development, Firebase **test phone numbers** with fixed OTPs avoid sendin
 
 ## 3. Database (PostgreSQL)
 
-### Catalog and pricing (imported from the old site)
+### Catalog and pricing (imported from the old site, one price per product)
 | Table | Key columns |
 |---|---|
 | `service_areas` | `id`, `name` (e.g. "Praneeth Pranav Flora", "Nizampet"), `is_active` |
 | `delivery_routes` | `id`, `area_id`, `route_number`, `name` |
 | `products` | `id` (text, **same IDs as the app**: `cow_milk`, `curd`, …), `name`, `category`, `description`, `unit_label` (`1 L`, `1 kg`, `500 g`), `is_active` |
-| `area_prices` | `area_id`, `product_id`, `price_paise`, `is_available`, `effective_from` (price history kept) |
+| `product_prices` | `product_id`, `price_paise`, `is_available`, `effective_from` (price history kept). Replaced the earlier `area_prices` table (migration `0002_flat_prices`) |
 
 ### Customers
 | Table | Key columns |
@@ -91,7 +92,7 @@ All endpoints require a Firebase ID token unless marked *public*.
 | Method & path | Purpose |
 |---|---|
 | `GET /v1/areas` *(public)* | Delivery areas |
-| `GET /v1/catalog?area_id=` *(public)* | Products with that area's prices and availability |
+| `GET /v1/catalog` *(public)* | All products with their current prices and availability (same for every customer) |
 | `POST /v1/session` | Verify the token and create or return the customer profile |
 | `GET` / `PATCH /v1/me` | Profile |
 | `DELETE /v1/me` | Account deletion request (Phase 3/13) |
@@ -113,7 +114,7 @@ The app sends the same order snapshot it already stores durably: items with prod
 | ID already exists with an **identical** request (same `request_hash`) | **200 OK** with the existing order | Treated as success. This covers a lost response or a retry |
 | ID exists with **different** content | **409 `ORDER_ID_CONFLICT`** | Stop. Show recovery (never overwrite) |
 | A price changed since the customer saw it | **409 `PRICE_CHANGED`** with current prices | Show the new prices. The customer re-confirms, which creates a **new** order. The old pending record is cancelled through the existing "Cancel Order, Keep Cart" path |
-| Product unavailable in the area, invalid address, etc. | **422** with error codes | Show the error. The cart is kept |
+| Product unavailable, address outside the delivery areas, etc. | **422** with error codes | Show the error. The cart is kept |
 | Network failure or timeout | — | The pending record stays. Retry later with the **same ID** |
 
 This maps directly onto the app's existing code. `OrderSubmissionService`'s `saveOrder` and `getOrderById` hooks become `PUT` and `GET` calls, and the local `pending_order_submissions` table becomes the app's offline **outbox** (orders saved on the phone and sent when the connection allows). Startup recovery and the Unfinished Order screen keep working unchanged.
@@ -122,7 +123,7 @@ This maps directly onto the app's existing code. `OrderSubmissionService`'s `sav
 
 ## 6. App changes (done in small steps, after each backend part exists)
 
-1. The catalog is loaded from `/v1/catalog` for the customer's area. Products are cached locally, and the hard-coded `ProductCatalog` becomes an offline fallback.
+1. The catalog is loaded from `/v1/catalog`. Products are cached locally, and the hard-coded `ProductCatalog` becomes an offline fallback.
 2. Login screen with Firebase Phone Auth, then `POST /v1/session`.
 3. Profile and addresses sync with the API. Addresses gain a delivery area.
 4. Order submission goes through the outbox to `PUT /v1/orders/{id}`. **Only then** is Place Order enabled in release builds.
@@ -135,7 +136,7 @@ This maps directly onto the app's existing code. `OrderSubmissionService`'s `sav
 
 ## 7. Importing data from the old website
 
-Needed from the old database: **areas, routes, products and area prices only.**
+Needed from the old database: **areas, routes, products and prices only.**
 
 Please export those tables (phpMyAdmin → Export → SQL, or `mysqldump`) to a folder **outside any git repository**, for example `C:\Sudhamrtam\old_site_export\`.
 
@@ -158,7 +159,7 @@ Please export those tables (phpMyAdmin → Export → SQL, or `mysqldump`) to a 
 
 | Step | Backend | App |
 |---|---|---|
-| 8a | Repo skeleton, PostgreSQL migrations, catalog tables, **old-site import**, `GET /v1/areas`, `GET /v1/catalog` | Load the catalog from the API, with an area picker |
+| 8a | Repo skeleton, PostgreSQL migrations, catalog tables, **old-site import**, `GET /v1/areas`, `GET /v1/catalog` | Load the catalog from the API (cached, offline fallback) |
 | 8b | Firebase token verification, `customers`, `/v1/session`, `/v1/me`, addresses | Login screen; profile and address sync |
 | 8c | Orders: `PUT`/`GET`, re-pricing, status history | Outbox submission; enable release Place Order (Cash on Delivery) |
 | 8d | Subscriptions, pauses and skips, delivery occurrence generation | Subscription sync |
