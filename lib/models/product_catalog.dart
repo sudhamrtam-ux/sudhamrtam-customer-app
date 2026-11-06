@@ -6,6 +6,14 @@ import 'product.dart';
 ///
 /// All product IDs must remain unique because they are
 /// used by the Shopping Cart and SQLite persistence.
+///
+/// PRICES ARE PROVISIONAL (set 6 November 2026):
+/// - Taken from https://sudhamrtam.in/products.php for the
+///   "Praneeth Pranav Flora" delivery area. Prices differ
+///   by area on the website; the app has no areas yet.
+/// - Curd is not listed on the website. ₹120 per 500 g was
+///   provided directly by the business owner.
+/// - Replace with backend, area-based pricing (roadmap Phase 4).
 class ProductCatalog {
   ProductCatalog._();
 
@@ -19,7 +27,7 @@ class ProductCatalog {
       name: 'Buffalo Milk',
       category: 'Fresh Dairy',
       description: 'Fresh buffalo milk from Sudhamrtam.',
-      price: 0.0,
+      price: 90.0,
       unit: '1 L',
       icon: Icons.local_drink_outlined,
     ),
@@ -29,7 +37,7 @@ class ProductCatalog {
       name: 'Cow Milk',
       category: 'Fresh Dairy',
       description: 'Fresh cow milk from Sudhamrtam.',
-      price: 0.0,
+      price: 85.0,
       unit: '1 L',
       icon: Icons.local_drink_outlined,
     ),
@@ -39,7 +47,7 @@ class ProductCatalog {
       name: 'Curd',
       category: 'Fresh Dairy',
       description: 'Fresh curd from Sudhamrtam.',
-      price: 0.0,
+      price: 120.0,
       unit: '500 g',
       icon: Icons.breakfast_dining_outlined,
     ),
@@ -52,8 +60,8 @@ class ProductCatalog {
       name: 'Raw Honey',
       category: 'Natural Goodness',
       description: 'Naturally sourced raw honey.',
-      price: 0.0,
-      unit: '500 g',
+      price: 550.0,
+      unit: '1 kg',
       icon: Icons.spa_outlined,
     ),
 
@@ -65,8 +73,8 @@ class ProductCatalog {
       name: 'Groundnut Oil',
       category: 'Wood-Pressed Oils',
       description: 'Traditionally wood-pressed groundnut oil.',
-      price: 0.0,
-      unit: '1 L',
+      price: 430.0,
+      unit: '1 kg',
       icon: Icons.water_drop_outlined,
     ),
 
@@ -75,8 +83,8 @@ class ProductCatalog {
       name: 'Sesame Oil',
       category: 'Wood-Pressed Oils',
       description: 'Traditionally wood-pressed sesame oil.',
-      price: 0.0,
-      unit: '1 L',
+      price: 460.0,
+      unit: '1 kg',
       icon: Icons.water_drop_outlined,
     ),
 
@@ -85,8 +93,8 @@ class ProductCatalog {
       name: 'Sunflower Oil',
       category: 'Wood-Pressed Oils',
       description: 'Traditionally wood-pressed sunflower oil.',
-      price: 0.0,
-      unit: '1 L',
+      price: 550.0,
+      unit: '1 kg',
       icon: Icons.water_drop_outlined,
     ),
 
@@ -95,8 +103,8 @@ class ProductCatalog {
       name: 'Coconut Oil',
       category: 'Wood-Pressed Oils',
       description: 'Traditionally wood-pressed coconut oil.',
-      price: 0.0,
-      unit: '1 L',
+      price: 700.0,
+      unit: '1 kg',
       icon: Icons.water_drop_outlined,
     ),
   ];
