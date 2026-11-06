@@ -1,4 +1,5 @@
 import '../features/checkout/order_snapshot_equivalence.dart';
+import '../features/checkout/order_submission_service.dart';
 import 'checkout_reconciliation_service.dart';
 import 'checkout_startup_recovery_service.dart';
 import 'order_database_service.dart';
@@ -93,6 +94,87 @@ class CheckoutRecoveryExecutor {
   }
 
   // =====================================================
+  // CUSTOMER DECISION: FINISH UNFINISHED ORDER
+  // =====================================================
+
+  /// Saves the unfinished order with its original ID,
+  /// then completes normal recovery (cart reconciliation
+  /// and pending cleanup).
+  ///
+  /// The order is always taken from the durable pending
+  /// snapshot, never rebuilt from the current cart.
+  ///
+  /// If the checkout is no longer awaiting submission
+  /// (for example an earlier attempt already saved it),
+  /// normal recovery is run instead.
+  Future<CheckoutRecoveryExecutionResult> finishAwaitingSubmission(
+    String orderId,
+  ) async {
+    final inspection = await CheckoutStartupRecoveryService.instance
+        .inspectRecoveryState();
+
+    if (inspection.status != CheckoutRecoveryStatus.awaitingOrderSubmission ||
+        inspection.orderId != orderId) {
+      return recoverAtStartup();
+    }
+
+    final pending = await PendingOrderSubmissionService.instance
+        .getPendingOrder();
+
+    if (pending == null || pending.id != orderId) {
+      return CheckoutRecoveryExecutionResult(
+        status: CheckoutRecoveryExecutionStatus.blocked,
+        orderId: orderId,
+        message: 'The unfinished order could not be found.',
+      );
+    }
+
+    try {
+      await OrderSubmissionService().submit(pending);
+    } catch (error) {
+      // Nothing was cleared. The customer can try again
+      // or cancel.
+      return CheckoutRecoveryExecutionResult(
+        status: CheckoutRecoveryExecutionStatus.awaitingSubmission,
+        orderId: orderId,
+        message: 'The order could not be saved: $error',
+      );
+    }
+
+    return recoverAtStartup();
+  }
+
+  // =====================================================
+  // CUSTOMER DECISION: CANCEL UNFINISHED ORDER
+  // =====================================================
+
+  /// Discards an unfinished order that was never saved.
+  ///
+  /// The cart is kept unchanged. If the order turns out
+  /// to be saved already, nothing is cancelled and normal
+  /// recovery is reported instead.
+  Future<CheckoutRecoveryExecutionResult> cancelAwaitingSubmission(
+    String orderId,
+  ) async {
+    final cancelled = await PendingOrderSubmissionService.instance
+        .cancelUnsavedSubmission(orderId);
+
+    final result = await recoverAtStartup();
+
+    if (cancelled) {
+      return result;
+    }
+
+    return CheckoutRecoveryExecutionResult(
+      status: result.status,
+      orderId: result.orderId,
+      message:
+          'The order could not be cancelled because its state has '
+          'changed. ${result.message}',
+    );
+  }
+
+  // =====================================================
   // STARTUP RECOVERY
   // =====================================================
 
@@ -119,8 +201,9 @@ class CheckoutRecoveryExecutor {
           status: CheckoutRecoveryExecutionStatus.awaitingSubmission,
           orderId: inspection.orderId,
           message:
-              'An unfinished order submission was found. '
-              'The cart and pending order have been preserved.',
+              'An order you started placing was not finished. '
+              'Your cart has been kept. Choose whether to '
+              'finish placing this order or cancel it.',
         );
 
       // -------------------------------------------------

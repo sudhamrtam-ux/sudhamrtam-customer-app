@@ -14,6 +14,7 @@ class PendingOrderSubmissionService {
       PendingOrderSubmissionService._();
 
   static const String prepared = 'prepared';
+
   /// Legacy state still permitted by the v6 schema.
   ///
   /// The app no longer writes it: any unresolved
@@ -233,6 +234,83 @@ class PendingOrderSubmissionService {
       );
 
       return deleted == 1;
+    });
+  }
+
+  // ==========================================
+  // CANCEL UNSAVED SUBMISSION
+  // ==========================================
+
+  /// Cancels an unfinished checkout at the customer's request.
+  ///
+  /// Allowed only while the order has never been saved
+  /// and cart reconciliation is still pending. The pending
+  /// submission and its reconciliation record are deleted
+  /// in one SQLite transaction. The persisted cart is not
+  /// touched, so the customer keeps their products.
+  ///
+  /// Returns false, without changing anything, when the
+  /// order was already saved or the checkout is no longer
+  /// in a cancellable state.
+  Future<bool> cancelUnsavedSubmission(String orderId) async {
+    if (orderId.trim().isEmpty) {
+      throw ArgumentError('Order ID cannot be empty.');
+    }
+
+    final db = await MilkDatabaseService.instance.database;
+
+    return db.transaction((txn) async {
+      final orderRows = await txn.query(
+        MilkDatabaseService.ordersTable,
+        columns: ['id'],
+        where: 'id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
+
+      // A saved order can no longer be cancelled here.
+      if (orderRows.isNotEmpty) {
+        return false;
+      }
+
+      final pendingRows = await txn.query(
+        MilkDatabaseService.pendingOrderSubmissionsTable,
+        columns: ['order_id'],
+        where: 'order_id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
+
+      if (pendingRows.isEmpty) {
+        return false;
+      }
+
+      final reconciliationRows = await txn.query(
+        MilkDatabaseService.checkoutReconciliationsTable,
+        columns: ['reconciliation_state'],
+        where: 'order_id = ?',
+        whereArgs: [orderId],
+        limit: 1,
+      );
+
+      if (reconciliationRows.isEmpty ||
+          reconciliationRows.first['reconciliation_state'] != 'pending') {
+        return false;
+      }
+
+      await txn.delete(
+        MilkDatabaseService.checkoutReconciliationsTable,
+        where: 'order_id = ? AND reconciliation_state = ?',
+        whereArgs: [orderId, 'pending'],
+      );
+
+      await txn.delete(
+        MilkDatabaseService.pendingOrderSubmissionsTable,
+        where: 'order_id = ?',
+        whereArgs: [orderId],
+      );
+
+      return true;
     });
   }
 }

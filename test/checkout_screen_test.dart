@@ -105,7 +105,9 @@ void main() {
         home: CheckoutScreen(
           enableTestOrders: enableTestOrders,
           coordinator: coordinator,
-          orderSession: CheckoutOrderSession(loadPendingOrder: () async => null),
+          orderSession: CheckoutOrderSession(
+            loadPendingOrder: () async => null,
+          ),
         ),
       ),
     );
