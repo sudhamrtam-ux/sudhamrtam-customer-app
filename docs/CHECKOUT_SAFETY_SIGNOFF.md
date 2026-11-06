@@ -58,3 +58,9 @@ The release switch is `CheckoutScreen.enableTestOrders`, which defaults to `kDeb
 - [x] I agree to keep Place Order disabled in release builds until the backend order API is live.
 
 Approved by: **Nagaraju**  Date: **06 Nov 2026**
+
+---
+
+## Addendum (after sign-off)
+
+- **6 Nov 2026:** The owner clarified that Curd is **₹120 per kg** in both areas. The "₹120 / 500 g" in limitation 2 was an assumption by the assistant. The app catalog now uses `1 kg`. This does not affect the safety rules above.

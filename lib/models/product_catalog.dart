@@ -11,7 +11,7 @@ import 'product.dart';
 /// - Taken from https://sudhamrtam.in/products.php for the
 ///   "Praneeth Pranav Flora" delivery area. Prices differ
 ///   by area on the website; the app has no areas yet.
-/// - Curd is not listed on the website. ₹120 per 500 g was
+/// - Curd is not listed on the website. ₹120 per kg was
 ///   provided directly by the business owner.
 /// - Replace with backend, area-based pricing (roadmap Phase 4).
 class ProductCatalog {
@@ -48,7 +48,7 @@ class ProductCatalog {
       category: 'Fresh Dairy',
       description: 'Fresh curd from Sudhamrtam.',
       price: 120.0,
-      unit: '500 g',
+      unit: '1 kg',
       icon: Icons.breakfast_dining_outlined,
     ),
 
