@@ -30,6 +30,14 @@ class OrderSnapshotEquivalence {
       return false;
     }
 
+    if (prepared.recipientName != saved.recipientName) {
+      return false;
+    }
+
+    if (prepared.recipientPhone != saved.recipientPhone) {
+      return false;
+    }
+
     if (prepared.notes != saved.notes) {
       return false;
     }

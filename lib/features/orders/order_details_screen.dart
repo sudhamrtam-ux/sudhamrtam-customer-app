@@ -277,11 +277,18 @@ class OrderDetailsScreen extends StatelessWidget {
                     _formatFulfillment(order.fulfillmentMethod),
                   ),
 
-                  if (order.fulfillmentMethod == FulfillmentMethod.delivery)
+                  if (order.fulfillmentMethod ==
+                      FulfillmentMethod.delivery) ...[
+                    _detailRow(
+                      'Recipient',
+                      order.recipientName ?? 'Not recorded',
+                    ),
+                    _detailRow('Phone', order.recipientPhone ?? 'Not recorded'),
                     _detailRow(
                       'Delivery Address',
                       order.deliveryAddress ?? 'Not available',
                     ),
+                  ],
                 ],
               ),
             ),

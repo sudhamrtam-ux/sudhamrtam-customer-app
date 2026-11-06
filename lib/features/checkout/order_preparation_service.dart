@@ -18,10 +18,29 @@ class OrderPreparationService {
     required FulfillmentMethod fulfillmentMethod,
     required OrderPaymentMethod paymentMethod,
     String? deliveryAddress,
+    String? recipientName,
+    String? recipientPhone,
     String? deliveryInstructions,
   }) {
     final normalizedAddress = deliveryAddress?.trim();
+    final normalizedRecipientName = recipientName?.trim();
+    final normalizedRecipientPhone = recipientPhone?.trim();
     final normalizedInstructions = deliveryInstructions?.trim();
+
+    final isDelivery = fulfillmentMethod == FulfillmentMethod.delivery;
+
+    // Delivery orders must say who receives them and how
+    // to reach that person.
+    if (isDelivery &&
+        (normalizedRecipientName == null ||
+            normalizedRecipientName.isEmpty ||
+            normalizedRecipientPhone == null ||
+            normalizedRecipientPhone.isEmpty)) {
+      throw StateError(
+        'A recipient name and phone number are required '
+        'for Home Delivery.',
+      );
+    }
 
     // Validate the current cart and checkout selections.
     final validation = CheckoutValidator.validate(
@@ -56,9 +75,9 @@ class OrderPreparationService {
       fulfillmentMethod: fulfillmentMethod,
       paymentMethod: paymentMethod,
       status: OrderStatus.pending,
-      deliveryAddress: fulfillmentMethod == FulfillmentMethod.delivery
-          ? normalizedAddress
-          : null,
+      deliveryAddress: isDelivery ? normalizedAddress : null,
+      recipientName: isDelivery ? normalizedRecipientName : null,
+      recipientPhone: isDelivery ? normalizedRecipientPhone : null,
       notes:
           fulfillmentMethod == FulfillmentMethod.delivery &&
               normalizedInstructions != null &&

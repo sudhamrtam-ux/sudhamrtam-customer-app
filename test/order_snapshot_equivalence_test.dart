@@ -32,6 +32,8 @@ void main() {
     OrderStatus status = OrderStatus.pending,
     String? address = 'Kukatpally, Hyderabad',
     String? notes = 'Morning delivery',
+    String? recipientName = 'Lakshmi Devi',
+    String? recipientPhone = '9876543210',
   }) {
     return CustomerOrder(
       id: id,
@@ -43,9 +45,28 @@ void main() {
       deliveryAddress: fulfillment == FulfillmentMethod.delivery
           ? address
           : null,
+      recipientName: recipientName,
+      recipientPhone: recipientPhone,
       notes: notes,
     );
   }
+
+  test('Different recipient name or phone is rejected', () {
+    expect(
+      OrderSnapshotEquivalence.matches(
+        order(),
+        order(recipientName: 'Someone Else'),
+      ),
+      isFalse,
+    );
+    expect(
+      OrderSnapshotEquivalence.matches(
+        order(),
+        order(recipientPhone: '9000000000'),
+      ),
+      isFalse,
+    );
+  });
 
   test('Identical order snapshots match', () {
     expect(OrderSnapshotEquivalence.matches(order(), order()), isTrue);

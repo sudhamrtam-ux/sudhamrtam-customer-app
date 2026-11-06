@@ -34,6 +34,12 @@ class CustomerOrder {
   // Required for delivery orders.
   final String? deliveryAddress;
 
+  // Delivery contact captured at checkout (schema v8).
+  // Null for pickup orders and for delivery orders
+  // saved before v8.
+  final String? recipientName;
+  final String? recipientPhone;
+
   // Optional customer instructions.
   final String? notes;
 
@@ -45,6 +51,8 @@ class CustomerOrder {
     required this.paymentMethod,
     this.status = OrderStatus.pending,
     this.deliveryAddress,
+    this.recipientName,
+    this.recipientPhone,
     this.notes,
   }) : items = List<OrderItem>.unmodifiable(items) {
     if (id.trim().isEmpty) {
@@ -85,6 +93,8 @@ class CustomerOrder {
       paymentMethod: paymentMethod,
       status: status ?? this.status,
       deliveryAddress: deliveryAddress,
+      recipientName: recipientName,
+      recipientPhone: recipientPhone,
       notes: notes,
     );
   }
@@ -100,6 +110,11 @@ class CustomerOrder {
       'payment_method': paymentMethod.name,
       'status': status.name,
       'delivery_address': deliveryAddress,
+      // Recipient keys are written only when present, so
+      // orders without them serialize exactly as before v8.
+      // Durable pending payloads are compared byte-for-byte.
+      if (recipientName != null) 'recipient_name': recipientName,
+      if (recipientPhone != null) 'recipient_phone': recipientPhone,
       'notes': notes,
       'subtotal': subtotal,
     };
@@ -122,6 +137,8 @@ class CustomerOrder {
       ),
       status: OrderStatus.values.byName(map['status'] as String),
       deliveryAddress: map['delivery_address'] as String?,
+      recipientName: map['recipient_name'] as String?,
+      recipientPhone: map['recipient_phone'] as String?,
       notes: map['notes'] as String?,
     );
   }

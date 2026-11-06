@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
@@ -5,12 +6,32 @@ import '../../database/customer_address_database_service.dart';
 import '../../models/customer_address.dart';
 import '../../models/customer_order.dart';
 import '../account/address_form_screen.dart';
+import '../orders/order_details_screen.dart';
+import 'checkout_order_session.dart';
 import 'checkout_validator.dart';
+import 'durable_checkout_coordinator.dart';
+import 'order_preparation_service.dart';
 
 const _brandGreen = Color(0xFF82B440);
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key});
+  const CheckoutScreen({
+    super.key,
+    this.enableTestOrders = kDebugMode,
+    this.coordinator,
+    this.orderSession,
+  });
+
+  /// Local test orders are allowed only in debug builds
+  /// until checkout safety has been signed off.
+  ///
+  /// Test orders are saved on this phone only. They are
+  /// not sent to Sudhamrtam and no payment is taken.
+  final bool enableTestOrders;
+
+  /// Optional overrides for deterministic testing.
+  final DurableCheckoutCoordinator? coordinator;
+  final CheckoutOrderSession? orderSession;
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -33,6 +54,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _selectedAddressId;
   bool _addressesLoading = true;
   String? _addressError;
+
+  late final DurableCheckoutCoordinator _coordinator =
+      widget.coordinator ?? DurableCheckoutCoordinator();
+
+  late final CheckoutOrderSession _orderSession =
+      widget.orderSession ?? CheckoutOrderSession();
+
+  bool _isSubmitting = false;
+  String? _submissionError;
 
   CustomerAddress? get _selectedAddress {
     for (final address in _savedAddresses) {
@@ -132,6 +162,110 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() {
       _selectedAddressId = address.id;
     });
+  }
+
+  /// Places (or safely retries) a local test order.
+  ///
+  /// The order and its ID come from [CheckoutOrderSession],
+  /// so a retry never generates a new order ID.
+  Future<void> _placeOrder() async {
+    if (_isSubmitting) return;
+
+    setState(() {
+      _isSubmitting = true;
+      _submissionError = null;
+    });
+
+    try {
+      final isDelivery = _fulfillmentMethod == FulfillmentMethod.delivery;
+
+      final order = await _orderSession.resolveOrder(
+        isRecoveryLocked: sudhamrtamCart.isCheckoutRecoveryLocked,
+        prepare: () => OrderPreparationService.prepare(
+          cart: sudhamrtamCart,
+          fulfillmentMethod: _fulfillmentMethod,
+          paymentMethod: _paymentMethod,
+          deliveryAddress: isDelivery
+              ? _selectedAddress?.formattedAddress
+              : null,
+          recipientName: isDelivery ? _selectedAddress?.recipientName : null,
+          recipientPhone: isDelivery ? _selectedAddress?.phoneNumber : null,
+          deliveryInstructions: isDelivery
+              ? _deliveryInstructionsController.text
+              : null,
+        ),
+      );
+
+      final saved = await _coordinator.submitPreparedOrder(
+        order: order,
+        cart: sudhamrtamCart,
+      );
+
+      _orderSession.markCompleted(saved.id);
+
+      if (!mounted) return;
+
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (context) => OrderDetailsScreen(order: saved),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _submissionError = error.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  Widget _submissionErrorCard(String error) {
+    final isProtected = sudhamrtamCart.isCheckoutRecoveryLocked;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFCCC7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.error_outline, color: Color(0xFFB3261E)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Order could not be completed',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFB3261E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(error, style: const TextStyle(fontSize: 13)),
+          if (isProtected) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Your cart is locked to protect this order. '
+              'Tap Retry to finish it. The same order will be used.',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _sectionTitle(String title) {
@@ -535,10 +669,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         const SizedBox(height: 8),
 
-        const Text(
-          'This summary is for review only. '
-          'No order or payment will be created.',
-          style: TextStyle(color: Colors.black54, fontSize: 12),
+        Text(
+          widget.enableTestOrders
+              ? 'Test mode: orders are saved on this phone only. '
+                    'No payment is taken.'
+              : 'This summary is for review only. '
+                    'No order or payment will be created.',
+          style: const TextStyle(color: Colors.black54, fontSize: 12),
         ),
       ],
     );
@@ -624,14 +761,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            isValid
+            !isValid
+                ? 'Please review the checkout requirements '
+                      'above. Order placement is currently '
+                      'unavailable.'
+                : !widget.enableTestOrders
                 ? 'Initial checkout checks passed. '
                       'Order placement remains disabled '
                       'until the remaining business and '
                       'payment requirements are verified.'
-                : 'Please review the checkout requirements '
-                      'above. Order placement is currently '
-                      'unavailable.',
+                : _paymentMethod != OrderPaymentMethod.cashOnDelivery
+                ? 'Online payment is not available yet. '
+                      'Choose Cash on Delivery / Pickup '
+                      'to place a test order.'
+                : 'Checks passed. You can place a test order. '
+                      'It is saved on this phone only and is '
+                      'not sent to Sudhamrtam.',
           ),
         ],
       ),
@@ -708,6 +853,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   (!_addressesLoading &&
                       _addressError == null &&
                       selectedAddress != null));
+
+          // A retry resubmits the original durable order,
+          // so the current on-screen selections do not apply.
+          final isRetry = sudhamrtamCart.isCheckoutRecoveryLocked;
+
+          final canPlaceOrder =
+              widget.enableTestOrders &&
+              !_isSubmitting &&
+              (isRetry ||
+                  (checkoutReady &&
+                      !sudhamrtamCart.isCheckoutLocked &&
+                      _paymentMethod == OrderPaymentMethod.cashOnDelivery));
+
+          final placeOrderLabel = !widget.enableTestOrders
+              ? 'Place Order — Coming Soon'
+              : _isSubmitting
+              ? 'Placing Test Order...'
+              : isRetry
+              ? 'Retry Test Order'
+              : 'Place Test Order';
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -906,22 +1071,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
               const SizedBox(height: 24),
 
+              if (_submissionError != null) ...[
+                _submissionErrorCard(_submissionError!),
+                const SizedBox(height: 24),
+              ],
+
               FilledButton.icon(
-                onPressed: null,
-                icon: const Icon(Icons.lock_outline),
-                label: const Text('Place Order — Coming Soon'),
+                onPressed: canPlaceOrder ? _placeOrder : null,
+                icon: _isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        !widget.enableTestOrders
+                            ? Icons.lock_outline
+                            : isRetry
+                            ? Icons.refresh
+                            : Icons.check_circle_outline,
+                      ),
+                label: Text(placeOrderLabel),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
+                  backgroundColor: _brandGreen,
+                  foregroundColor: Colors.white,
                 ),
               ),
 
               const SizedBox(height: 12),
 
-              const Text(
-                'No order or payment will be created '
-                'from this preview screen.',
+              Text(
+                widget.enableTestOrders
+                    ? 'Test order — saved on this phone only. '
+                          'Not sent to Sudhamrtam. No payment is taken.'
+                    : 'No order or payment will be created '
+                          'from this preview screen.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54, fontSize: 12),
+                style: const TextStyle(color: Colors.black54, fontSize: 12),
               ),
 
               const SizedBox(height: 24),

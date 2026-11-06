@@ -95,6 +95,8 @@ void main() {
         fulfillmentMethod: FulfillmentMethod.delivery,
         paymentMethod: OrderPaymentMethod.cashOnDelivery,
         deliveryAddress: ' Kukatpally, Hyderabad ',
+        recipientName: ' Lakshmi Devi ',
+        recipientPhone: ' 9876543210 ',
         deliveryInstructions: ' Leave at the gate ',
       );
 
@@ -107,6 +109,8 @@ void main() {
       expect(order.paymentMethod, OrderPaymentMethod.cashOnDelivery);
 
       expect(order.deliveryAddress, 'Kukatpally, Hyderabad');
+      expect(order.recipientName, 'Lakshmi Devi');
+      expect(order.recipientPhone, '9876543210');
       expect(order.notes, 'Leave at the gate');
 
       expect(order.items.length, 2);
@@ -128,13 +132,39 @@ void main() {
         fulfillmentMethod: FulfillmentMethod.pickup,
         paymentMethod: OrderPaymentMethod.online,
         deliveryAddress: 'Unused address',
+        recipientName: 'Unused name',
+        recipientPhone: 'Unused phone',
         deliveryInstructions: 'Unused instructions',
       );
 
       expect(order.fulfillmentMethod, FulfillmentMethod.pickup);
       expect(order.paymentMethod, OrderPaymentMethod.online);
       expect(order.deliveryAddress, isNull);
+      expect(order.recipientName, isNull);
+      expect(order.recipientPhone, isNull);
       expect(order.notes, isNull);
+    });
+
+    test('Rejects Home Delivery without recipient name or phone', () {
+      for (final (name, phone) in [
+        (null, '9876543210'),
+        ('Lakshmi Devi', null),
+        ('   ', '9876543210'),
+        ('Lakshmi Devi', '   '),
+      ]) {
+        expect(
+          () => OrderPreparationService.prepare(
+            cart: createValidCart(),
+            fulfillmentMethod: FulfillmentMethod.delivery,
+            paymentMethod: OrderPaymentMethod.cashOnDelivery,
+            deliveryAddress: 'Kukatpally, Hyderabad',
+            recipientName: name,
+            recipientPhone: phone,
+          ),
+          throwsStateError,
+          reason: 'name=$name phone=$phone',
+        );
+      }
     });
 
     test('Rejects Home Delivery without an address', () {

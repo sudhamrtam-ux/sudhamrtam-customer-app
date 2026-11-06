@@ -32,7 +32,7 @@ void main() {
 
       // Verify database version.
       final version = await db.rawQuery('PRAGMA user_version');
-      expect(version.first.values.first, 7);
+      expect(version.first.values.first, MilkDatabaseService.databaseVersion);
 
       // Verify database integrity.
       final integrity = await db.rawQuery('PRAGMA integrity_check');

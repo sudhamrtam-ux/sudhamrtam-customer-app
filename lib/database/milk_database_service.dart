@@ -10,12 +10,13 @@ import 'package:sqflite/sqflite.dart';
 /// Version 5: Optional GPS coordinates for delivery addresses.
 /// Version 6: Durable pending order submissions.
 /// Version 7: Checkout reconciliation tracking.
+/// Version 8: Delivery recipient name and phone on orders.
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 7;
+  static const int databaseVersion = 8;
   static const String subscriptionsTable = 'milk_subscriptions';
   static const String schedulesTable = 'milk_shift_schedules';
   static const String cartItemsTable = 'cart_items';
@@ -166,6 +167,7 @@ class MilkDatabaseService {
 
     await _createCartTable(db);
     await _createOrderTables(db);
+    await _addOrderRecipientColumns(db);
     await _createCustomerAccountTables(db);
     await _createPendingOrderSubmissionsTable(db);
     await _createCheckoutReconciliationsTable(db);
@@ -217,6 +219,28 @@ class MilkDatabaseService {
     if (oldVersion < 7) {
       await _createCheckoutReconciliationsTable(db);
     }
+
+    // Version 8: Delivery recipient on orders.
+    //
+    // Existing orders remain intact with NULL recipients.
+    if (oldVersion < 8) {
+      await _addOrderRecipientColumns(db);
+    }
+  }
+
+  /// Version 8: Delivery recipient name and phone.
+  ///
+  /// Shared by fresh installs and upgrades, and always
+  /// applied after the v3 order table exists.
+  Future<void> _addOrderRecipientColumns(Database db) async {
+    await db.execute('''
+      ALTER TABLE $ordersTable
+      ADD COLUMN recipient_name TEXT
+    ''');
+    await db.execute('''
+      ALTER TABLE $ordersTable
+      ADD COLUMN recipient_phone TEXT
+    ''');
   }
 
   /// Version 2: Shopping cart.
