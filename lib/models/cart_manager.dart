@@ -32,6 +32,10 @@ class CartManager extends ChangeNotifier {
 
   final Map<String, CartItem> _items = {};
 
+  /// Set when a catalog update arrived during checkout;
+  /// applied as soon as the checkout locks are released.
+  bool _productsStale = false;
+
   static const int maxQuantityPerProduct = 100;
 
   bool _isInitialized = false;
@@ -220,6 +224,7 @@ class CartManager extends ChangeNotifier {
 
     _isCheckoutLocked = false;
     notifyListeners();
+    _applyDeferredProductRefresh();
   }
 
   // ==========================================
@@ -251,6 +256,56 @@ class CartManager extends ChangeNotifier {
 
     _isCheckoutRecoveryLocked = false;
     notifyListeners();
+    _applyDeferredProductRefresh();
+  }
+
+  // ==========================================
+  // CATALOG UPDATES (PRICES / AVAILABILITY)
+  // ==========================================
+
+  /// Re-resolves every cart item's product through the
+  /// catalog lookup, updating prices and availability.
+  ///
+  /// Quantities are unchanged and nothing is written to
+  /// SQLite (the cart stores only product IDs and
+  /// quantities).
+  ///
+  /// Deferred while any checkout lock is active, so an
+  /// order being placed never sees prices change mid-way.
+  void refreshProducts() {
+    if (!_isInitialized) return;
+
+    if (isCheckoutLocked) {
+      _productsStale = true;
+      return;
+    }
+
+    _productsStale = false;
+    var changed = false;
+
+    for (final entry in _items.entries.toList()) {
+      final current = entry.value.product;
+      final updated = _resolveProduct(entry.key);
+
+      if (updated.price != current.price ||
+          updated.isAvailable != current.isAvailable ||
+          updated.name != current.name ||
+          updated.unit != current.unit) {
+        _items[entry.key] = CartItem(
+          product: updated,
+          quantity: entry.value.quantity,
+        );
+        changed = true;
+      }
+    }
+
+    if (changed) notifyListeners();
+  }
+
+  void _applyDeferredProductRefresh() {
+    if (_productsStale && !isCheckoutLocked) {
+      refreshProducts();
+    }
   }
 
   // ==========================================
