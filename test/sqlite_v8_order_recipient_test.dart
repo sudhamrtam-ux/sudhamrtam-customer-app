@@ -65,7 +65,7 @@ void main() {
     final db = await service.database;
 
     final version = await db.rawQuery('PRAGMA user_version');
-    expect(version.first.values.first, 8);
+    expect(version.first.values.first, MilkDatabaseService.databaseVersion);
 
     final columns = (await db.rawQuery('PRAGMA table_info(customer_orders)'))
         .map((column) => column['name'] as String)
@@ -130,7 +130,7 @@ void main() {
     final db = await service.database;
 
     final version = await db.rawQuery('PRAGMA user_version');
-    expect(version.first.values.first, 8);
+    expect(version.first.values.first, MilkDatabaseService.databaseVersion);
 
     final rows = await db.query('customer_orders');
     expect(rows, hasLength(1));

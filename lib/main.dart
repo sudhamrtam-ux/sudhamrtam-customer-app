@@ -11,7 +11,7 @@ Future<void> main() async {
 
   final startupController = CheckoutStartupController(
     recover: CheckoutRecoveryExecutor.instance.recoverAtStartup,
-    initializeCart: sudhamrtamCart.initialize,
+    initializeCart: initializeCatalogAndCart,
   );
 
   final startupResult = await startupController.start();

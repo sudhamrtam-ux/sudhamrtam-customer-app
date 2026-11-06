@@ -42,7 +42,12 @@ class CheckoutValidator {
         errors.add('Invalid quantity for ${item.product.name}.');
       }
 
-      if (!item.product.price.isFinite || item.product.price <= 0) {
+      if (!item.product.isAvailable) {
+        errors.add(
+          '${item.product.name} is not available in your delivery area. '
+          'Please remove it from your cart.',
+        );
+      } else if (!item.product.price.isFinite || item.product.price <= 0) {
         errors.add('Price is not configured for ${item.product.name}.');
       }
     }

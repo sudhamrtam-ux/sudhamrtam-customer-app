@@ -11,12 +11,15 @@ import 'package:sqflite/sqflite.dart';
 /// Version 6: Durable pending order submissions.
 /// Version 7: Checkout reconciliation tracking.
 /// Version 8: Delivery recipient name and phone on orders.
+/// Version 9: Server catalog cache and app settings.
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 8;
+  static const int databaseVersion = 9;
+  static const String catalogCacheTable = 'catalog_cache';
+  static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
   static const String schedulesTable = 'milk_shift_schedules';
   static const String cartItemsTable = 'cart_items';
@@ -171,6 +174,7 @@ class MilkDatabaseService {
     await _createCustomerAccountTables(db);
     await _createPendingOrderSubmissionsTable(db);
     await _createCheckoutReconciliationsTable(db);
+    await _createCatalogCacheTables(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -226,6 +230,35 @@ class MilkDatabaseService {
     if (oldVersion < 8) {
       await _addOrderRecipientColumns(db);
     }
+
+    // Version 9: Server catalog cache and app settings.
+    if (oldVersion < 9) {
+      await _createCatalogCacheTables(db);
+    }
+  }
+
+  /// Version 9: Server catalog cache and app settings.
+  ///
+  /// `catalog_cache` keeps the last catalog received for each
+  /// delivery area so the app works offline. `app_settings`
+  /// stores small key/value preferences such as the selected
+  /// delivery area.
+  Future<void> _createCatalogCacheTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $catalogCacheTable (
+        area_id TEXT PRIMARY KEY,
+        area_name TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        fetched_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $appSettingsTable (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
   }
 
   /// Version 8: Delivery recipient name and phone.

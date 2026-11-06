@@ -3,9 +3,24 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../features/shell/customer_shell.dart';
 import '../models/cart_manager.dart';
+import '../models/catalog_repository.dart';
 import '../models/milk_subscription_manager.dart';
 
-final CartManager sudhamrtamCart = CartManager();
+final CatalogRepository sudhamrtamCatalog = CatalogRepository();
+
+final CartManager sudhamrtamCart = CartManager(
+  productLookup: sudhamrtamCatalog.productById,
+);
+
+/// Loads local catalog data, then the cart. Runs only after
+/// checkout recovery has succeeded (see CheckoutStartupController).
+///
+/// Catalog loading never throws and never uses the network.
+Future<void> initializeCatalogAndCart() async {
+  await sudhamrtamCatalog.initialize();
+  await sudhamrtamCart.initialize();
+}
+
 final MilkSubscriptionManager sudhamrtamMilkSubscriptions =
     MilkSubscriptionManager();
 

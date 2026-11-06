@@ -5,8 +5,31 @@ import 'cart_item.dart';
 import 'product.dart';
 import 'product_catalog.dart';
 
+/// Resolves a saved product ID to a product, or null if unknown.
+typedef ProductLookup = Product? Function(String productId);
+
 /// Manages Sudhamrtam Shopping Cart state and SQLite persistence.
 class CartManager extends ChangeNotifier {
+  /// [productLookup] resolves saved cart rows to products.
+  /// The app passes `CatalogRepository.productById`; when
+  /// omitted, the built-in catalog is used.
+  CartManager({ProductLookup? productLookup})
+    : _productLookup = productLookup ?? _builtInLookup;
+
+  static Product? _builtInLookup(String productId) {
+    for (final product in ProductCatalog.products) {
+      if (product.id == productId) return product;
+    }
+    return null;
+  }
+
+  final ProductLookup _productLookup;
+
+  /// Unknown IDs become an unavailable placeholder, so a
+  /// saved item is never silently deleted from the cart.
+  Product _resolveProduct(String productId) =>
+      _productLookup(productId) ?? Product.unknown(productId);
+
   final Map<String, CartItem> _items = {};
 
   static const int maxQuantityPerProduct = 100;
@@ -83,23 +106,19 @@ class CartManager extends ChangeNotifier {
     try {
       final savedItems = await CartDatabaseService.instance.loadCart();
 
-      final productsById = {
-        for (final product in ProductCatalog.products) product.id: product,
-      };
-
       _items.clear();
 
       for (final entry in savedItems.entries) {
-        final product = productsById[entry.key];
         final quantity = entry.value;
 
-        if (product == null ||
-            quantity < 1 ||
-            quantity > maxQuantityPerProduct) {
+        if (quantity < 1 || quantity > maxQuantityPerProduct) {
           continue;
         }
 
-        _items[entry.key] = CartItem(product: product, quantity: quantity);
+        _items[entry.key] = CartItem(
+          product: _resolveProduct(entry.key),
+          quantity: quantity,
+        );
       }
 
       _isInitialized = true;
@@ -239,7 +258,10 @@ class CartManager extends ChangeNotifier {
   // ==========================================
 
   bool addProduct(Product product, {int quantity = 1}) {
-    if (!_isInitialized || isCheckoutLocked || quantity <= 0) {
+    if (!_isInitialized ||
+        isCheckoutLocked ||
+        quantity <= 0 ||
+        !product.isAvailable) {
       return false;
     }
 
@@ -267,7 +289,9 @@ class CartManager extends ChangeNotifier {
 
     final existing = _items[productId];
 
-    if (existing == null || existing.quantity >= maxQuantityPerProduct) {
+    if (existing == null ||
+        !existing.product.isAvailable ||
+        existing.quantity >= maxQuantityPerProduct) {
       return false;
     }
 
@@ -308,6 +332,11 @@ class CartManager extends ChangeNotifier {
     final existing = _items[productId];
 
     if (existing == null || quantity < 0 || quantity > maxQuantityPerProduct) {
+      return false;
+    }
+
+    // Unavailable products can only be reduced or removed.
+    if (!existing.product.isAvailable && quantity > existing.quantity) {
       return false;
     }
 
@@ -374,22 +403,17 @@ class CartManager extends ChangeNotifier {
 
     final savedItems = await CartDatabaseService.instance.loadCart();
 
-    final productsById = {
-      for (final product in ProductCatalog.products) product.id: product,
-    };
-
     final refreshedItems = <String, CartItem>{};
 
     for (final entry in savedItems.entries) {
-      final product = productsById[entry.key];
       final quantity = entry.value;
 
-      if (product == null || quantity < 1 || quantity > maxQuantityPerProduct) {
+      if (quantity < 1 || quantity > maxQuantityPerProduct) {
         throw StateError('Cannot refresh cart: invalid persisted cart item.');
       }
 
       refreshedItems[entry.key] = CartItem(
-        product: product,
+        product: _resolveProduct(entry.key),
         quantity: quantity,
       );
     }
