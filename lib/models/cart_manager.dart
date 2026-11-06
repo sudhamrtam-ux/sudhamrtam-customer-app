@@ -13,12 +13,19 @@ class CartManager extends ChangeNotifier {
 
   bool _isInitialized = false;
   bool _isLoading = false;
+
+  // Active checkout processing lock.
   bool _isCheckoutLocked = false;
+
+  // Protects the cart while a durable checkout
+  // remains unresolved during the current session.
+  bool _isCheckoutRecoveryLocked = false;
 
   Future<void>? _initializationFuture;
 
   // Database operations execute sequentially.
   Future<void> _pendingSave = Future<void>.value();
+
   Object? _lastPersistenceError;
 
   bool get hasPersistenceError => _lastPersistenceError != null;
@@ -28,11 +35,21 @@ class CartManager extends ChangeNotifier {
   // ==========================================
 
   bool get isInitialized => _isInitialized;
+
   bool get isLoading => _isLoading;
-  bool get isCheckoutLocked => _isCheckoutLocked;
+
+  /// True whenever cart mutations must be blocked.
+  ///
+  /// This includes active checkout processing and
+  /// unresolved checkout recovery.
+  bool get isCheckoutLocked => _isCheckoutLocked || _isCheckoutRecoveryLocked;
+
+  bool get isCheckoutRecoveryLocked => _isCheckoutRecoveryLocked;
 
   List<CartItem> get items => List<CartItem>.unmodifiable(_items.values);
+
   int get uniqueItemCount => _items.length;
+
   int get itemCount => totalQuantity;
 
   int get totalQuantity =>
@@ -42,6 +59,7 @@ class CartManager extends ChangeNotifier {
       _items.values.fold<double>(0.0, (total, item) => total + item.totalPrice);
 
   bool get isEmpty => _items.isEmpty;
+
   bool get isNotEmpty => _items.isNotEmpty;
 
   int quantityFor(String productId) => _items[productId]?.quantity ?? 0;
@@ -51,7 +69,9 @@ class CartManager extends ChangeNotifier {
   // ==========================================
 
   /// Restores the saved Shopping Cart from SQLite.
-  /// Call this before runApp() in main.dart.
+  ///
+  /// Startup recovery must be completed before this
+  /// method is called.
   Future<void> initialize() {
     return _initializationFuture ??= _loadSavedCart();
   }
@@ -62,6 +82,7 @@ class CartManager extends ChangeNotifier {
 
     try {
       final savedItems = await CartDatabaseService.instance.loadCart();
+
       final productsById = {
         for (final product in ProductCatalog.products) product.id: product,
       };
@@ -85,6 +106,7 @@ class CartManager extends ChangeNotifier {
     } catch (error) {
       _isInitialized = false;
       _initializationFuture = null;
+
       debugPrint('Cart initialization failed: $error');
       rethrow;
     } finally {
@@ -96,12 +118,6 @@ class CartManager extends ChangeNotifier {
   // ==========================================
   // SQLITE SAVE QUEUE
   // ==========================================
-
-  /// Queues a complete cart snapshot for persistence.
-  ///
-  /// Existing behavior is retained. Save errors are logged, not propagated.
-  /// A later step will add explicit persistence-failure reporting before
-  /// checkout is permitted to finalize.
 
   /// Queues an atomic snapshot of the current cart.
   ///
@@ -140,17 +156,17 @@ class CartManager extends ChangeNotifier {
   }
 
   // ==========================================
-  // CHECKOUT CART LOCK
+  // ACTIVE CHECKOUT CART LOCK
   // ==========================================
 
-  /// Prevents new cart mutations immediately, then drains queued saves.
+  /// Prevents new cart mutations immediately, then
+  /// waits for queued SQLite saves to finish.
   ///
-  /// Returns false when the cart is unavailable or already locked.
-  /// The caller must release a successful lock with endCheckoutCartLock().
+  /// Returns false when the cart is unavailable or
+  /// already being processed.
   ///
-  /// IMPORTANT: Draining does not prove that all saves succeeded, because
-  /// _scheduleSave currently logs and swallows persistence errors. Do not
-  /// use this method alone to authorize an order or clear the cart.
+  /// The caller must release a successful lock with
+  /// endCheckoutCartLock().
   Future<bool> beginCheckoutCartLock() async {
     if (!_isInitialized || _isLoading || _isCheckoutLocked) {
       return false;
@@ -177,10 +193,44 @@ class CartManager extends ChangeNotifier {
     }
   }
 
-  /// Releases the checkout lock. Does not change cart quantities.
+  /// Releases the temporary active checkout lock.
+  ///
+  /// Does not release the separate recovery lock.
   void endCheckoutCartLock() {
     if (!_isCheckoutLocked) return;
+
     _isCheckoutLocked = false;
+    notifyListeners();
+  }
+
+  // ==========================================
+  // CHECKOUT RECOVERY LOCK
+  // ==========================================
+
+  /// Blocks cart mutations while a durable checkout
+  /// remains unresolved.
+  ///
+  /// The checkout coordinator must activate this
+  /// after durable preparation succeeds.
+  ///
+  /// This is a session-local lock. After application
+  /// restart, startup recovery must inspect SQLite
+  /// before normal cart initialization.
+  void beginCheckoutRecoveryLock() {
+    if (_isCheckoutRecoveryLocked) return;
+
+    _isCheckoutRecoveryLocked = true;
+    notifyListeners();
+  }
+
+  /// Releases the recovery lock after checkout has
+  /// been safely resolved.
+  ///
+  /// Do not call merely because order submission failed.
+  void endCheckoutRecoveryLock() {
+    if (!_isCheckoutRecoveryLocked) return;
+
+    _isCheckoutRecoveryLocked = false;
     notifyListeners();
   }
 
@@ -189,11 +239,12 @@ class CartManager extends ChangeNotifier {
   // ==========================================
 
   bool addProduct(Product product, {int quantity = 1}) {
-    if (!_isInitialized || _isCheckoutLocked || quantity <= 0) {
+    if (!_isInitialized || isCheckoutLocked || quantity <= 0) {
       return false;
     }
 
     final currentQuantity = quantityFor(product.id);
+
     if (currentQuantity + quantity > maxQuantityPerProduct) {
       return false;
     }
@@ -212,14 +263,16 @@ class CartManager extends ChangeNotifier {
   // ==========================================
 
   bool increaseQuantity(String productId) {
-    if (!_isInitialized || _isCheckoutLocked) return false;
+    if (!_isInitialized || isCheckoutLocked) return false;
 
     final existing = _items[productId];
+
     if (existing == null || existing.quantity >= maxQuantityPerProduct) {
       return false;
     }
 
     _items[productId] = existing.copyWith(quantity: existing.quantity + 1);
+
     _notifyAndSave();
     return true;
   }
@@ -229,9 +282,10 @@ class CartManager extends ChangeNotifier {
   // ==========================================
 
   bool decreaseQuantity(String productId) {
-    if (!_isInitialized || _isCheckoutLocked) return false;
+    if (!_isInitialized || isCheckoutLocked) return false;
 
     final existing = _items[productId];
+
     if (existing == null) return false;
 
     if (existing.quantity == 1) {
@@ -249,9 +303,10 @@ class CartManager extends ChangeNotifier {
   // ==========================================
 
   bool updateQuantity(String productId, int quantity) {
-    if (!_isInitialized || _isCheckoutLocked) return false;
+    if (!_isInitialized || isCheckoutLocked) return false;
 
     final existing = _items[productId];
+
     if (existing == null || quantity < 0 || quantity > maxQuantityPerProduct) {
       return false;
     }
@@ -271,13 +326,12 @@ class CartManager extends ChangeNotifier {
   // ==========================================
 
   bool removeProduct(String productId) {
-    if (!_isInitialized ||
-        _isCheckoutLocked ||
-        !_items.containsKey(productId)) {
+    if (!_isInitialized || isCheckoutLocked || !_items.containsKey(productId)) {
       return false;
     }
 
     _items.remove(productId);
+
     _notifyAndSave();
     return true;
   }
@@ -287,13 +341,14 @@ class CartManager extends ChangeNotifier {
   // ==========================================
 
   void clearCart() {
-    if (!_isInitialized || _isCheckoutLocked || _items.isEmpty) {
+    if (!_isInitialized || isCheckoutLocked || _items.isEmpty) {
       return;
     }
 
     _items.clear();
     _notifyAndSave();
   }
+
   // ==========================================
   // REFRESH CART AFTER CHECKOUT
   // ==========================================
@@ -303,8 +358,8 @@ class CartManager extends ChangeNotifier {
   ///
   /// Does not write anything to SQLite.
   ///
-  /// Requires the checkout lock to remain active so
-  /// no cart mutation can occur during synchronization.
+  /// Requires the active checkout processing lock
+  /// so cart mutations cannot occur during refresh.
   Future<void> refreshAfterCheckoutReconciliation() async {
     if (!_isInitialized || !_isCheckoutLocked) {
       throw StateError(
@@ -313,8 +368,8 @@ class CartManager extends ChangeNotifier {
       );
     }
 
-    // All queued cart saves must have finished before
-    // the reconciled SQLite state can be loaded.
+    // All queued cart saves must finish before the
+    // reconciled SQLite state can be loaded.
     await waitForPendingSaves();
 
     final savedItems = await CartDatabaseService.instance.loadCart();
@@ -339,8 +394,8 @@ class CartManager extends ChangeNotifier {
       );
     }
 
-    // Only replace the in-memory cart after the entire
-    // SQLite snapshot has been loaded and validated.
+    // Replace memory only after the complete SQLite
+    // snapshot has been loaded and validated.
     _items
       ..clear()
       ..addAll(refreshedItems);
