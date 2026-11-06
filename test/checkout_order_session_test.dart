@@ -37,7 +37,9 @@ void main() {
   setUp(() {
     durablePending = null;
     prepareCalls = 0;
-    session = CheckoutOrderSession(loadPendingOrder: () async => durablePending);
+    session = CheckoutOrderSession(
+      loadPendingOrder: () async => durablePending,
+    );
   });
 
   test('Prepares a new order when nothing is unresolved', () async {
