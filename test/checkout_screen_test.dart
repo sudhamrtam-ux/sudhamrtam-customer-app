@@ -133,6 +133,15 @@ void main() {
 
     expect(isEnabled(tester, 'Place Order — Coming Soon'), isFalse);
     expect(find.text('Place Test Order'), findsNothing);
+    expect(find.text('Debug: Simulate Failure'), findsNothing);
+  });
+
+  testWidgets('Debug test orders show the failure simulator', (tester) async {
+    await pumpCheckout(tester);
+
+    expect(find.text('Debug: Simulate Failure'), findsOneWidget);
+    expect(find.text('Fail after preparing order'), findsOneWidget);
+    expect(find.text('Fail after saving order'), findsOneWidget);
   });
 
   testWidgets('Pickup with Cash on Delivery places one test order', (

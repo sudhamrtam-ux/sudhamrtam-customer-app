@@ -7,6 +7,7 @@ import '../../models/customer_address.dart';
 import '../../models/customer_order.dart';
 import '../account/address_form_screen.dart';
 import '../orders/order_details_screen.dart';
+import 'checkout_fault_injector.dart';
 import 'checkout_order_session.dart';
 import 'checkout_validator.dart';
 import 'durable_checkout_coordinator.dart';
@@ -55,8 +56,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _addressesLoading = true;
   String? _addressError;
 
+  /// Debug-only failure simulation for device recovery tests.
+  final CheckoutFaultInjector _faultInjector = CheckoutFaultInjector();
+
+  bool get _showFaultSimulation => kDebugMode && widget.enableTestOrders;
+
   late final DurableCheckoutCoordinator _coordinator =
-      widget.coordinator ?? DurableCheckoutCoordinator();
+      widget.coordinator ??
+      (kDebugMode
+          ? DurableCheckoutCoordinator(
+              prepareCheckout: _faultInjector.prepareCheckout,
+              refreshCart: _faultInjector.refreshCart,
+            )
+          : DurableCheckoutCoordinator());
 
   late final CheckoutOrderSession _orderSession =
       widget.orderSession ?? CheckoutOrderSession();
@@ -223,6 +235,64 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         });
       }
     }
+  }
+
+  Widget _faultSimulationCard() {
+    const labels = {
+      CheckoutFault.none: 'No failure',
+      CheckoutFault.afterPreparation: 'Fail after preparing order',
+      CheckoutFault.afterOrderSaved: 'Fail after saving order',
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F0FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD0C7F5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.bug_report_outlined, color: Color(0xFF5B4B9A)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Debug: Simulate Failure',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF5B4B9A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Debug builds only. Fires once on the next order. '
+            'Then force-close and reopen the app to test recovery.',
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final fault in CheckoutFault.values)
+                ChoiceChip(
+                  label: Text(labels[fault]!),
+                  selected: _faultInjector.armed == fault,
+                  onSelected: _isSubmitting
+                      ? null
+                      : (_) => setState(() => _faultInjector.armed = fault),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _submissionErrorCard(String error) {
@@ -1070,6 +1140,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               _checkoutStatusCard(isValid: checkoutReady),
 
               const SizedBox(height: 24),
+
+              if (_showFaultSimulation) ...[
+                _faultSimulationCard(),
+                const SizedBox(height: 24),
+              ],
 
               if (_submissionError != null) ...[
                 _submissionErrorCard(_submissionError!),
