@@ -38,9 +38,10 @@ The root-level `verify_*.dart` / `verify_*.py` scripts are one-off manual checks
 Global singletons live in `lib/app/sudhamrtam_app.dart`: `sudhamrtamCart` (`CartManager`) and `sudhamrtamMilkSubscriptions`. Both are `ChangeNotifier`s that screens listen to directly. There is no state-management package.
 
 ### Single SQLite database (`lib/database/milk_database_service.dart`)
-Despite the name, `MilkDatabaseService.instance` owns the **one** app database (`sudhamrtam_milk.db`) for all tables: subscriptions, cart, orders, profiles/addresses, pending submissions, checkout reconciliations. Schema is versioned (currently **v7**; the version history is in the class doc comment).
+Despite the name, `MilkDatabaseService.instance` owns the **one** app database (`sudhamrtam_milk.db`) for all tables: subscriptions, cart, orders, profiles/addresses, pending submissions, checkout reconciliations. Schema is versioned (currently **v8**; the version history is in the class doc comment).
 - New installs: `_createTables`. Upgrades: `_upgradeDatabase` with cumulative `if (oldVersion < N)` blocks that must never drop customer data.
-- A schema change means bumping `databaseVersion`, adding to both create and upgrade paths, and adding `sqlite_vN_fresh_install_test` / `sqlite_vN_migration_test`-style tests (see existing v5–v7 tests and the v6 fixture test).
+- A schema change means bumping `databaseVersion`, adding to both create and upgrade paths, and adding tests (see `sqlite_v8_order_recipient_test.dart` for a self-contained example; older v5–v7 tests depend on fixture DBs under `C:\Sudhamrtamackups\`).
+- `CustomerOrder.toMap()` omits recipient keys when null, because durable pending payloads are compared byte-for-byte. Keep new optional order fields backward-compatible the same way.
 - Other `*DatabaseService` / `*Service` classes are thin singletons that call `MilkDatabaseService.instance.database`.
 
 ### Durable checkout pipeline (the bulk of recent work)
@@ -53,10 +54,14 @@ Checkout is designed to be crash-safe. An order is identified by a stable preass
 
 `DurableCheckoutCoordinator` (`lib/features/checkout/`) orchestrates these stages. Its doc comment lists the 10 steps. `CheckoutStartupRecoveryService` is the read-only inspector of this state. `CheckoutRecoveryExecutor` acts on it at startup. Any inconsistency yields a `blocked` status and leaves the cart untouched instead of auto-repairing it.
 
-Invariants to preserve: never generate a new order ID on retry; never clear the cart without a matching reconciliation snapshot; unresolved or uncertain checkouts keep the cart lock held.
+Invariants to preserve: never generate a new order ID on retry; never clear the cart without a matching reconciliation snapshot; unresolved checkouts keep the cart recovery lock held. These are signed off in `docs/CHECKOUT_SAFETY_SIGNOFF.md`.
+
+- `CheckoutScreen` gets the order to submit from `CheckoutOrderSession` (durable pending order first, then the in-session order while recovery-locked, else a fresh one).
+- An order prepared but never saved shows the **Unfinished Order** screen at startup. The customer picks Finish (`CheckoutRecoveryExecutor.finishAwaitingSubmission`) or Cancel (`cancelAwaitingSubmission`, which keeps the cart).
+- **Place Order is enabled only in debug builds** (`CheckoutScreen.enableTestOrders` defaults to `kDebugMode`). The owner decided to keep it disabled in release until a backend order API exists. Debug builds also show a one-shot failure simulator (`CheckoutFaultInjector`) for device recovery tests.
 
 ### UI
-Feature folders live under `lib/features/` (home, shop, milk_plan, cart, checkout, orders, account, shell). `CustomerShell` switches tab bodies by `_selectedIndex`. Products come from the static `ProductCatalog` in `lib/models/`; product IDs are persisted in cart and order rows, so they must stay stable. Theme: `lib/core/theme/app_theme.dart` (Material 3, seeded from `#82B440`).
+Feature folders live under `lib/features/` (home, shop, milk_plan, cart, checkout, orders, account, shell). `CustomerShell` switches tab bodies by `_selectedIndex`. Products come from the static `ProductCatalog` in `lib/models/`; product IDs are persisted in cart and order rows, so they must stay stable. Catalog prices are provisional (from sudhamrtam.in, one delivery area), as documented in that file. Theme: `lib/core/theme/app_theme.dart` (Material 3, seeded from `#82B440`).
 
 ## Testing conventions
 
