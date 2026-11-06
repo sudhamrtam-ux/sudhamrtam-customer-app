@@ -14,6 +14,10 @@ class PendingOrderSubmissionService {
       PendingOrderSubmissionService._();
 
   static const String prepared = 'prepared';
+  /// Legacy state still permitted by the v6 schema.
+  ///
+  /// The app no longer writes it: any unresolved
+  /// submission keeps the cart recovery lock instead.
   static const String uncertain = 'uncertain';
 
   // ==========================================
@@ -139,29 +143,6 @@ class PendingOrderSubmissionService {
     }
 
     return rows.first['submission_state'] as String;
-  }
-
-  // ==========================================
-  // MARK UNCERTAIN
-  // ==========================================
-
-  /// Marks an unresolved submission as uncertain.
-  Future<void> markUncertain(String orderId) async {
-    final db = await MilkDatabaseService.instance.database;
-
-    final updated = await db.update(
-      MilkDatabaseService.pendingOrderSubmissionsTable,
-      {
-        'submission_state': uncertain,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      },
-      where: 'order_id = ?',
-      whereArgs: [orderId],
-    );
-
-    if (updated != 1) {
-      throw StateError('Pending order was not found.');
-    }
   }
 
   // ==========================================

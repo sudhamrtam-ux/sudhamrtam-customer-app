@@ -122,22 +122,6 @@ void main() {
       expect(recovered!.id, 'PENDING-001');
     });
 
-    test('Marks a pending order as uncertain', () async {
-      await pendingService.markUncertain('PENDING-001');
-
-      expect(
-        await pendingService.getSubmissionState('PENDING-001'),
-        PendingOrderSubmissionService.uncertain,
-      );
-    });
-
-    test('Rejects marking an unknown order as uncertain', () async {
-      await expectLater(
-        pendingService.markUncertain('UNKNOWN-ORDER'),
-        throwsStateError,
-      );
-    });
-
     test('Recovers the pending order after database reopening', () async {
       await databaseService.close();
 
@@ -148,7 +132,7 @@ void main() {
 
       expect(
         await pendingService.getSubmissionState('PENDING-001'),
-        PendingOrderSubmissionService.uncertain,
+        PendingOrderSubmissionService.prepared,
       );
     });
 
