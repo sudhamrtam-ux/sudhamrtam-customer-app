@@ -7,6 +7,7 @@
 - **Import** delivery areas, routes, products and prices from the old site's database. The owner has access to it.
 - **OTP login run by the backend, delivered through MSG91**: WhatsApp now, SMS once DLT approval for Sudhamrtam's sender comes through (7 November 2026; replaces the earlier Firebase Phone Auth plan, which needed paid Blaze billing at about ₹6 per SMS).
 - Place Order stays **disabled in release builds** until this backend's order API is live (Phase 1 sign-off).
+- **Order rules** (7 November 2026): free home delivery with a **₹200 minimum order**; **delivery only** (no store pickup at launch); **Cash on Delivery** only; orders placed by **9 PM India time** are delivered the next morning, later ones the day after. Kept in the backend's `src/orders/rules.ts` and published at `GET /v1/order-rules`.
 - **One price per product for every customer, in every area** (6 November 2026). There is no area picker in the app. Areas and routes are used only for delivery planning and addresses.
 
 ---
@@ -172,5 +173,5 @@ Each step is reviewed, tested and confirmed by you before the next one starts.
 
 1. **Hosting budget and provider.** Options range from a free tier for development to a small cloud server with managed PostgreSQL for the pilot. When we reach 8a, I'll compare 2–3 concrete options using current prices.
 2. **MSG91 account** under the Sudhamrtam email, with a WhatsApp Business number and an approved Authentication template.
-3. **Business rules for orders:** delivery fee or minimum order, pickup location(s), and the cut-off time for next-day delivery.
+3. ~~Business rules for orders~~ — decided 7 November 2026 (see the top of this document).
 4. **The old site export** described in §7.
