@@ -151,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
-                    height: 214,
+                    height: 290,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: essentials.length,
@@ -415,7 +415,7 @@ class _QuickAddCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: Key('quickAdd_${product.id}'),
-      width: 140,
+      width: 160,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: _paleGreen,
@@ -425,7 +425,7 @@ class _QuickAddCard extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(
-            height: 72,
+            height: 140,
             child: ProductImage(
               productId: product.id,
               icon: product.icon,
