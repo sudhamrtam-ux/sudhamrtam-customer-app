@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../models/milk_subscription.dart';
 import '../../models/milk_subscription_manager.dart';
+import '../../models/milk_plan_merge.dart';
 import 'milk_plan_merge_dialog.dart';
 import 'milk_subscription_setup_screen.dart';
 
@@ -146,15 +147,28 @@ class MilkPlanScreen extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: DuplicatePlansBanner(group: group),
                       ),
-                    ...subscriptions.map((subscription) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _SavedSubscriptionCard(
-                          key: ValueKey(subscription.id),
-                          subscription: subscription,
+                    // One card per milk, with every shift in it.
+                    for (final productId in const ['buffalo_milk', 'cow_milk'])
+                      if (sudhamrtamMilkSubscriptions
+                          .plansFor(productId)
+                          .isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: MilkProductCard(
+                            key: ValueKey('milk_$productId'),
+                            productId: productId,
+                            plans: sudhamrtamMilkSubscriptions.plansFor(
+                              productId,
+                            ),
+                          ),
                         ),
-                      );
-                    }),
+                    _CancelledPlans(
+                      plans: [
+                        for (final plan in subscriptions)
+                          if (plan.status == MilkSubscriptionStatus.cancelled)
+                            plan,
+                      ],
+                    ),
                   ],
                 );
               },
@@ -233,10 +247,19 @@ class MilkPlanScreen extends StatelessWidget {
 // SAVED MILK SUBSCRIPTION CARD
 // ============================================================
 
+/// One plan inside a milk's card: its shift(s) and its actions.
 class _SavedSubscriptionCard extends StatefulWidget {
   final MilkSubscription subscription;
 
-  const _SavedSubscriptionCard({super.key, required this.subscription});
+  /// True when the milk has more than one plan (e.g. a separate
+  /// morning and evening plan): each gets compact buttons.
+  final bool compact;
+
+  const _SavedSubscriptionCard({
+    super.key,
+    required this.subscription,
+    this.compact = false,
+  });
 
   @override
   State<_SavedSubscriptionCard> createState() => _SavedSubscriptionCardState();
@@ -312,23 +335,6 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
 
       case MilkDeliveryFrequency.randomDays:
         return 'Random Days';
-    }
-  }
-
-  // ==========================================================
-  // SUBSCRIPTION STATUS
-  // ==========================================================
-
-  String get _statusName {
-    switch (subscription.status) {
-      case MilkSubscriptionStatus.active:
-        return 'Active';
-
-      case MilkSubscriptionStatus.paused:
-        return 'Paused';
-
-      case MilkSubscriptionStatus.cancelled:
-        return 'Cancelled';
     }
   }
 
@@ -477,228 +483,194 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
 
     final isCancelled = subscription.status == MilkSubscriptionStatus.cancelled;
 
-    return Card(
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // =================================================
-            // PRODUCT NAME AND STATUS
-            // =================================================
-
-            Row(
-              children: [
-                const Icon(Icons.water_drop, color: brandGreen, size: 30),
-
-                const SizedBox(width: 12),
-
-                Expanded(
-                  child: Text(
-                    _productName,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? const Color(0xFFE5F0D7)
-                        : const Color(0xFFEEEEEE),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _statusName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: isActive
-                          ? const Color(0xFF4D7726)
-                          : Colors.black54,
-                    ),
-                  ),
-                ),
-              ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // =================================================
+        // MORNING / EVENING DELIVERY SCHEDULES
+        // =================================================
+        if (subscription.shiftSchedules.isNotEmpty) ...[
+          for (final shift in MilkDeliveryShift.values)
+            for (final schedule in subscription.shiftSchedules.where(
+              (item) => item.shift == shift,
+            )) ...[
+              _ShiftScheduleSummary(schedule: schedule, paused: !isActive),
+              const SizedBox(height: 8),
+            ],
+        ] else ...[
+          // Plans created before the shift upgrade.
+          const Text(
+            'Earlier subscription — original delivery schedule',
+            style: TextStyle(color: Colors.black54, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(
+                Icons.local_drink_outlined,
+                color: brandGreen,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text('${subscription.quantity} unit(s) per delivery'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(
+                Icons.calendar_today_outlined,
+                color: brandGreen,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: Text(_frequencyName)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.only(left: 28),
+            child: Text(
+              _deliveryDetails,
+              style: const TextStyle(color: Colors.black54, fontSize: 13),
             ),
+          ),
+        ],
 
-            const SizedBox(height: 16),
+        if (_isProcessing) ...[
+          const SizedBox(height: 12),
+          const LinearProgressIndicator(),
+        ],
 
-            // =================================================
-            // MORNING / EVENING DELIVERY SCHEDULES
-            // =================================================
-            if (subscription.shiftSchedules.isNotEmpty) ...[
-              for (final shift in MilkDeliveryShift.values)
-                for (final schedule in subscription.shiftSchedules.where(
-                  (item) => item.shift == shift,
-                )) ...[
-                  _ShiftScheduleSummary(schedule: schedule),
-                  const SizedBox(height: 12),
-                ],
-              Row(
-                children: [
-                  const Icon(
-                    Icons.local_drink_outlined,
-                    color: brandGreen,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Combined quantity when both shifts deliver: '
-                      '${_formatLitres(subscription.combinedQuantityMl)}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
+        // =================================================
+        // ACTIVE / PAUSED SUBSCRIPTION ACTIONS
+        // =================================================
+        if (!isCancelled && widget.compact)
+          Wrap(
+            alignment: WrapAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: _isProcessing
+                    ? null
+                    : () => _editSubscription(context),
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Edit'),
+                style: TextButton.styleFrom(foregroundColor: brandGreen),
               ),
-            ] else ...[
-              // Plans created before the shift upgrade.
-              const Text(
-                'Earlier subscription — original delivery schedule',
-                style: TextStyle(color: Colors.black54, fontSize: 12),
+              TextButton.icon(
+                onPressed: _isProcessing
+                    ? null
+                    : () => _changeStatus(pause: isActive),
+                icon: Icon(
+                  isActive
+                      ? Icons.pause_circle_outline
+                      : Icons.play_circle_outline,
+                  size: 18,
+                ),
+                label: Text(isActive ? 'Pause' : 'Resume'),
+                style: TextButton.styleFrom(foregroundColor: brandGreen),
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.local_drink_outlined,
-                    color: brandGreen,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text('${subscription.quantity} unit(s) per delivery'),
-                ],
+              TextButton.icon(
+                onPressed: _isProcessing
+                    ? null
+                    : () => _confirmCancellation(context),
+                icon: const Icon(Icons.cancel_outlined, size: 18),
+                label: const Text('Cancel'),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today_outlined,
-                    color: brandGreen,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(_frequencyName)),
-                ],
+            ],
+          ),
+
+        if (!isCancelled && !widget.compact) ...[
+          const SizedBox(height: 8),
+
+          // ===============================================
+          // EDIT SUBSCRIPTION
+          // ===============================================
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _isProcessing
+                  ? null
+                  : () => _editSubscription(context),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Edit Subscription'),
+              style: FilledButton.styleFrom(
+                backgroundColor: brandGreen,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.only(left: 28),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // ===============================================
+          // PAUSE / RESUME SUBSCRIPTION
+          // ===============================================
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isProcessing
+                  ? null
+                  : () => _changeStatus(pause: isActive),
+              icon: Icon(
+                isActive
+                    ? Icons.pause_circle_outline
+                    : Icons.play_circle_outline,
+              ),
+              label: Text(
+                isActive ? 'Pause Subscription' : 'Resume Subscription',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: brandGreen,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // ===============================================
+          // CANCEL SUBSCRIPTION
+          // ===============================================
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isProcessing
+                  ? null
+                  : () => _confirmCancellation(context),
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Cancel Subscription'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+
+        // =================================================
+        // CANCELLED SUBSCRIPTION
+        // =================================================
+        if (isCancelled) ...[
+          const SizedBox(height: 16),
+
+          const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.black54, size: 18),
+              SizedBox(width: 8),
+              Expanded(
                 child: Text(
-                  _deliveryDetails,
-                  style: const TextStyle(color: Colors.black54, fontSize: 13),
+                  'This subscription has been cancelled.',
+                  style: TextStyle(color: Colors.black54, fontSize: 13),
                 ),
               ),
             ],
-
-            if (_isProcessing) ...[
-              const SizedBox(height: 12),
-              const LinearProgressIndicator(),
-            ],
-
-            // =================================================
-            // ACTIVE / PAUSED SUBSCRIPTION ACTIONS
-            // =================================================
-            if (!isCancelled) ...[
-              const SizedBox(height: 16),
-
-              // ===============================================
-              // EDIT SUBSCRIPTION
-              // ===============================================
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _isProcessing
-                      ? null
-                      : () => _editSubscription(context),
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit Subscription'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: brandGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              // ===============================================
-              // PAUSE / RESUME SUBSCRIPTION
-              // ===============================================
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _isProcessing
-                      ? null
-                      : () => _changeStatus(pause: isActive),
-                  icon: Icon(
-                    isActive
-                        ? Icons.pause_circle_outline
-                        : Icons.play_circle_outline,
-                  ),
-                  label: Text(
-                    isActive ? 'Pause Subscription' : 'Resume Subscription',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: brandGreen,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              // ===============================================
-              // CANCEL SUBSCRIPTION
-              // ===============================================
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _isProcessing
-                      ? null
-                      : () => _confirmCancellation(context),
-                  icon: const Icon(Icons.cancel_outlined),
-                  label: const Text('Cancel Subscription'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ],
-
-            // =================================================
-            // CANCELLED SUBSCRIPTION
-            // =================================================
-            if (isCancelled) ...[
-              const SizedBox(height: 16),
-
-              const Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.black54, size: 18),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'This subscription has been cancelled.',
-                      style: TextStyle(color: Colors.black54, fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -717,8 +689,9 @@ String _formatLitres(int millilitres) {
 
 class _ShiftScheduleSummary extends StatelessWidget {
   final MilkShiftSchedule schedule;
+  final bool paused;
 
-  const _ShiftScheduleSummary({required this.schedule});
+  const _ShiftScheduleSummary({required this.schedule, this.paused = false});
 
   String get _frequencyLabel {
     switch (schedule.frequency) {
@@ -787,8 +760,13 @@ class _ShiftScheduleSummary extends StatelessWidget {
                 ),
               ),
               Text(
-                _formatLitres(schedule.quantityMl),
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                paused
+                    ? '${_formatLitres(schedule.quantityMl)} (paused)'
+                    : _formatLitres(schedule.quantityMl),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: paused ? Colors.black45 : null,
+                ),
               ),
             ],
           ),
@@ -1005,7 +983,9 @@ class _DuplicatePlansBannerState extends State<DuplicatePlansBanner> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Two $name plans deliver in the same shift',
+            group.plans.length == 2
+                ? 'Two $name plans deliver in the same shift'
+                : '${group.plans.length} $name plans deliver in the same shift',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 4),
@@ -1025,6 +1005,185 @@ class _DuplicatePlansBannerState extends State<DuplicatePlansBanner> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// One card per milk: every shift (from one or more plans), each
+/// plan's actions, and the total.
+class MilkProductCard extends StatelessWidget {
+  const MilkProductCard({
+    super.key,
+    required this.productId,
+    required this.plans,
+  });
+
+  final String productId;
+
+  /// Not cancelled, for this milk.
+  final List<MilkSubscription> plans;
+
+  @override
+  Widget build(BuildContext context) {
+    const brandGreen = Color(0xFF82B440);
+
+    // Morning plan first.
+    final ordered = [...plans]
+      ..sort(
+        (a, b) => a.shiftSchedules.first.shift.index.compareTo(
+          b.shiftSchedules.first.shift.index,
+        ),
+      );
+
+    final active = plans
+        .where((p) => p.status == MilkSubscriptionStatus.active)
+        .toList();
+    final status = active.length == plans.length
+        ? 'Active'
+        : active.isEmpty
+        ? 'Paused'
+        : 'Partly paused';
+
+    return Card(
+      key: Key('milkCard_$productId'),
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.water_drop, color: brandGreen, size: 30),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    milkName(productId),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: status == 'Active'
+                        ? const Color(0xFFE5F0D7)
+                        : const Color(0xFFEEEEEE),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    status,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: status == 'Active'
+                          ? const Color(0xFF4D7726)
+                          : Colors.black54,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            for (final plan in ordered)
+              _SavedSubscriptionCard(
+                key: ValueKey(plan.id),
+                subscription: plan,
+                compact: plans.length > 1,
+              ),
+            const Divider(height: 24),
+            Row(
+              children: [
+                const Icon(
+                  Icons.local_drink_outlined,
+                  color: brandGreen,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    milkTotalText(plans),
+                    key: Key('milkTotal_$productId'),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The milk delivered per day across a milk's plans, counting only
+/// deliveries that are not paused, e.g. "Total: 1.5 L every day".
+String milkTotalText(List<MilkSubscription> plans) {
+  final active = [
+    for (final plan in plans)
+      if (plan.status == MilkSubscriptionStatus.active) ...plan.shiftSchedules,
+  ];
+  final paused = [
+    for (final plan in plans)
+      if (plan.status != MilkSubscriptionStatus.active)
+        for (final schedule in plan.shiftSchedules)
+          shiftText(schedule.shift).toLowerCase(),
+  ];
+  final note = paused.isEmpty ? '' : ' (${paused.join(' and ')} paused)';
+
+  if (active.isEmpty) return 'All deliveries are paused';
+
+  final total = active.fold<int>(0, (sum, s) => sum + s.quantityMl);
+  if (active.length == 1) {
+    return 'Total: ${litresText(total)} ${deliveryDaysText(active.single)}$note';
+  }
+
+  final sameDays = active.every((s) => sameDeliveryDays(active.first, s));
+  return sameDays
+      ? 'Total: ${litresText(total)} ${deliveryDaysText(active.first)}$note'
+      : 'Up to ${litresText(total)} on days with both deliveries$note';
+}
+
+/// Cancelled plans, listed briefly at the bottom.
+class _CancelledPlans extends StatelessWidget {
+  const _CancelledPlans({required this.plans});
+
+  final List<MilkSubscription> plans;
+
+  @override
+  Widget build(BuildContext context) {
+    if (plans.isEmpty) return const SizedBox.shrink();
+
+    return ExpansionTile(
+      key: const Key('cancelledPlans'),
+      tilePadding: EdgeInsets.zero,
+      title: Text(
+        'Cancelled plans (${plans.length})',
+        style: const TextStyle(color: Colors.black54),
+      ),
+      children: [
+        for (final plan in plans)
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.history, color: Colors.black38),
+            title: Text(milkName(plan.productId)),
+            subtitle: Text(
+              plan.shiftSchedules
+                  .map(
+                    (s) =>
+                        '${shiftText(s.shift)} ${litresText(s.quantityMl)} '
+                        '${deliveryDaysText(s)}',
+                  )
+                  .join(', '),
+            ),
+          ),
+      ],
     );
   }
 }

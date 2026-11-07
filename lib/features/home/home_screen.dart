@@ -534,7 +534,8 @@ class _CategoryGrid extends StatelessWidget {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.1,
+        // Tall tiles so the product photo is the main thing.
+        childAspectRatio: 0.78,
       ),
       itemBuilder: (context, index) {
         final category = categories[index];
@@ -551,21 +552,18 @@ class _CategoryGrid extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             onTap: () => onOpen(category),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(
-                    height: 64,
-                    width: 64,
+                  Expanded(
                     child: ProductImage(
                       productId: firstProduct[category]!.id,
                       icon: firstProduct[category]!.icon,
-                      iconSize: 36,
-                      borderRadius: 8,
+                      iconSize: 56,
+                      borderRadius: 10,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(
                     category,
                     textAlign: TextAlign.center,

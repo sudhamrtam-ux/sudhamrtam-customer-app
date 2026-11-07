@@ -30,8 +30,9 @@ final CartManager sudhamrtamCart = CartManager(
 );
 
 bool _catalogLinkedToCart = false;
+bool _milkPlansRestored = false;
 
-/// Loads local catalog data, then the cart. Runs only after
+/// Loads local catalog data, then the cart and saved milk plans. Runs only after
 /// checkout recovery has succeeded (see CheckoutStartupController).
 ///
 /// Startup itself never uses the network. Afterwards, a fresh
@@ -44,6 +45,19 @@ Future<void> initializeCatalogAndCart() async {
   if (!_catalogLinkedToCart) {
     _catalogLinkedToCart = true;
     sudhamrtamCatalog.addListener(sudhamrtamCart.refreshProducts);
+  }
+
+  // Milk plans saved on this phone. A failure here must not stop
+  // the app; the plans stay in the database.
+  if (!_milkPlansRestored) {
+    _milkPlansRestored = true;
+    try {
+      final skipped = await sudhamrtamMilkSubscriptions
+          .restoreSavedSubscriptions();
+      if (skipped > 0) debugPrint('Skipped $skipped invalid milk plan(s).');
+    } catch (error) {
+      debugPrint('Milk plans could not be loaded: $error');
+    }
   }
 
   unawaited(sudhamrtamCatalog.refresh());

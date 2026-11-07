@@ -56,6 +56,22 @@ class MilkSubscriptionManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Loads the plans saved on this phone. Call once at startup.
+  ///
+  /// A plan that no longer passes validation is skipped (it stays
+  /// in the database untouched) instead of hiding every other
+  /// plan. Returns how many were skipped.
+  Future<int> restoreSavedSubscriptions() async {
+    final saved = await _repository.loadSubscriptions();
+    final ids = <String>{};
+    final usable = [
+      for (final plan in saved)
+        if (_isValidSubscription(plan) && ids.add(plan.id)) plan,
+    ];
+    await loadSavedSubscriptions(usable);
+    return saved.length - usable.length;
+  }
+
   // ============================================================
   // SUBSCRIPTION GETTERS
   // ============================================================

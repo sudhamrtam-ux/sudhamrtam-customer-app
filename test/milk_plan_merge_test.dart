@@ -355,6 +355,29 @@ void main() {
       expect((await reload('b')).status, MilkSubscriptionStatus.active);
     });
 
+    test('plans come back after the app restarts', () async {
+      final before = MilkSubscriptionManager();
+      await before.addSubscription(
+        plan('a', [morning(1000)], productId: 'buffalo_milk'),
+      );
+      await before.addSubscription(
+        plan('b', [evening(500)], productId: 'buffalo_milk'),
+      );
+
+      // A new manager is what the app has after a restart.
+      final after = MilkSubscriptionManager();
+      expect(await after.restoreSavedSubscriptions(), 0);
+      expect(after.plansFor('buffalo_milk').map((p) => p.id), ['a', 'b']);
+
+      // ...so the one-plan-per-shift rule still holds.
+      expect(
+        await after.addSubscription(
+          plan('c', [morning(500)], productId: 'buffalo_milk'),
+        ),
+        isFalse,
+      );
+    });
+
     test('a failed save changes nothing', () async {
       final repository = MilkSubscriptionRepository();
       await repository.saveSubscription(plan('a', [morning(1000)]));
@@ -480,6 +503,74 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('combinePlans')), findsOneWidget);
+    });
+  });
+
+  group('one card per milk', () {
+    test('the total counts only deliveries that are coming', () {
+      expect(
+        milkTotalText([
+          plan('a', [morning(1000)], productId: 'buffalo_milk'),
+          plan('b', [evening(500)], productId: 'buffalo_milk'),
+        ]),
+        'Total: 1.5 L every day',
+      );
+      expect(
+        milkTotalText([
+          plan('a', [morning(1000)]),
+          plan('b', [evening(500)], status: MilkSubscriptionStatus.paused),
+        ]),
+        'Total: 1 L every day (evening paused)',
+      );
+      expect(
+        milkTotalText([
+          plan('a', [morning(1000)]),
+          plan('b', [
+            shift(e, 500, frequency: MilkDeliveryFrequency.alternateDays),
+          ]),
+        ]),
+        'Up to 1.5 L on days with both deliveries',
+      );
+      expect(
+        milkTotalText([
+          plan('a', [morning(1000)], status: MilkSubscriptionStatus.paused),
+        ]),
+        'All deliveries are paused',
+      );
+    });
+
+    testWidgets('morning and evening plans share one card', (tester) async {
+      tester.view.physicalSize = const Size(1080, 4000);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: MilkProductCard(
+                productId: 'buffalo_milk',
+                plans: [
+                  plan('b', [evening(500)], productId: 'buffalo_milk'),
+                  plan('a', [morning(1000)], productId: 'buffalo_milk'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Buffalo Milk'), findsOneWidget);
+      expect(find.text('Morning Delivery'), findsOneWidget);
+      expect(find.text('Evening Delivery'), findsOneWidget);
+      expect(find.text('Total: 1.5 L every day'), findsOneWidget);
+      // Each plan keeps its own Pause button.
+      expect(find.text('Pause'), findsNWidgets(2));
+      // Morning is listed first.
+      expect(
+        tester.getTopLeft(find.text('Morning Delivery')).dy,
+        lessThan(tester.getTopLeft(find.text('Evening Delivery')).dy),
+      );
     });
   });
 }
