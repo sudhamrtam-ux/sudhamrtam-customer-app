@@ -119,8 +119,10 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
 
     final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (context) =>
-            AddressFormScreen(existingAddress: address, account: widget.account),
+        builder: (context) => AddressFormScreen(
+          existingAddress: address,
+          account: widget.account,
+        ),
       ),
     );
 

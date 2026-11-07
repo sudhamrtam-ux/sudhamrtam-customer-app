@@ -25,18 +25,14 @@ class AccountScreen extends StatelessWidget {
   /// Opens the customer profile screen.
   void _openCustomerProfile(BuildContext context) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => CustomerProfileScreen(),
-      ),
+      MaterialPageRoute<void>(builder: (context) => CustomerProfileScreen()),
     );
   }
 
   /// Opens the customer's saved delivery addresses.
   void _openSavedAddresses(BuildContext context) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => SavedAddressesScreen(),
-      ),
+      MaterialPageRoute<void>(builder: (context) => SavedAddressesScreen()),
     );
   }
 
@@ -214,7 +210,9 @@ class _SignInCard extends StatelessWidget {
         child: ListTile(
           leading: Icon(Icons.cloud_off_outlined),
           title: Text('Sign-in unavailable'),
-          subtitle: Text('Sign-in needs the Sudhamrtam server, which this build does not use yet.'),
+          subtitle: Text(
+            'Sign-in needs the Sudhamrtam server, which this build does not use yet.',
+          ),
         ),
       );
     }

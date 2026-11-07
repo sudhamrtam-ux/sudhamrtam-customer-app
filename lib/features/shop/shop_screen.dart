@@ -4,14 +4,27 @@ import '../../app/sudhamrtam_app.dart';
 import '../../models/catalog_repository.dart';
 import '../../models/product.dart';
 import 'product_details_screen.dart';
+import 'product_image.dart';
 
 const _green = Color(0xFF82B440);
 
 class ShopScreen extends StatelessWidget {
-  const ShopScreen({super.key, this.catalog});
+  const ShopScreen({
+    super.key,
+    this.catalog,
+    this.category,
+    this.onCategoryChanged,
+  });
 
   /// Optional override for tests; defaults to the app catalog.
   final CatalogRepository? catalog;
+
+  /// Shows only this category (null: all products).
+  final String? category;
+
+  /// Called when the customer picks a category chip. Without it
+  /// the chips are hidden.
+  final ValueChanged<String?>? onCategoryChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +33,15 @@ class ShopScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: repository,
       builder: (context, _) {
-        final products = repository.products;
+        final allProducts = repository.products;
+        final categories = <String>{
+          for (final product in allProducts) product.category,
+        }.toList();
+        // A category that no longer exists falls back to all.
+        final selected = categories.contains(category) ? category : null;
+        final products = selected == null
+            ? allProducts
+            : allProducts.where((p) => p.category == selected).toList();
 
         return SafeArea(
           child: RefreshIndicator(
@@ -41,6 +62,27 @@ class ShopScreen extends StatelessWidget {
                 ),
                 if (repository.canUseServer)
                   _CatalogStatus(repository: repository),
+                if (onCategoryChanged != null && categories.length > 1) ...[
+                  const SizedBox(height: 16),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final option in <String?>[null, ...categories])
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              key: Key('shopCategory_${option ?? 'all'}'),
+                              label: Text(option ?? 'All'),
+                              selected: option == selected,
+                              selectedColor: _green.withValues(alpha: 0.25),
+                              onSelected: (_) => onCategoryChanged!(option),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 if (products.isEmpty)
                   const Padding(
@@ -60,7 +102,7 @@ class ShopScreen extends StatelessWidget {
                           crossAxisCount: 2,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
-                          childAspectRatio: 0.85,
+                          childAspectRatio: 0.68,
                         ),
                     itemBuilder: (context, index) =>
                         _ProductCard(product: products[index]),
@@ -159,12 +201,22 @@ class _ProductCard extends StatelessWidget {
           side: const BorderSide(color: Color(0xFFE1EBCF)),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(product.icon, size: 42, color: color),
-              const SizedBox(height: 12),
+              Expanded(
+                child: Opacity(
+                  // Unavailable products look faded.
+                  opacity: available ? 1 : 0.4,
+                  child: ProductImage(
+                    productId: product.id,
+                    icon: product.icon,
+                    iconColor: color,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(
                 product.name,
                 textAlign: TextAlign.center,

@@ -137,4 +137,43 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('Category chips filter the products', (tester) async {
+    final catalog = CatalogRepository();
+    await tester.runAsync(catalog.initialize);
+
+    tester.view.physicalSize = const Size(1080, 4000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    String? category = 'Ghee';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) => Scaffold(
+            body: ShopScreen(
+              catalog: catalog,
+              category: category,
+              onCategoryChanged: (value) => setState(() => category = value),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Opened from Home on one category.
+    expect(find.text('Buffalo Ghee'), findsOneWidget);
+    expect(find.text('Cow Milk'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('shopCategory_all')));
+    await tester.pump();
+    expect(find.text('Cow Milk'), findsOneWidget);
+    expect(find.text('Buffalo Ghee'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('shopCategory_Wood-Pressed Oils')));
+    await tester.pump();
+    expect(find.text('Sesame Oil'), findsOneWidget);
+    expect(find.text('Cow Milk'), findsNothing);
+  });
 }

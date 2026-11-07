@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../app/sudhamrtam_app.dart';
 import '../home/home_screen.dart';
+import '../shop/product_image.dart';
 import '../shop/shop_screen.dart';
 import '../cart/cart_screen.dart';
 import '../milk_plan/milk_plan_screen.dart';
@@ -17,13 +19,38 @@ class CustomerShell extends StatefulWidget {
 class _CustomerShellState extends State<CustomerShell> {
   int _selectedIndex = 0;
 
+  /// Shop filter; set when Home opens a category.
+  String? _shopCategory;
+
+  void _openShop(String? category) {
+    setState(() {
+      _shopCategory = category;
+      _selectedIndex = 1;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Sudhamrtam',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            ClipOval(
+              child: Image.asset(
+                sudhamrtamLogoAsset,
+                width: 36,
+                height: 36,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox.shrink(),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Sudhamrtam',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
 
         // Temporary button for SQLite testing.
@@ -50,24 +77,40 @@ class _CustomerShellState extends State<CustomerShell> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
           setState(() {
+            // The Shop tab itself always opens on all products.
+            if (index == 1) _shopCategory = null;
             _selectedIndex = index;
           });
         },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            label: 'Home',
+          ),
+          const NavigationDestination(
             icon: Icon(Icons.storefront_outlined),
             label: 'Shop',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),
             label: 'Milk Plan',
           ),
           NavigationDestination(
-            icon: Icon(Icons.shopping_cart_outlined),
+            // Shows how many items are in the cart.
+            icon: ListenableBuilder(
+              listenable: sudhamrtamCart,
+              builder: (context, _) {
+                final count = sudhamrtamCart.totalQuantity;
+                return Badge(
+                  isLabelVisible: count > 0,
+                  label: Text(count > 99 ? '99+' : '$count'),
+                  child: const Icon(Icons.shopping_cart_outlined),
+                );
+              },
+            ),
             label: 'Cart',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.person_outline),
             label: 'Account',
           ),
@@ -80,10 +123,18 @@ class _CustomerShellState extends State<CustomerShell> {
   Widget _buildSelectedScreen() {
     switch (_selectedIndex) {
       case 0:
-        return const HomeScreen();
+        return HomeScreen(
+          onOpenShop: _openShop,
+          onOpenMilkPlan: () => setState(() => _selectedIndex = 2),
+          onOpenCart: () => setState(() => _selectedIndex = 3),
+        );
 
       case 1:
-        return const ShopScreen();
+        return ShopScreen(
+          category: _shopCategory,
+          onCategoryChanged: (category) =>
+              setState(() => _shopCategory = category),
+        );
 
       case 2:
         return const MilkPlanScreen();
@@ -95,7 +146,7 @@ class _CustomerShellState extends State<CustomerShell> {
         return AccountScreen();
 
       default:
-        return const HomeScreen();
+        return HomeScreen(onOpenShop: _openShop);
     }
   }
 

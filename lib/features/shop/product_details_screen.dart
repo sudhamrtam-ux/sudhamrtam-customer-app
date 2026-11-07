@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import 'product_image.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final String productId;
@@ -111,15 +112,20 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Product image placeholder
+              // Product photo (icon when there is none).
               Container(
-                height: 220,
+                height: 300,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F8F0),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Icon(widget.productIcon, size: 100, color: brandGreen),
+                child: ProductImage(
+                  productId: widget.productId,
+                  icon: widget.productIcon,
+                  iconSize: 100,
+                  borderRadius: 20,
+                    ),
               ),
 
               const SizedBox(height: 24),

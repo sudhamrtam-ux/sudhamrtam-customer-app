@@ -1,0 +1,64 @@
+import 'package:flutter/material.dart';
+
+/// Product photos bundled with the app, by product ID.
+///
+/// The photos come from the Sudhamrtam website
+/// (sudhamrtam.in/admin/uploads/products/), resized for the app.
+/// Products without a photo (e.g. curd) show their icon instead.
+const Map<String, String> productImageAssets = {
+  'buffalo_milk': 'assets/images/products/buffalo_milk.jpg',
+  'cow_milk': 'assets/images/products/cow_milk.jpg',
+  'buffalo_ghee': 'assets/images/products/buffalo_ghee.jpg',
+  'cow_ghee': 'assets/images/products/cow_ghee.jpg',
+  'raw_honey': 'assets/images/products/raw_honey.jpg',
+  'paneer': 'assets/images/products/paneer.jpg',
+  'coconut_oil': 'assets/images/products/coconut_oil.jpg',
+  'groundnut_oil': 'assets/images/products/groundnut_oil.jpg',
+  'sesame_oil': 'assets/images/products/sesame_oil.jpg',
+  'sunflower_oil': 'assets/images/products/sunflower_oil.jpg',
+};
+
+const String sudhamrtamLogoAsset = 'assets/images/logo.jpg';
+
+/// A product's photo, or its [icon] when there is no photo.
+///
+/// The whole photo is always shown, scaled to fit the space and
+/// centred, so tall bottles keep their caps and bases.
+class ProductImage extends StatelessWidget {
+  const ProductImage({
+    super.key,
+    required this.productId,
+    required this.icon,
+    this.iconSize = 42,
+    this.iconColor = const Color(0xFF82B440),
+    this.borderRadius = 12,
+  });
+
+  final String productId;
+  final IconData icon;
+  final double iconSize;
+  final Color iconColor;
+  final double borderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = productImageAssets[productId];
+    final fallback = Center(
+      child: Icon(icon, size: iconSize, color: iconColor),
+    );
+
+    if (asset == null) return fallback;
+
+    // Without a fixed size the image keeps its shape inside the
+    // space, and the rounded corners follow the photo itself.
+    return Center(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: Image.asset(
+          asset,
+          errorBuilder: (context, error, stackTrace) => fallback,
+        ),
+      ),
+    );
+  }
+}

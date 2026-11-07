@@ -295,8 +295,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _deliveryDateText(OrderRules rules) {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final date = rules.deliveryDateFor(DateTime.now());
     return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} '
