@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import '../../models/milk_subscription.dart';
+import '../../models/milk_subscription_manager.dart';
+import 'milk_plan_merge_dialog.dart';
 import 'milk_subscription_setup_screen.dart';
 
 // ============================================================
@@ -137,15 +139,23 @@ class MilkPlanScreen extends StatelessWidget {
                 }
 
                 return Column(
-                  children: subscriptions.map((subscription) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _SavedSubscriptionCard(
-                        key: ValueKey(subscription.id),
-                        subscription: subscription,
+                  children: [
+                    for (final group
+                        in sudhamrtamMilkSubscriptions.duplicatePlans)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: DuplicatePlansBanner(group: group),
                       ),
-                    );
-                  }).toList(),
+                    ...subscriptions.map((subscription) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _SavedSubscriptionCard(
+                          key: ValueKey(subscription.id),
+                          subscription: subscription,
+                        ),
+                      );
+                    }),
+                  ],
                 );
               },
             ),
@@ -919,6 +929,100 @@ class _DeliveryOption extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Offers to combine plans for the same milk into one plan.
+class DuplicatePlansBanner extends StatefulWidget {
+  const DuplicatePlansBanner({super.key, required this.group});
+
+  final DuplicateMilkPlans group;
+
+  @override
+  State<DuplicatePlansBanner> createState() => _DuplicatePlansBannerState();
+}
+
+class _DuplicatePlansBannerState extends State<DuplicatePlansBanner> {
+  bool _working = false;
+
+  Future<void> _combine() async {
+    setState(() => _working = true);
+    final ok = await sudhamrtamMilkSubscriptions.combinePlans(
+      widget.group.productId,
+    );
+    if (!mounted) return;
+    setState(() => _working = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Merged your ${milkName(widget.group.productId)} deliveries.'
+              : 'The plans could not be combined. Please try again.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final group = widget.group;
+    final name = milkName(group.productId);
+    final summaries = [
+      for (final plan in group.plans)
+        plan.shiftSchedules
+            .map((s) => '${shiftText(s.shift)} ${litresText(s.quantityMl)}')
+            .join(' + '),
+    ];
+
+    final shared = {
+      for (final outcome in group.changes.shifts)
+        shiftText(outcome.shift).toLowerCase(),
+    }.join(' and ');
+
+    final detail = group.canCombine
+        ? [
+            'Merge the $shared deliveries? Each shift keeps one plan.',
+            ...mergeLines(group.changes),
+          ].join('\n')
+        : [
+            ...mergeLines(group.changes),
+            'Please edit or cancel one of them, so each shift has one '
+                '$name plan.',
+          ].join('\n');
+
+    return Container(
+      key: Key('duplicatePlans_${group.productId}'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFD54F)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Two $name plans deliver in the same shift',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 4),
+          Text(summaries.join('   |   ')),
+          const SizedBox(height: 8),
+          Text(detail),
+          if (group.canCombine) ...[
+            const SizedBox(height: 12),
+            FilledButton(
+              key: const Key('combinePlans'),
+              onPressed: _working ? null : _combine,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF82B440),
+              ),
+              child: Text(_working ? 'Merging…' : 'Merge deliveries'),
+            ),
+          ],
         ],
       ),
     );

@@ -18,40 +18,74 @@ class MilkSubscriptionRepository {
   Future<void> saveSubscription(MilkSubscription subscription) async {
     _validate(subscription);
     final db = await _databaseService.database;
+    await db.transaction((txn) => _write(txn, subscription));
+  }
+
+  /// Saves [saves] (new or updated plans) and cancels [cancelIds]
+  /// in one transaction, so merging deliveries never leaves milk
+  /// counted twice or lost halfway.
+  Future<void> saveChanges({
+    required List<MilkSubscription> saves,
+    List<String> cancelIds = const [],
+  }) async {
+    for (final plan in saves) {
+      _validate(plan);
+    }
+    if (saves.any((plan) => cancelIds.contains(plan.id))) {
+      throw ArgumentError('A plan cannot be saved and cancelled together.');
+    }
+    final db = await _databaseService.database;
 
     await db.transaction((txn) async {
-      await txn.insert(MilkDatabaseService.subscriptionsTable, {
-        'id': subscription.id,
-        'product_id': subscription.productId,
-        'status': subscription.status.name,
-        'created_at': subscription.startDate.toIso8601String(),
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-
-      // Replacing the parent row may cascade-delete old shifts; explicitly
-      // delete them as well so updates always reflect the supplied schedules.
-      await txn.delete(
-        MilkDatabaseService.schedulesTable,
-        where: 'subscription_id = ?',
-        whereArgs: [subscription.id],
-      );
-
-      for (final schedule in subscription.shiftSchedules) {
-        await txn.insert(MilkDatabaseService.schedulesTable, {
-          'subscription_id': subscription.id,
-          'shift': schedule.shift.name,
-          'quantity_ml': schedule.quantityMl,
-          'frequency': schedule.frequency.name,
-          'selected_weekdays': jsonEncode(schedule.selectedWeekdays),
-          'selected_random_dates': jsonEncode(
-            schedule.selectedRandomDates
-                .map((date) => date.toIso8601String())
-                .toList(),
-          ),
-          'start_date': schedule.startDate.toIso8601String(),
-          'end_date': schedule.endDate?.toIso8601String(),
-        });
+      for (final plan in saves) {
+        await _write(txn, plan);
+      }
+      for (final id in cancelIds) {
+        final updated = await txn.update(
+          MilkDatabaseService.subscriptionsTable,
+          {'status': MilkSubscriptionStatus.cancelled.name},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        if (updated != 1) {
+          throw StateError('Cannot cancel missing plan $id.');
+        }
       }
     });
+  }
+
+  Future<void> _write(Transaction txn, MilkSubscription subscription) async {
+    await txn.insert(MilkDatabaseService.subscriptionsTable, {
+      'id': subscription.id,
+      'product_id': subscription.productId,
+      'status': subscription.status.name,
+      'created_at': subscription.startDate.toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    // Replacing the parent row may cascade-delete old shifts; explicitly
+    // delete them as well so updates always reflect the supplied schedules.
+    await txn.delete(
+      MilkDatabaseService.schedulesTable,
+      where: 'subscription_id = ?',
+      whereArgs: [subscription.id],
+    );
+
+    for (final schedule in subscription.shiftSchedules) {
+      await txn.insert(MilkDatabaseService.schedulesTable, {
+        'subscription_id': subscription.id,
+        'shift': schedule.shift.name,
+        'quantity_ml': schedule.quantityMl,
+        'frequency': schedule.frequency.name,
+        'selected_weekdays': jsonEncode(schedule.selectedWeekdays),
+        'selected_random_dates': jsonEncode(
+          schedule.selectedRandomDates
+              .map((date) => date.toIso8601String())
+              .toList(),
+        ),
+        'start_date': schedule.startDate.toIso8601String(),
+        'end_date': schedule.endDate?.toIso8601String(),
+      });
+    }
   }
 
   Future<List<MilkSubscription>> loadSubscriptions() async {

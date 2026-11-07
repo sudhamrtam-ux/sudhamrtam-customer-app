@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import '../../models/milk_subscription.dart';
+import '../../models/milk_plan_merge.dart';
+import 'milk_plan_merge_dialog.dart';
 
 const _brandGreen = Color(0xFF82B440);
 
@@ -204,6 +206,39 @@ class _MilkSubscriptionSetupScreenState
           .map((schedule) => schedule.startDate)
           .reduce((a, b) => a.isBefore(b) ? a : b);
 
+      // One plan per milk and shift: a shift that another plan
+      // already delivers is added to that plan (after asking).
+      if (existing == null) {
+        final changes = sudhamrtamMilkSubscriptions.checkNewPlan(
+          MilkSubscription(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            productId: productId,
+            shiftSchedules: schedules,
+            quantity: 1,
+            frequency: MilkDeliveryFrequency.daily,
+            startDate: legacyStart,
+          ),
+        );
+        if (changes.mergesIntoExisting) {
+          await _offerAddToPlan(changes);
+          return;
+        }
+      } else {
+        // An edit may not add a shift another plan already has.
+        final shared = sudhamrtamMilkSubscriptions
+            .sharedShifts(existing.copyWith(shiftSchedules: schedules))
+            .difference(sudhamrtamMilkSubscriptions.sharedShifts(existing));
+        if (shared.isNotEmpty) {
+          final names = shared.map(shiftText).join(' and ');
+          _showError(
+            'Another ${milkName(productId)} plan already has your '
+            '${names.toLowerCase()} delivery. Change the quantity in that '
+            'plan instead.',
+          );
+          return;
+        }
+      }
+
       bool saved;
       if (existing != null) {
         saved = await sudhamrtamMilkSubscriptions.updateSubscription(
@@ -257,6 +292,42 @@ class _MilkSubscriptionSetupScreenState
       if (mounted) {
         setState(() => _isSaving = false);
       }
+    }
+  }
+
+  Future<void> _offerAddToPlan(MilkPlanChanges changes) async {
+    final choice = await showAddToPlanDialog(context, changes: changes);
+    if (!mounted) return;
+
+    switch (choice) {
+      case AddToPlanChoice.cancel:
+        return;
+      case AddToPlanChoice.edit:
+        final plan = changes.blockingPlan;
+        if (plan == null) return;
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (context) => MilkSubscriptionSetupScreen(
+              productName: widget.productName,
+              existingSubscription: plan,
+            ),
+          ),
+        );
+        return;
+      case AddToPlanChoice.add:
+        final saved = await sudhamrtamMilkSubscriptions.saveNewPlan(changes);
+        if (!mounted) return;
+        if (!saved) {
+          _showError('Your plan was not updated. Please try again.');
+          return;
+        }
+        final messenger = ScaffoldMessenger.of(context);
+        Navigator.of(context).pop();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Added to your ${milkName(changes.productId)} plan.'),
+          ),
+        );
     }
   }
 

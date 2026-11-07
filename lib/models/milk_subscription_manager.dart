@@ -1,7 +1,24 @@
 import 'package:flutter/foundation.dart';
 
+import 'milk_plan_merge.dart';
 import 'milk_subscription.dart';
 import '../database/milk_subscription_repository.dart';
+
+/// Plans of the same milk that deliver in the same shift (made
+/// before deliveries were merged automatically).
+class DuplicateMilkPlans {
+  final String productId;
+
+  /// The plans involved, oldest first.
+  final List<MilkSubscription> plans;
+
+  /// How they merge; `changes.isPossible` is false if they can't.
+  final MilkPlanChanges changes;
+
+  const DuplicateMilkPlans(this.productId, this.plans, this.changes);
+
+  bool get canCombine => changes.isPossible;
+}
 
 class MilkSubscriptionManager extends ChangeNotifier {
   final List<MilkSubscription> _subscriptions = [];
@@ -53,7 +70,128 @@ class MilkSubscriptionManager extends ChangeNotifier {
 
   int get subscriptionCount => _subscriptions.length;
 
-  bool get isEmpty => _subscriptions.isEmpty;
+  // ============================================================
+  // ONE PLAN PER MILK AND SHIFT
+  // ============================================================
+
+  /// The customer's plans for [productId] that are not cancelled,
+  /// oldest first.
+  List<MilkSubscription> plansFor(String productId) => [
+    for (final subscription in _subscriptions)
+      if (subscription.productId == productId &&
+          subscription.status != MilkSubscriptionStatus.cancelled &&
+          subscription.shiftSchedules.isNotEmpty)
+        subscription,
+  ];
+
+  /// The shifts in which [plan] would deliver the same milk as
+  /// another (not cancelled) plan.
+  Set<MilkDeliveryShift> sharedShifts(MilkSubscription plan) => {
+    for (final other in plansFor(plan.productId))
+      if (other.id != plan.id)
+        for (final schedule in plan.shiftSchedules)
+          if (other.scheduleFor(schedule.shift) != null) schedule.shift,
+  };
+
+  /// How a new plan fits with the existing plans for its milk:
+  /// shifts already delivered by a plan are added to that plan;
+  /// the other shifts form the new plan.
+  MilkPlanChanges checkNewPlan(MilkSubscription incoming) =>
+      planNewSubscription(plansFor(incoming.productId), incoming);
+
+  /// Saves a new plan (with any merged deliveries) in one step.
+  Future<bool> saveNewPlan(MilkPlanChanges changes) async {
+    if (!changes.isPossible) return false;
+    return _applyChanges(changes.saves, changes.cancelIds);
+  }
+
+  /// Plans that deliver the same milk in the same shift.
+  List<DuplicateMilkPlans> get duplicatePlans {
+    final byProduct = <String, List<MilkSubscription>>{};
+    for (final plan in _subscriptions) {
+      if (plan.status == MilkSubscriptionStatus.cancelled ||
+          plan.shiftSchedules.isEmpty) {
+        continue;
+      }
+      byProduct.putIfAbsent(plan.productId, () => []).add(plan);
+    }
+
+    final groups = <DuplicateMilkPlans>[];
+    for (final entry in byProduct.entries) {
+      final changes = combineSharedShifts(entry.value);
+      if (changes == null) continue;
+      final involved = {
+        for (final outcome in changes.shifts) ...[
+          outcome.target!.id,
+          for (final plan in entry.value)
+            if (plan.scheduleFor(outcome.shift) != null) plan.id,
+        ],
+      };
+      groups.add(
+        DuplicateMilkPlans(entry.key, [
+          for (final plan in entry.value)
+            if (involved.contains(plan.id)) plan,
+        ], changes),
+      );
+    }
+    return groups;
+  }
+
+  /// Merges the shared shifts of [productId]'s plans, in one
+  /// database transaction.
+  Future<bool> combinePlans(String productId) async {
+    for (final group in duplicatePlans) {
+      if (group.productId == productId && group.canCombine) {
+        return _applyChanges(group.changes.saves, group.changes.cancelIds);
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _applyChanges(
+    List<MilkSubscription> saves,
+    List<String> cancelIds,
+  ) async {
+    if (_isWriting || saves.any((plan) => !_isValidSubscription(plan))) {
+      return false;
+    }
+    for (final plan in saves) {
+      final current = _subscriptions.where((s) => s.id == plan.id);
+      if (current.isNotEmpty &&
+          current.first.status == MilkSubscriptionStatus.cancelled) {
+        return false;
+      }
+    }
+
+    final snapshots = saves.map(_copyWithScheduleSnapshots).toList();
+
+    _isWriting = true;
+    try {
+      await _repository.saveChanges(saves: snapshots, cancelIds: cancelIds);
+
+      for (final snapshot in snapshots) {
+        final index = _subscriptions.indexWhere((s) => s.id == snapshot.id);
+        if (index == -1) {
+          _subscriptions.add(snapshot);
+        } else {
+          _subscriptions[index] = snapshot;
+        }
+      }
+      for (var i = 0; i < _subscriptions.length; i++) {
+        if (cancelIds.contains(_subscriptions[i].id)) {
+          _subscriptions[i] = _copyWithScheduleSnapshots(
+            _subscriptions[i].copyWith(
+              status: MilkSubscriptionStatus.cancelled,
+            ),
+          );
+        }
+      }
+      notifyListeners();
+      return true;
+    } finally {
+      _isWriting = false;
+    }
+  }
 
   // ============================================================
   // QUANTITY RULES
@@ -225,7 +363,9 @@ class MilkSubscriptionManager extends ChangeNotifier {
     if (_isWriting ||
         !_isValidSubscription(subscription) ||
         subscription.shiftSchedules.isEmpty ||
-        _subscriptions.any((item) => item.id == subscription.id)) {
+        _subscriptions.any((item) => item.id == subscription.id) ||
+        // One plan per milk and shift: use checkNewPlan/saveNewPlan.
+        sharedShifts(subscription).isNotEmpty) {
       return false;
     }
 
@@ -256,7 +396,11 @@ class MilkSubscriptionManager extends ChangeNotifier {
     final existing = _subscriptions[index];
     if (existing.status == MilkSubscriptionStatus.cancelled ||
         !_isValidSubscription(updatedSubscription) ||
-        updatedSubscription.shiftSchedules.isEmpty) {
+        updatedSubscription.shiftSchedules.isEmpty ||
+        // An edit may not add a shift another plan already delivers.
+        sharedShifts(updatedSubscription)
+            .difference(sharedShifts(existing))
+            .isNotEmpty) {
       return false;
     }
 
