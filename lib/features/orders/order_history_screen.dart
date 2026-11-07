@@ -2,10 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../../database/order_database_service.dart';
 import '../../models/customer_order.dart';
+import '../../services/order_api_client.dart';
+import '../checkout/order_destination.dart';
 import 'order_details_screen.dart';
+import 'order_status_labels.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
-  const OrderHistoryScreen({super.key});
+  OrderHistoryScreen({super.key, OrderApiClient? api})
+    : api = api ?? OrderDestination.server;
+
+  /// Payment statuses come from here; null without a server.
+  final OrderApiClient? api;
 
   @override
   State<OrderHistoryScreen> createState() => _OrderHistoryScreenState();
@@ -16,6 +23,10 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
   late Future<List<CustomerOrder>> _ordersFuture;
 
+  /// The server's payment status per order; empty if unknown
+  /// (no server, offline, or a local test order).
+  Map<String, OrderPaymentStatus> _payments = const {};
+
   @override
   void initState() {
     super.initState();
@@ -24,6 +35,18 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
   void _loadOrders() {
     _ordersFuture = OrderDatabaseService.instance.getAllOrders();
+    _loadPayments();
+  }
+
+  Future<void> _loadPayments() async {
+    final api = widget.api;
+    if (api == null) return;
+    try {
+      final payments = await api.fetchPaymentStatuses();
+      if (mounted) setState(() => _payments = payments);
+    } catch (_) {
+      // Offline: the cards show the payment method instead.
+    }
   }
 
   Future<void> _refreshOrders() async {
@@ -46,56 +69,6 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     final year = local.year;
 
     return '$day/$month/$year';
-  }
-
-  String _formatStatus(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.pending:
-        return 'Pending';
-
-      case OrderStatus.confirmed:
-        return 'Confirmed';
-
-      case OrderStatus.preparing:
-        return 'Preparing';
-
-      case OrderStatus.outForDelivery:
-        return 'Out for Delivery';
-
-      case OrderStatus.readyForPickup:
-        return 'Ready for Pickup';
-
-      case OrderStatus.delivered:
-        return 'Delivered';
-
-      case OrderStatus.pickedUp:
-        return 'Picked Up';
-
-      case OrderStatus.cancelled:
-        return 'Cancelled';
-    }
-  }
-
-  Color _statusColor(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.pending:
-        return Colors.orange;
-
-      case OrderStatus.confirmed:
-      case OrderStatus.preparing:
-        return Colors.blue;
-
-      case OrderStatus.outForDelivery:
-      case OrderStatus.readyForPickup:
-        return Colors.deepPurple;
-
-      case OrderStatus.delivered:
-      case OrderStatus.pickedUp:
-        return Colors.green;
-
-      case OrderStatus.cancelled:
-        return Colors.red;
-    }
   }
 
   String _formatFulfillment(FulfillmentMethod method) {
@@ -161,7 +134,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   // ==========================================
 
   Widget _buildOrderCard(CustomerOrder order) {
-    final statusColor = _statusColor(order.status);
+    final server = _payments[order.id];
+    final delivery = deliveryLabel(effectiveStatus(order, server));
+    final payment = paymentLabel(order, server);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -176,42 +151,26 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ORDER ID AND STATUS
+              // ORDER ID
+              Text(
+                'Order #${order.id}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
 
-              Row(
+              const SizedBox(height: 10),
+
+              // PAYMENT AND DELIVERY STATUS
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Order #${order.id}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      _formatStatus(order.status),
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                  StatusChip(payment, key: Key('payment_${order.id}')),
+                  StatusChip(delivery, key: Key('delivery_${order.id}')),
                 ],
               ),
 

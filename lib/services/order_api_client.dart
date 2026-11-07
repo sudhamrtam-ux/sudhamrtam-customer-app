@@ -32,19 +32,94 @@ class OrderRejectedException implements Exception {
   String toString() => message;
 }
 
+/// A payment request the server refused, with its stable code:
+/// ALREADY_PAID, PAYMENT_WINDOW_CLOSED, ORDER_CANCELLED,
+/// NOT_ONLINE_PAYMENT, PAYMENT_IN_PROGRESS or PAYMENT_NOT_OFFERED.
+class PaymentRejectedException implements Exception {
+  final String code;
+  final String message;
+
+  const PaymentRejectedException(this.code, this.message);
+
+  bool get isAlreadyPaid => code == 'ALREADY_PAID';
+
+  @override
+  String toString() => message;
+}
+
+/// What the app needs to open Cashfree's payment screen.
+class PaymentSession {
+  final String orderId;
+  final String paymentSessionId;
+
+  /// "sandbox" (test payments) or "production".
+  final String environment;
+
+  const PaymentSession({
+    required this.orderId,
+    required this.paymentSessionId,
+    required this.environment,
+  });
+
+  bool get isSandbox => environment != 'production';
+}
+
+/// An order's payment, as the server knows it.
+class OrderPaymentStatus {
+  /// "online" or "cash_on_delivery".
+  final String paymentMethod;
+
+  /// due_on_delivery, awaiting_online, paid_online or not_paid.
+  final String paymentStatus;
+
+  /// The order status, e.g. "pending" or "cancelled".
+  final String orderStatus;
+
+  /// Online orders are cancelled if not paid by this time.
+  final DateTime? paymentDueAt;
+
+  const OrderPaymentStatus({
+    required this.paymentMethod,
+    required this.paymentStatus,
+    required this.orderStatus,
+    this.paymentDueAt,
+  });
+
+  bool get isPaid => paymentStatus == 'paid_online';
+  bool get isAwaitingPayment => paymentStatus == 'awaiting_online';
+  bool get isCashOnDelivery => paymentStatus == 'due_on_delivery';
+  bool get isCancelledUnpaid => paymentStatus == 'not_paid';
+
+  factory OrderPaymentStatus.fromOrderJson(Map<String, dynamic> order) {
+    final due = order['payment_due_at'] as String?;
+    return OrderPaymentStatus(
+      paymentMethod: order['payment_method'] as String,
+      paymentStatus: order['payment_status'] as String? ?? 'due_on_delivery',
+      orderStatus: order['status'] as String,
+      paymentDueAt: due == null ? null : DateTime.parse(due),
+    );
+  }
+}
+
 /// The owner's order rules, as published by the server.
 class OrderRules {
   final int minimumOrderPaise;
   final int deliveryFeePaise;
   final int cutoffHourIst;
 
+  /// e.g. ["cash_on_delivery", "online"].
+  final List<String> paymentMethods;
+
   const OrderRules({
     required this.minimumOrderPaise,
     required this.deliveryFeePaise,
     required this.cutoffHourIst,
+    this.paymentMethods = const ['cash_on_delivery'],
   });
 
   double get minimumOrderRupees => minimumOrderPaise / 100;
+
+  bool get offersOnlinePayment => paymentMethods.contains('online');
 
   /// The delivery date for an order placed at [now] (India time):
   /// tomorrow before the cut-off, otherwise the day after.
@@ -156,10 +231,96 @@ class OrderApiClient {
         minimumOrderPaise: json['minimum_order_paise'] as int,
         deliveryFeePaise: json['delivery_fee_paise'] as int,
         cutoffHourIst: json['cutoff_hour_ist'] as int,
+        paymentMethods: [
+          for (final method in (json['payment_methods'] as List? ?? const []))
+            method as String,
+        ],
       );
     } catch (_) {
       throw const OrderApiException('Could not load the order rules.');
     }
+  }
+
+  /// Starts (or resumes) paying for an online order.
+  Future<PaymentSession> startPayment(String orderId) async {
+    final response = await _send('POST', 'v1/orders/$orderId/payment');
+    final json = _paymentJson(response);
+    return PaymentSession(
+      orderId: json['order_id'] as String,
+      paymentSessionId: json['payment_session_id'] as String,
+      environment: json['environment'] as String,
+    );
+  }
+
+  /// Asks the server to check the payment with Cashfree.
+  Future<OrderPaymentStatus> checkPayment(String orderId) async {
+    final response = await _send('POST', 'v1/orders/$orderId/payment/check');
+    return OrderPaymentStatus.fromOrderJson(
+      _paymentJson(response)['order'] as Map<String, dynamic>,
+    );
+  }
+
+  /// Changes an unpaid online order to Cash on Delivery.
+  Future<OrderPaymentStatus> switchToCashOnDelivery(String orderId) async {
+    final response = await _send(
+      'POST',
+      'v1/orders/$orderId/payment/cash-on-delivery',
+    );
+    return OrderPaymentStatus.fromOrderJson(
+      _paymentJson(response)['order'] as Map<String, dynamic>,
+    );
+  }
+
+  /// The order's payment as the server has it, without asking
+  /// Cashfree.
+  Future<OrderPaymentStatus> fetchPaymentStatus(String orderId) async {
+    final response = await _send('GET', 'v1/orders/$orderId');
+    return OrderPaymentStatus.fromOrderJson(
+      _paymentJson(response)['order'] as Map<String, dynamic>,
+    );
+  }
+
+  /// The payment status of the customer's recent orders on the
+  /// server (one request), by order ID.
+  Future<Map<String, OrderPaymentStatus>> fetchPaymentStatuses() async {
+    final response = await _send('GET', 'v1/orders');
+    final orders = _paymentJson(response)['orders'] as List? ?? const [];
+    return {
+      for (final order in orders.cast<Map<String, dynamic>>())
+        order['id'] as String: OrderPaymentStatus.fromOrderJson(order),
+    };
+  }
+
+  static Map<String, dynamic> _paymentJson(http.Response response) {
+    Map<String, dynamic>? json;
+    try {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is Map<String, dynamic>) json = decoded;
+    } catch (_) {
+      // Not JSON.
+    }
+
+    final status = response.statusCode;
+    if (status == 200 && json != null) return json;
+
+    if (status == 401) {
+      throw const OrderApiException('Please sign in again to pay.');
+    }
+
+    final code = json?['error'] as String?;
+    final message = json?['message'] as String?;
+    if (code != null && status >= 400 && status < 500 || status == 503) {
+      throw PaymentRejectedException(
+        code ?? 'PAYMENT_NOT_OFFERED',
+        message ?? 'Online payment is not available right now.',
+      );
+    }
+
+    throw OrderApiException(
+      message ??
+          'The payment service did not respond (error $status). '
+              'Please try again.',
+    );
   }
 
   Future<http.Response> _send(
@@ -210,7 +371,9 @@ class OrderApiClient {
     final status = response.statusCode;
 
     if (status == 401) {
-      return const OrderApiException('Please sign in again to place your order.');
+      return const OrderApiException(
+        'Please sign in again to place your order.',
+      );
     }
 
     // 400/409/422: the server refused this exact order.

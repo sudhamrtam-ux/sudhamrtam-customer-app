@@ -11,6 +11,7 @@ import '../../services/phone_auth_service.dart';
 import '../account/address_form_screen.dart';
 import '../account/phone_login_screen.dart';
 import '../orders/order_details_screen.dart';
+import '../payment/payment_screen.dart';
 import 'checkout_fault_injector.dart';
 import 'checkout_order_session.dart';
 import 'checkout_validator.dart';
@@ -105,6 +106,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool get _ordersEnabled => _serverMode || widget.enableTestOrders;
 
   bool get _signedIn => widget.auth?.currentUser != null;
+
+  /// The server takes online payments (Cashfree).
+  bool get _onlineOffered =>
+      _serverMode && (_rules?.offersOnlinePayment ?? false);
+
+  /// An online order would be placed and paid on the next screen.
+  bool get _paysOnline =>
+      _paymentMethod == OrderPaymentMethod.online && _onlineOffered;
 
   CustomerAddress? get _selectedAddress {
     for (final address in _savedAddresses) {
@@ -441,9 +450,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       if (!mounted) return;
 
+      // Online orders are placed first, then paid.
+      final paysOnline =
+          _serverMode && saved.paymentMethod == OrderPaymentMethod.online;
+
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (context) => OrderDetailsScreen(order: saved),
+          builder: (context) => paysOnline
+              ? PaymentScreen(order: saved)
+              : OrderDetailsScreen(order: saved),
         ),
       );
     } on OrderRejectedException catch (error) {
@@ -875,7 +890,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final fulfillmentText = isDelivery ? 'Home Delivery' : 'Store Pickup';
 
     final paymentText = _paymentMethod == OrderPaymentMethod.online
-        ? 'Online Payment'
+        ? (_serverMode
+              ? 'Pay Online (UPI / Card / Net Banking)'
+              : 'Online Payment')
         : _serverMode
         ? 'Cash on Delivery'
         : 'Cash on Delivery / Pickup';
@@ -1101,6 +1118,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ? 'Please review the checkout requirements '
                       'above. Order placement is currently '
                       'unavailable.'
+                : _serverMode && _paysOnline
+                ? 'Ready to place your order. You pay online on the '
+                      'next screen.'
                 : _serverMode
                 ? 'Ready to place your order. It is sent to '
                       'Sudhamrtam and paid in cash on delivery.'
@@ -1208,7 +1228,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               (isRetry ||
                   (checkoutReady &&
                       !sudhamrtamCart.isCheckoutLocked &&
-                      _paymentMethod == OrderPaymentMethod.cashOnDelivery));
+                      (_paymentMethod == OrderPaymentMethod.cashOnDelivery ||
+                          _paysOnline)));
 
           final placeOrderLabel = !_ordersEnabled
               ? 'Place Order — Coming Soon'
@@ -1217,6 +1238,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ? 'Placing Order...'
                     : isRetry
                     ? 'Retry Order'
+                    : _paysOnline
+                    ? 'Place Order & Pay'
                     : 'Place Order')
               : _isSubmitting
               ? 'Placing Test Order...'
@@ -1394,11 +1417,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 },
               ),
 
-              // Online payment is not available yet.
-              if (!_serverMode)
+              // Online payment: offered when the server takes it
+              // (Cashfree); local test orders keep the old option.
+              if (!_serverMode || _onlineOffered)
                 _optionCard(
-                  title: 'Online Payment',
-                  subtitle: 'UPI, cards and other online options',
+                  title: _serverMode ? 'Pay Online' : 'Online Payment',
+                  subtitle: _serverMode
+                      ? 'UPI, cards and net banking (Cashfree)'
+                      : 'UPI, cards and other online options',
                   icon: Icons.credit_card_outlined,
                   selected: _paymentMethod == OrderPaymentMethod.online,
                   onTap: () {

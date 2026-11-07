@@ -59,7 +59,7 @@ void main() {
 
       expect(find.text('Order Details'), findsOneWidget);
       expect(find.text('Order #TEST-ORDER-001'), findsOneWidget);
-      expect(find.text('Pending'), findsOneWidget);
+      expect(find.text('Delivery pending'), findsOneWidget);
       expect(find.textContaining('04/11/2026'), findsOneWidget);
     });
 
@@ -132,7 +132,7 @@ void main() {
 
       await openOrderDetails(tester, order);
 
-      expect(find.text('Ready for Pickup'), findsOneWidget);
+      expect(find.text('Ready for pickup'), findsOneWidget);
 
       await tester.scrollUntilVisible(find.text('Online Payment'), 200);
 

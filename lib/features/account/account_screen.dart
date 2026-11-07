@@ -18,7 +18,7 @@ class AccountScreen extends StatelessWidget {
   /// Opens the existing customer order history screen.
   void _openOrderHistory(BuildContext context) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (context) => const OrderHistoryScreen()),
+      MaterialPageRoute<void>(builder: (context) => OrderHistoryScreen()),
     );
   }
 

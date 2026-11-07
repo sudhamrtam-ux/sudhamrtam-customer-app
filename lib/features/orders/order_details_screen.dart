@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../models/customer_order.dart';
 import '../../models/order_item.dart';
+import '../payment/order_payment_status.dart';
+import 'order_status_labels.dart';
 
 class OrderDetailsScreen extends StatelessWidget {
   final CustomerOrder order;
@@ -21,45 +23,6 @@ class OrderDetailsScreen extends StatelessWidget {
     final minute = local.minute.toString().padLeft(2, '0');
 
     return '$day/$month/$year  $hour:$minute';
-  }
-
-  String _formatStatus(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.pending:
-        return 'Pending';
-      case OrderStatus.confirmed:
-        return 'Confirmed';
-      case OrderStatus.preparing:
-        return 'Preparing';
-      case OrderStatus.outForDelivery:
-        return 'Out for Delivery';
-      case OrderStatus.readyForPickup:
-        return 'Ready for Pickup';
-      case OrderStatus.delivered:
-        return 'Delivered';
-      case OrderStatus.pickedUp:
-        return 'Picked Up';
-      case OrderStatus.cancelled:
-        return 'Cancelled';
-    }
-  }
-
-  Color _statusColor(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.pending:
-        return Colors.orange;
-      case OrderStatus.confirmed:
-      case OrderStatus.preparing:
-        return Colors.blue;
-      case OrderStatus.outForDelivery:
-      case OrderStatus.readyForPickup:
-        return Colors.deepPurple;
-      case OrderStatus.delivered:
-      case OrderStatus.pickedUp:
-        return Colors.green;
-      case OrderStatus.cancelled:
-        return Colors.red;
-    }
   }
 
   String _formatFulfillment(FulfillmentMethod method) {
@@ -166,8 +129,6 @@ class OrderDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _statusColor(order.status);
-
     return Scaffold(
       appBar: AppBar(title: const Text('Order Details')),
       body: ListView(
@@ -205,27 +166,11 @@ class OrderDetailsScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Order Status',
+                        'Delivery Status',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
 
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _formatStatus(order.status),
-                          style: TextStyle(
-                            color: statusColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      StatusChip(deliveryLabel(order.status)),
                     ],
                   ),
                 ],
@@ -310,6 +255,8 @@ class OrderDetailsScreen extends StatelessWidget {
                     'Payment Method',
                     _formatPayment(order.paymentMethod),
                   ),
+                  if (order.paymentMethod == OrderPaymentMethod.online)
+                    OrderPaymentStatusView(order: order),
                 ],
               ),
             ),

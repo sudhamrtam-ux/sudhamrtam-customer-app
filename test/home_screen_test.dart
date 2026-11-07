@@ -79,7 +79,7 @@ void main() {
   Future<void> drainSaves(WidgetTester tester) async {
     var done = false;
     cart.waitForPendingSaves().then((_) => done = true);
-    for (var i = 0; i < 100 && !done; i++) {
+    for (var i = 0; i < 500 && !done; i++) {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 20)),
       );

@@ -147,7 +147,10 @@ void main() {
     await setCart(4); // ₹200
   });
 
-  Future<void> pump(WidgetTester tester) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    OrderRules serverRules = rules,
+  }) async {
     tester.view.physicalSize = const Size(1200, 6000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -159,7 +162,7 @@ void main() {
           sendsToServer: true,
           coordinator: coordinator,
           auth: auth,
-          loadRules: () async => rules,
+          loadRules: () async => serverRules,
           orderSession: CheckoutOrderSession(
             loadPendingOrder: () async => null,
           ),
@@ -202,6 +205,42 @@ void main() {
     expect(order.paymentMethod, OrderPaymentMethod.cashOnDelivery);
   });
 
+  testWidgets('online payment is offered when the server takes it', (
+    tester,
+  ) async {
+    await tester.runAsync(() => setUpAddress(areaId: 'nizampet'));
+    await pump(
+      tester,
+      serverRules: const OrderRules(
+        minimumOrderPaise: 20000,
+        deliveryFeePaise: 0,
+        cutoffHourIst: 21,
+        paymentMethods: ['cash_on_delivery', 'online'],
+      ),
+    );
+
+    expect(find.text('Pay Online'), findsOneWidget);
+    await tester.tap(find.text('Pay Online'));
+    await tester.pump();
+
+    expect(isEnabled(tester, 'Place Order & Pay'), isTrue);
+    await tester.tap(button('Place Order & Pay'));
+    await tester.pump();
+
+    final order = coordinator.received.single;
+    expect(order.paymentMethod, OrderPaymentMethod.online);
+    expect(order.addressId, 'home_1');
+  });
+
+  testWidgets('online payment is hidden when the server does not take it', (
+    tester,
+  ) async {
+    await tester.runAsync(() => setUpAddress(areaId: 'nizampet'));
+    await pump(tester);
+
+    expect(find.text('Pay Online'), findsNothing);
+  });
+
   testWidgets('signing in is required', (tester) async {
     auth.user = null;
     await tester.runAsync(() => setUpAddress(areaId: 'nizampet'));
@@ -236,7 +275,9 @@ void main() {
     expect(isEnabled(tester, 'Place Order'), isFalse);
   });
 
-  testWidgets('a refused order can be cancelled, keeping the cart', (tester) async {
+  testWidgets('a refused order can be cancelled, keeping the cart', (
+    tester,
+  ) async {
     await tester.runAsync(() => setUpAddress(areaId: 'nizampet'));
     coordinator.failNext = const OrderRejectedException(
       'PRODUCT_UNAVAILABLE',
@@ -247,7 +288,10 @@ void main() {
     await tester.tap(button('Place Order'));
     await tester.pump();
 
-    expect(find.text('Some products are not available right now.'), findsOneWidget);
+    expect(
+      find.text('Some products are not available right now.'),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('cancelRejectedOrder')), findsOneWidget);
     expect(sudhamrtamCart.isCheckoutRecoveryLocked, isTrue);
   });

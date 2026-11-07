@@ -122,6 +122,24 @@ class OrderDatabaseService {
     return updatedRows > 0;
   }
 
+  /// Updates only the payment method of an existing order (an
+  /// unpaid online order switched to Cash on Delivery).
+  Future<bool> updatePaymentMethod(
+    String orderId,
+    OrderPaymentMethod method,
+  ) async {
+    final db = await MilkDatabaseService.instance.database;
+
+    final updatedRows = await db.update(
+      MilkDatabaseService.ordersTable,
+      {'payment_method': method.name},
+      where: 'id = ?',
+      whereArgs: [orderId],
+    );
+
+    return updatedRows > 0;
+  }
+
   /// Returns the number of stored customer orders.
   Future<int> getOrderCount() async {
     final db = await MilkDatabaseService.instance.database;
