@@ -54,6 +54,25 @@ class MilkSubscriptionRepository {
     });
   }
 
+  /// Replaces every saved plan with [plans] (the server's copy), in
+  /// one transaction.
+  Future<void> replaceAll(List<MilkSubscription> plans) async {
+    for (final plan in plans) {
+      _validate(plan);
+    }
+    final db = await _databaseService.database;
+    await db.transaction((txn) async {
+      await txn.delete(MilkDatabaseService.schedulesTable);
+      await txn.delete(MilkDatabaseService.subscriptionsTable);
+      for (final plan in plans) {
+        await _write(txn, plan);
+      }
+    });
+  }
+
+  /// Removes every saved plan (sign-out: they are on the server).
+  Future<void> deleteAll() => replaceAll(const []);
+
   Future<void> _write(Transaction txn, MilkSubscription subscription) async {
     await txn.insert(MilkDatabaseService.subscriptionsTable, {
       'id': subscription.id,

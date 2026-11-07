@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import '../../services/milk_plan_api_client.dart';
+import '../account/phone_login_screen.dart';
 import '../../models/milk_subscription.dart';
 import '../../models/milk_subscription_manager.dart';
 import '../../models/milk_plan_merge.dart';
@@ -48,15 +50,7 @@ class MilkPlanScreen extends StatelessWidget {
               name: 'Buffalo Milk',
               description: 'Rich, creamy farm-fresh buffalo milk.',
               icon: Icons.water_drop,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (context) => const MilkSubscriptionSetupScreen(
-                      productName: 'Buffalo Milk',
-                    ),
-                  ),
-                );
-              },
+              onTap: () => openMilkPlanSetup(context, 'Buffalo Milk'),
             ),
 
             const SizedBox(height: 16),
@@ -68,15 +62,7 @@ class MilkPlanScreen extends StatelessWidget {
               name: 'Cow Milk',
               description: 'Fresh, wholesome cow milk.',
               icon: Icons.water_drop_outlined,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (context) => const MilkSubscriptionSetupScreen(
-                      productName: 'Cow Milk',
-                    ),
-                  ),
-                );
-              },
+              onTap: () => openMilkPlanSetup(context, 'Cow Milk'),
             ),
 
             const SizedBox(height: 32),
@@ -98,6 +84,33 @@ class MilkPlanScreen extends StatelessWidget {
             ),
 
             const SizedBox(height: 16),
+
+            ListenableBuilder(
+              listenable: sudhamrtamMilkSync,
+              builder: (context, _) {
+                final message = sudhamrtamMilkSync.message;
+                if (message == null) return const SizedBox.shrink();
+                return Container(
+                  key: const Key('milkSyncMessage'),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(message),
+                      TextButton(
+                        onPressed: sudhamrtamMilkSync.syncNow,
+                        child: const Text('Try again'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
 
             ListenableBuilder(
               listenable: sudhamrtamMilkSubscriptions,
@@ -295,7 +308,11 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
       );
     } catch (error) {
       debugPrint('Milk subscription status error: $error');
-      _showMessage('Unable to save subscription status. Please try again.');
+      _showMessage(
+        error is MilkPlanSyncException
+            ? error.message
+            : 'Unable to save subscription status. Please try again.',
+      );
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -465,7 +482,11 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
       );
     } catch (error) {
       debugPrint('Milk subscription cancellation error: $error');
-      _showMessage('Unable to save cancellation. Please try again.');
+      _showMessage(
+        error is MilkPlanSyncException
+            ? error.message
+            : 'Unable to save cancellation. Please try again.',
+      );
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -928,9 +949,15 @@ class _DuplicatePlansBannerState extends State<DuplicatePlansBanner> {
 
   Future<void> _combine() async {
     setState(() => _working = true);
-    final ok = await sudhamrtamMilkSubscriptions.combinePlans(
-      widget.group.productId,
-    );
+    String? failure;
+    var ok = false;
+    try {
+      ok = await sudhamrtamMilkSubscriptions.combinePlans(
+        widget.group.productId,
+      );
+    } on MilkPlanSyncException catch (error) {
+      failure = error.message;
+    }
     if (!mounted) return;
     setState(() => _working = false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -938,7 +965,7 @@ class _DuplicatePlansBannerState extends State<DuplicatePlansBanner> {
         content: Text(
           ok
               ? 'Merged your ${milkName(widget.group.productId)} deliveries.'
-              : 'The plans could not be combined. Please try again.',
+              : failure ?? 'The plans could not be combined. Please try again.',
         ),
       ),
     );
@@ -1186,4 +1213,25 @@ class _CancelledPlans extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Opens the setup for a new plan. With a server, milk plans belong
+/// to the account, so the customer signs in first.
+Future<void> openMilkPlanSetup(BuildContext context, String productName) async {
+  final auth = sudhamrtamAuth;
+  if (sudhamrtamMilkSync.isAvailable &&
+      auth != null &&
+      auth.currentUser == null) {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => PhoneLoginScreen(auth: auth)),
+    );
+    if (!context.mounted || auth.currentUser == null) return;
+  }
+  if (!context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (context) =>
+          MilkSubscriptionSetupScreen(productName: productName),
+    ),
+  );
 }

@@ -9,6 +9,7 @@ import '../models/catalog_repository.dart';
 import '../models/milk_subscription_manager.dart';
 import '../services/account_sync_service.dart';
 import '../services/catalog_api_client.dart';
+import '../services/milk_plan_sync_service.dart';
 import '../services/phone_auth_service.dart';
 
 /// Phone login, or null when this build has no server
@@ -65,6 +66,12 @@ Future<void> initializeCatalogAndCart() async {
 
 final MilkSubscriptionManager sudhamrtamMilkSubscriptions =
     MilkSubscriptionManager();
+
+/// Keeps milk plans in step with the signed-in account. Local-only
+/// until main() sets it up for a build with a server.
+MilkPlanSyncService sudhamrtamMilkSync = MilkPlanSyncService(
+  manager: sudhamrtamMilkSubscriptions,
+);
 
 class SudhamrtamApp extends StatelessWidget {
   const SudhamrtamApp({super.key});

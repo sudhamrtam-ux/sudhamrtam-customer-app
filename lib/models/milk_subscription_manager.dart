@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'milk_plan_merge.dart';
 import 'milk_subscription.dart';
 import '../database/milk_subscription_repository.dart';
+import '../services/milk_plan_api_client.dart';
 
 /// Plans of the same milk that deliver in the same shift (made
 /// before deliveries were merged automatically).
@@ -20,12 +21,43 @@ class DuplicateMilkPlans {
   bool get canCombine => changes.isPossible;
 }
 
+/// The customer's milk plans.
+///
+/// - **Signed out ([remote] null):** plans are saved on the phone.
+/// - **Signed in:** every change goes to the server first; the
+///   phone then mirrors the server's answer. If the server can't
+///   be reached, nothing changes and [MilkPlanSyncException] is
+///   thrown. Before the first change of a session, plans that
+///   exist only on the phone are uploaded ([syncWithServer]), so
+///   mirroring never loses them.
+/// - Changes and syncs run one at a time.
 class MilkSubscriptionManager extends ChangeNotifier {
   final List<MilkSubscription> _subscriptions = [];
   final MilkSubscriptionRepository _repository = MilkSubscriptionRepository();
   bool _isWriting = false;
 
   bool get isWriting => _isWriting;
+
+  /// True once plans are in memory (restored or mirrored).
+  bool _loaded = false;
+
+  MilkPlanRemote? _remote;
+  bool _syncedThisSession = false;
+  Future<void> _queue = Future.value();
+
+  /// The server, while signed in; null: plans stay on the phone.
+  MilkPlanRemote? get remote => _remote;
+  set remote(MilkPlanRemote? value) {
+    _remote = value;
+    _syncedThisSession = false;
+  }
+
+  /// Runs [action] after every earlier change or sync finished.
+  Future<T> _serial<T>(Future<T> Function() action) {
+    final result = _queue.then((_) => action());
+    _queue = result.then((_) {}, onError: (_) {});
+    return result;
+  }
 
   /// Restores subscriptions that were previously saved in SQLite.
   ///
@@ -52,6 +84,7 @@ class MilkSubscriptionManager extends ChangeNotifier {
     }
 
     _subscriptions.addAll(savedSubscriptions.map(_copyWithScheduleSnapshots));
+    _loaded = true;
 
     notifyListeners();
   }
@@ -62,6 +95,8 @@ class MilkSubscriptionManager extends ChangeNotifier {
   /// in the database untouched) instead of hiding every other
   /// plan. Returns how many were skipped.
   Future<int> restoreSavedSubscriptions() async {
+    // Already mirrored from the server (or restored): keep that.
+    if (_loaded) return 0;
     final saved = await _repository.loadSubscriptions();
     final ids = <String>{};
     final usable = [
@@ -179,35 +214,132 @@ class MilkSubscriptionManager extends ChangeNotifier {
       }
     }
 
-    final snapshots = saves.map(_copyWithScheduleSnapshots).toList();
-
-    _isWriting = true;
-    try {
-      await _repository.saveChanges(saves: snapshots, cancelIds: cancelIds);
-
-      for (final snapshot in snapshots) {
-        final index = _subscriptions.indexWhere((s) => s.id == snapshot.id);
-        if (index == -1) {
-          _subscriptions.add(snapshot);
-        } else {
-          _subscriptions[index] = snapshot;
-        }
-      }
-      for (var i = 0; i < _subscriptions.length; i++) {
-        if (cancelIds.contains(_subscriptions[i].id)) {
-          _subscriptions[i] = _copyWithScheduleSnapshots(
-            _subscriptions[i].copyWith(
-              status: MilkSubscriptionStatus.cancelled,
-            ),
-          );
-        }
-      }
-      notifyListeners();
-      return true;
-    } finally {
-      _isWriting = false;
-    }
+    await _commit(saves, cancelIds);
+    return true;
   }
+
+  // ============================================================
+  // SAVING: PHONE OR SERVER
+  // ============================================================
+
+  /// Saves [saves] and cancels [cancelIds]: on the server first
+  /// when signed in, otherwise on the phone. Throws if not saved.
+  Future<void> _commit(List<MilkSubscription> saves, List<String> cancelIds) =>
+      _serial(() async {
+        final snapshots = saves.map(_copyWithScheduleSnapshots).toList();
+        _isWriting = true;
+        try {
+          final server = _remote;
+          if (server == null) {
+            await _commitLocal(snapshots, cancelIds);
+            return;
+          }
+          if (!_syncedThisSession) await _syncLocked(server);
+          await _mirror(await server.applyChanges(snapshots, cancelIds));
+        } finally {
+          _isWriting = false;
+        }
+      });
+
+  Future<void> _commitLocal(
+    List<MilkSubscription> snapshots,
+    List<String> cancelIds,
+  ) async {
+    await _repository.saveChanges(saves: snapshots, cancelIds: cancelIds);
+
+    for (final snapshot in snapshots) {
+      final index = _subscriptions.indexWhere((s) => s.id == snapshot.id);
+      if (index == -1) {
+        _subscriptions.add(snapshot);
+      } else {
+        _subscriptions[index] = snapshot;
+      }
+    }
+    for (var i = 0; i < _subscriptions.length; i++) {
+      if (cancelIds.contains(_subscriptions[i].id)) {
+        _subscriptions[i] = _copyWithScheduleSnapshots(
+          _subscriptions[i].copyWith(status: MilkSubscriptionStatus.cancelled),
+        );
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Replaces the phone's plans with the server's [plans].
+  Future<void> _mirror(List<MilkSubscription> plans) async {
+    final ids = <String>{};
+    final usable = [
+      for (final plan in plans)
+        if (_isValidSubscription(plan) && ids.add(plan.id))
+          _copyWithScheduleSnapshots(plan),
+    ];
+    await _repository.replaceAll(usable);
+    _subscriptions
+      ..clear()
+      ..addAll(usable);
+    _loaded = true;
+    notifyListeners();
+  }
+
+  /// Uploads plans that exist only on this phone, then mirrors the
+  /// server. Where the account already has a plan for the same
+  /// milk and shift, the account's plan wins (quantities are not
+  /// added: the same plan on two phones would double the milk).
+  /// Returns how many shifts were left out for that reason.
+  Future<int> syncWithServer() => _serial(() async {
+    final server = _remote;
+    if (server == null) return 0;
+    return _syncLocked(server);
+  });
+
+  Future<int> _syncLocked(MilkPlanRemote server) async {
+    final serverPlans = await server.fetchPlans();
+    final serverIds = {for (final plan in serverPlans) plan.id};
+    String key(MilkSubscription plan, MilkShiftSchedule shift) =>
+        '${plan.productId}:${shift.shift.name}';
+    final taken = {
+      for (final plan in serverPlans)
+        if (plan.status != MilkSubscriptionStatus.cancelled)
+          for (final shift in plan.shiftSchedules) key(plan, shift),
+    };
+
+    var leftOut = 0;
+    final uploads = <MilkSubscription>[];
+    for (final plan in await _repository.loadSubscriptions()) {
+      if (plan.status == MilkSubscriptionStatus.cancelled ||
+          serverIds.contains(plan.id) ||
+          !_isValidSubscription(plan)) {
+        continue;
+      }
+      final kept = [
+        for (final shift in plan.shiftSchedules)
+          if (!taken.contains(key(plan, shift))) shift,
+      ];
+      leftOut += plan.shiftSchedules.length - kept.length;
+      if (kept.isEmpty) continue;
+      taken.addAll(kept.map((shift) => key(plan, shift)));
+      uploads.add(
+        _copyWithScheduleSnapshots(plan.copyWith(shiftSchedules: kept)),
+      );
+    }
+
+    final result = uploads.isEmpty
+        ? serverPlans
+        : await server.applyChanges(uploads, const []);
+    await _mirror(result);
+    _syncedThisSession = true;
+    return leftOut;
+  }
+
+  /// Sign-out: the plans belong to the account (they are on the
+  /// server), so they are removed from this phone.
+  Future<void> forgetAll() => _serial(() async {
+    await _repository.deleteAll();
+    _subscriptions.clear();
+    _syncedThisSession = false;
+    _loaded = true;
+    notifyListeners();
+  });
 
   // ============================================================
   // QUANTITY RULES
@@ -385,16 +517,8 @@ class MilkSubscriptionManager extends ChangeNotifier {
       return false;
     }
 
-    _isWriting = true;
-    try {
-      final snapshot = _copyWithScheduleSnapshots(subscription);
-      await _repository.saveSubscription(snapshot);
-      _subscriptions.add(snapshot);
-      notifyListeners();
-      return true;
-    } finally {
-      _isWriting = false;
-    }
+    await _commit([subscription], const []);
+    return true;
   }
 
   // ============================================================
@@ -432,15 +556,8 @@ class MilkSubscriptionManager extends ChangeNotifier {
       ),
     );
 
-    _isWriting = true;
-    try {
-      await _repository.updateSubscription(updated);
-      _subscriptions[index] = updated;
-      notifyListeners();
-      return true;
-    } finally {
-      _isWriting = false;
-    }
+    await _commit([updated], const []);
+    return true;
   }
 
   // ============================================================
@@ -532,14 +649,11 @@ class MilkSubscriptionManager extends ChangeNotifier {
     );
     if (updated.shiftSchedules.isEmpty) return false;
 
-    _isWriting = true;
-    try {
-      await _repository.updateSubscription(updated);
-      _subscriptions[index] = updated;
-      notifyListeners();
-      return true;
-    } finally {
-      _isWriting = false;
+    if (newStatus == MilkSubscriptionStatus.cancelled) {
+      await _commit(const [], [updated.id]);
+    } else {
+      await _commit([updated], const []);
     }
+    return true;
   }
 }

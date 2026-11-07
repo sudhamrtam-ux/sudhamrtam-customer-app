@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import '../../models/milk_subscription.dart';
+import '../../services/milk_plan_api_client.dart';
 import '../../models/milk_plan_merge.dart';
 import 'milk_plan_merge_dialog.dart';
 
@@ -286,7 +287,11 @@ class _MilkSubscriptionSetupScreenState
       debugPrint('Milk subscription save error: $error');
       debugPrintStack(stackTrace: stackTrace);
       if (mounted) {
-        _showError('Unable to save subscription. Please try again.');
+        _showError(
+          error is MilkPlanSyncException
+              ? error.message
+              : 'Unable to save subscription. Please try again.',
+        );
       }
     } finally {
       if (mounted) {
@@ -315,7 +320,13 @@ class _MilkSubscriptionSetupScreenState
         );
         return;
       case AddToPlanChoice.add:
-        final saved = await sudhamrtamMilkSubscriptions.saveNewPlan(changes);
+        final bool saved;
+        try {
+          saved = await sudhamrtamMilkSubscriptions.saveNewPlan(changes);
+        } on MilkPlanSyncException catch (error) {
+          if (mounted) _showError(error.message);
+          return;
+        }
         if (!mounted) return;
         if (!saved) {
           _showError('Your plan was not updated. Please try again.');

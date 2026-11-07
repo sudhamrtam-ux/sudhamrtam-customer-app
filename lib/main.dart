@@ -12,6 +12,8 @@ import 'services/account_api_client.dart';
 import 'services/account_sync_service.dart';
 import 'services/api_phone_auth_gateway.dart';
 import 'services/catalog_api_client.dart';
+import 'services/milk_plan_api_client.dart';
+import 'services/milk_plan_sync_service.dart';
 import 'services/order_api_client.dart';
 
 Future<void> main() async {
@@ -30,6 +32,14 @@ Future<void> main() async {
       sudhamrtamAuth = auth;
       sudhamrtamAccount = AccountSyncService(
         api: AccountApiClient(
+          baseUrl: apiBaseUrl,
+          token: () => auth.sessionToken,
+        ),
+        auth: auth,
+      );
+      sudhamrtamMilkSync = MilkPlanSyncService(
+        manager: sudhamrtamMilkSubscriptions,
+        api: MilkPlanApiClient(
           baseUrl: apiBaseUrl,
           token: () => auth.sessionToken,
         ),
@@ -57,6 +67,8 @@ Future<void> main() async {
   // After checkout recovery: refresh the profile and addresses
   // from the account (in the background; works offline too).
   sudhamrtamAccount.attach();
+  // Milk plans: upload phone-only plans and mirror the account.
+  sudhamrtamMilkSync.attach();
 
   if (startupController.isReady) {
     runApp(const SudhamrtamApp());
