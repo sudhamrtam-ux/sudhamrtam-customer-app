@@ -111,6 +111,13 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     }
   }
 
+  /// "A", "A and B", "A, B and C".
+  static String _joinNames(List<DeliveryArea> areas) {
+    final names = [for (final area in areas) area.name];
+    if (names.length == 1) return names.single;
+    return '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+  }
+
   Widget _buildAreaField() {
     final areas = _areas;
 
@@ -140,17 +147,25 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       child: DropdownButtonFormField<String>(
         key: const Key('areaField'),
         initialValue: _areaId,
-        decoration: const InputDecoration(
-          labelText: 'Delivery Area',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: 'Your Area',
+          // The areas come from the server, so this stays current.
+          helperText: areas.isEmpty
+              ? null
+              : 'We currently deliver only to ${_joinNames(areas)}.',
+          helperMaxLines: 3,
+          border: const OutlineInputBorder(),
         ),
         items: [
           for (final area in areas)
             DropdownMenuItem(value: area.id, child: Text(area.name)),
         ],
-        onChanged: _isSaving ? null : (value) => setState(() => _areaId = value),
-        validator: (value) =>
-            value == null ? 'Please choose your delivery area' : null,
+        onChanged: _isSaving
+            ? null
+            : (value) => setState(() => _areaId = value),
+        validator: (value) => value == null
+            ? 'Please choose your area. We deliver only to the areas listed.'
+            : null,
       ),
     );
   }

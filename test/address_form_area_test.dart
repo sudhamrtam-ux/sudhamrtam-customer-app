@@ -30,10 +30,8 @@ void main() {
   });
 
   Future<void> fillForm(WidgetTester tester) async {
-    Future<void> type(String label, String text) => tester.enterText(
-      find.widgetWithText(TextFormField, label),
-      text,
-    );
+    Future<void> type(String label, String text) =>
+        tester.enterText(find.widgetWithText(TextFormField, label), text);
 
     await type('Recipient Name', 'Asha');
     await type('Mobile Number', '9876543210');
@@ -67,10 +65,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(
+      find.text(
+        'We currently deliver only to Nizampet and Praneeth Pranav Flora.',
+      ),
+      findsOneWidget,
+    );
+
     await fillForm(tester);
     await tapSave(tester);
     await tester.pumpAndSettle();
-    expect(find.text('Please choose your delivery area'), findsOneWidget);
+    expect(
+      find.text(
+        'Please choose your area. We deliver only to the areas listed.',
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('areaField')));
     await tester.pumpAndSettle();
@@ -86,8 +96,9 @@ void main() {
     for (var i = 0; i < 50 && (saved?.isEmpty ?? true); i++) {
       saved = await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 50));
-        return CustomerAddressDatabaseService.instance
-            .getAddressesByCustomerId(AccountSyncService.localCustomerId);
+        return CustomerAddressDatabaseService.instance.getAddressesByCustomerId(
+          AccountSyncService.localCustomerId,
+        );
       });
       await tester.pump();
     }

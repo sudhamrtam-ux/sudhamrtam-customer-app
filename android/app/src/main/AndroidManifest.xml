@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds reach the Sudhamrtam server (API_BASE_URL). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="sudhamrtam_customer_app"
         android:name="${applicationName}"
