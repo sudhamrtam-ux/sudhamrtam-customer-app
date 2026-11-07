@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'app/checkout_startup_controller.dart';
@@ -5,9 +7,28 @@ import 'app/sudhamrtam_app.dart';
 import 'core/theme/app_theme.dart';
 import 'database/checkout_recovery_executor.dart';
 import 'features/checkout/checkout_recovery_gate_screen.dart';
+import 'services/api_phone_auth_gateway.dart';
+import 'services/catalog_api_client.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Phone login through the backend, only when this build has
+  // a server (API_BASE_URL). Optional: a failure here must not
+  // stop the app from starting or block checkout recovery.
+  if (apiBaseUrl.isNotEmpty) {
+    try {
+      final auth = ApiPhoneAuthGateway(
+        baseUrl: apiBaseUrl,
+        store: SecureSessionStore(),
+      );
+      await auth.restore();
+      sudhamrtamAuth = auth;
+      unawaited(auth.checkSession());
+    } catch (error) {
+      debugPrint('Sign-in could not start: $error');
+    }
+  }
 
   final startupController = CheckoutStartupController(
     recover: CheckoutRecoveryExecutor.instance.recoverAtStartup,

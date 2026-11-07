@@ -1,4 +1,4 @@
-package com.example.sudhamrtam_customer_app
+package com.sudhamrtam.customer
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Sudhamrtam customer app: a Flutter (Android first, iOS later) shopping app for a premium organic dairy/oil brand. Everything is **local-only** right now: SQLite via `sqflite`, with no backend, auth, or payment integration. Brand primary green is `#82B440` (premium, organic, pastoral style).
+Sudhamrtam customer app: a Flutter (Android first, iOS later) shopping app for a premium organic dairy/oil brand. Android package: `com.sudhamrtam.customer`. Data lives on the phone in SQLite (`sqflite`). A build can optionally talk to the Sudhamrtam backend (`../sudhamrtam_backend`, Node/PostgreSQL) for the catalog and phone login; orders, payments and subscriptions are still local-only. Brand primary green is `#82B440` (premium, organic, pastoral style).
 
 `AGENTS.md` and `SUDHAMRTAM_CODEX_HANDOFF.md` hold the original working agreement. **The handoff doc is badly out of date** (it describes a Step 45 scaffold with only a Home screen). Trust the source tree, not the doc's status sections.
 
@@ -38,7 +38,7 @@ The root-level `verify_*.dart` / `verify_*.py` scripts are one-off manual checks
 Global singletons live in `lib/app/sudhamrtam_app.dart`: `sudhamrtamCart` (`CartManager`) and `sudhamrtamMilkSubscriptions`. Both are `ChangeNotifier`s that screens listen to directly. There is no state-management package.
 
 ### Single SQLite database (`lib/database/milk_database_service.dart`)
-Despite the name, `MilkDatabaseService.instance` owns the **one** app database (`sudhamrtam_milk.db`) for all tables: subscriptions, cart, orders, profiles/addresses, pending submissions, checkout reconciliations. Schema is versioned (currently **v8**; the version history is in the class doc comment).
+Despite the name, `MilkDatabaseService.instance` owns the **one** app database (`sudhamrtam_milk.db`) for all tables: subscriptions, cart, orders, profiles/addresses, pending submissions, checkout reconciliations. Schema is versioned (currently **v9**; the version history is in the class doc comment).
 - New installs: `_createTables`. Upgrades: `_upgradeDatabase` with cumulative `if (oldVersion < N)` blocks that must never drop customer data.
 - A schema change means bumping `databaseVersion`, adding to both create and upgrade paths, and adding tests (see `sqlite_v8_order_recipient_test.dart` for a self-contained example; older v5–v7 tests depend on fixture DBs under `C:\Sudhamrtam\backups\`).
 - `CustomerOrder.toMap()` omits recipient keys when null, because durable pending payloads are compared byte-for-byte. Keep new optional order fields backward-compatible the same way.
@@ -60,8 +60,12 @@ Invariants to preserve: never generate a new order ID on retry; never clear the 
 - An order prepared but never saved shows the **Unfinished Order** screen at startup. The customer picks Finish (`CheckoutRecoveryExecutor.finishAwaitingSubmission`) or Cancel (`cancelAwaitingSubmission`, which keeps the cart).
 - **Place Order is enabled only in debug builds** (`CheckoutScreen.enableTestOrders` defaults to `kDebugMode`). The owner decided to keep it disabled in release until a backend order API exists. Debug builds also show a one-shot failure simulator (`CheckoutFaultInjector`) for device recovery tests.
 
+### Backend connection and login
+- The server is used only when the build sets `--dart-define=API_BASE_URL=...` (`lib/services/catalog_api_client.dart`). Release builds currently set none, so they make no network calls. On the phone in development: run the backend, `adb reverse tcp:3000 tcp:3000`, then `flutter run -d <device-id> --dart-define=API_BASE_URL=http://127.0.0.1:3000` (cleartext HTTP is allowed in debug builds only).
+- Phone login: screens use the `PhoneAuthGateway` interface (`lib/services/phone_auth_service.dart`); `ApiPhoneAuthGateway` calls the backend's `/v1/auth/otp/*` endpoints and keeps the session token in `flutter_secure_storage`. The backend sends the code (MSG91 WhatsApp planned; development prints it in the server log). Test number `+91 9999900001`, code `123456`. Firebase is no longer used. Global: `sudhamrtamAuth` (null without a server).
+
 ### UI
-Feature folders live under `lib/features/` (home, shop, milk_plan, cart, checkout, orders, account, shell). `CustomerShell` switches tab bodies by `_selectedIndex`. Products come from the static `ProductCatalog` in `lib/models/`; product IDs are persisted in cart and order rows, so they must stay stable. Catalog prices are provisional (from sudhamrtam.in, one delivery area), as documented in that file. Theme: `lib/core/theme/app_theme.dart` (Material 3, seeded from `#82B440`).
+Feature folders live under `lib/features/` (home, shop, milk_plan, cart, checkout, orders, account, shell). `CustomerShell` switches tab bodies by `_selectedIndex`. Products come from `CatalogRepository` (`lib/models/catalog_repository.dart`): the cached `/v1/catalog` response, with the static `ProductCatalog` as offline fallback. Every customer gets the same price in every area (owner decision; there is no area picker). Product IDs are persisted in cart and order rows, so they must stay stable. Theme: `lib/core/theme/app_theme.dart` (Material 3, seeded from `#82B440`).
 
 ## Testing conventions
 

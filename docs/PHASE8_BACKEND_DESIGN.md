@@ -5,7 +5,7 @@
 **Decisions already made by the owner:**
 - Build a **new backend**, shared by the Flutter app and a future website. Do not extend the old PHP site.
 - **Import** delivery areas, routes, products and prices from the old site's database. The owner has access to it.
-- **Firebase Phone Auth** for OTP login, while DLT approval for Sudhamrtam's own SMS sender is pending.
+- **OTP login run by the backend, delivered through MSG91**: WhatsApp now, SMS once DLT approval for Sudhamrtam's sender comes through (7 November 2026; replaces the earlier Firebase Phone Auth plan, which needed paid Blaze billing at about ₹6 per SMS).
 - Place Order stays **disabled in release builds** until this backend's order API is live (Phase 1 sign-off).
 - **One price per product for every customer, in every area** (6 November 2026). There is no area picker in the app. Areas and routes are used only for delivery planning and addresses.
 
@@ -15,8 +15,8 @@
 
 ```
 Flutter app ──HTTPS/JSON──▶  Sudhamrtam API (Node.js + TypeScript)  ──▶  PostgreSQL
-     │                              │
-     └── Firebase Phone Auth ──▶ ID token verified by the API (Firebase Admin SDK)
+                                    │
+                                    └── MSG91 (WhatsApp now, SMS after DLT) delivers login codes
 ```
 
 - **API:** Node.js with TypeScript and a lightweight framework (Fastify). The JSON API is versioned under `/v1`.
@@ -25,15 +25,14 @@ Flutter app ──HTTPS/JSON──▶  Sudhamrtam API (Node.js + TypeScript)  �
 - **Hosting:** to be decided (see §9). Use an India region (Mumbai), since customer data falls under India's DPDP Act 2023.
 - **Admin panel and website (Phases 9 and 12)** use the same API, with staff roles.
 
-### Login flow with Firebase
-1. The app signs the customer in with Firebase Phone Auth: they enter their phone number, Google sends the OTP, and they enter it.
-2. The app sends the Firebase **ID token** with each API call (`Authorization: Bearer …`).
-3. The API verifies the token and finds (or creates) the matching `customers` row by Firebase user ID.
-4. The OTP provider is hidden behind the API's customer identity. If you later switch to your own SMS sender after DLT approval, the database doesn't change.
+### Login flow (built in step 8b)
+1. The customer enters their phone number. `POST /v1/auth/otp/request` makes a 6-digit code, stores only its hash, and sends it through MSG91.
+2. The customer enters the code. `POST /v1/auth/otp/verify` checks it, finds or creates the `customers` row **by phone number**, and returns a session token.
+3. The app sends the token with each API call (`Authorization: Bearer …`) and keeps it in the phone's encrypted storage.
+4. Limits: codes expire after 5 minutes, 5 wrong tries, 30 seconds between codes, 5 codes per phone per hour.
+5. The delivery channel can change (WhatsApp → SMS after DLT) without changing accounts or the database.
 
-During development, Firebase **test phone numbers** with fixed OTPs avoid sending real SMS.
-
-> Confirm with Firebase's current India documentation that Phone Auth SMS needs no DLT registration by Sudhamrtam before relying on it for launch.
+During development, the code is printed in the server log, and **test numbers** (`+91 9999900001`, code `123456`) never get a message.
 
 ---
 
@@ -60,7 +59,7 @@ During development, Firebase **test phone numbers** with fixed OTPs avoid sendin
 ### Customers
 | Table | Key columns |
 |---|---|
-| `customers` | `id` (uuid), `firebase_uid` (unique), `phone_e164` (unique), `full_name`, `email`, `created_at`, `deleted_at` |
+| `customers` | `id` (uuid), `phone_e164` (unique), `full_name`, `email`, `created_at`, `deleted_at` |
 | `customer_addresses` | `id`, `customer_id`, `area_id`, `label`, `recipient_name`, `phone`, address lines, `city`, `postal_code`, `latitude`, `longitude`, `is_default` (at most one per customer) |
 
 ### Orders
@@ -87,13 +86,13 @@ During development, Firebase **test phone numbers** with fixed OTPs avoid sendin
 
 ## 4. API (version 1)
 
-All endpoints require a Firebase ID token unless marked *public*.
+All endpoints require a session token unless marked *public*.
 
 | Method & path | Purpose |
 |---|---|
 | `GET /v1/areas` *(public)* | Delivery areas |
 | `GET /v1/catalog` *(public)* | All products with their current prices and availability (same for every customer) |
-| `POST /v1/session` | Verify the token and create or return the customer profile |
+| `POST /v1/auth/otp/request`, `POST /v1/auth/otp/verify` *(public)*, `POST /v1/auth/logout` | Phone login (see §1) |
 | `GET` / `PATCH /v1/me` | Profile |
 | `DELETE /v1/me` | Account deletion request (Phase 3/13) |
 | `GET` / `POST /v1/addresses`, `PATCH` / `DELETE /v1/addresses/{id}`, `POST /v1/addresses/{id}/default` | Saved addresses |
@@ -124,7 +123,7 @@ This maps directly onto the app's existing code. `OrderSubmissionService`'s `sav
 ## 6. App changes (done in small steps, after each backend part exists)
 
 1. The catalog is loaded from `/v1/catalog`. Products are cached locally, and the hard-coded `ProductCatalog` becomes an offline fallback.
-2. Login screen with Firebase Phone Auth, then `POST /v1/session`.
+2. Login screen using the backend's OTP endpoints.
 3. Profile and addresses sync with the API. Addresses gain a delivery area.
 4. Order submission goes through the outbox to `PUT /v1/orders/{id}`. **Only then** is Place Order enabled in release builds.
 5. Order history reads from the API, cached locally.
@@ -147,9 +146,9 @@ Please export those tables (phpMyAdmin → Export → SQL, or `mysqldump`) to a 
 
 ## 8. Security basics (from the first version)
 
-- Every request verifies the Firebase token. Customers can only read or change their own records, which is enforced in every query.
+- Every request verifies the session token. Customers can only read or change their own records, which is enforced in every query.
 - Rate limits on login and order endpoints.
-- Secrets (database URL, Firebase service account) are kept in environment variables and never committed.
+- Secrets (database URL, MSG91 key, OTP secret) are kept in environment variables and never committed.
 - HTTPS only. Daily database backups with a tested restore.
 - Request logging without personal data. Order and money changes are recorded in history tables.
 
@@ -160,7 +159,7 @@ Please export those tables (phpMyAdmin → Export → SQL, or `mysqldump`) to a 
 | Step | Backend | App |
 |---|---|---|
 | 8a | Repo skeleton, PostgreSQL migrations, catalog tables, **old-site import**, `GET /v1/areas`, `GET /v1/catalog` | Load the catalog from the API (cached, offline fallback) |
-| 8b | Firebase token verification, `customers`, `/v1/session`, `/v1/me`, addresses | Login screen; profile and address sync |
+| 8b | OTP login, `customers`, sessions, `/v1/me`, addresses | Login screen; profile and address sync |
 | 8c | Orders: `PUT`/`GET`, re-pricing, status history | Outbox submission; enable release Place Order (Cash on Delivery) |
 | 8d | Subscriptions, pauses and skips, delivery occurrence generation | Subscription sync |
 | 8e | Staff roles for the admin panel (Phase 9) | — |
@@ -172,6 +171,6 @@ Each step is reviewed, tested and confirmed by you before the next one starts.
 ## 10. Decisions needed from you
 
 1. **Hosting budget and provider.** Options range from a free tier for development to a small cloud server with managed PostgreSQL for the pilot. When we reach 8a, I'll compare 2–3 concrete options using current prices.
-2. **Firebase project ownership.** Create it under a Sudhamrtam Google account that you control, not a personal or developer account.
+2. **MSG91 account** under the Sudhamrtam email, with a WhatsApp Business number and an approved Authentication template.
 3. **Business rules for orders:** delivery fee or minimum order, pickup location(s), and the cut-off time for next-day delivery.
 4. **The old site export** described in §7.
