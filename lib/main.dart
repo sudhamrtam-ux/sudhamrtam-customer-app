@@ -6,11 +6,13 @@ import 'app/checkout_startup_controller.dart';
 import 'app/sudhamrtam_app.dart';
 import 'core/theme/app_theme.dart';
 import 'database/checkout_recovery_executor.dart';
+import 'features/checkout/order_destination.dart';
 import 'features/checkout/checkout_recovery_gate_screen.dart';
 import 'services/account_api_client.dart';
 import 'services/account_sync_service.dart';
 import 'services/api_phone_auth_gateway.dart';
 import 'services/catalog_api_client.dart';
+import 'services/order_api_client.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,12 @@ Future<void> main() async {
           token: () => auth.sessionToken,
         ),
         auth: auth,
+      );
+      // Orders go to the server (before startup recovery, so an
+      // unfinished order is finished on the server too).
+      OrderDestination.server = OrderApiClient(
+        baseUrl: apiBaseUrl,
+        token: () => auth.sessionToken,
       );
       unawaited(auth.checkSession());
     } catch (error) {

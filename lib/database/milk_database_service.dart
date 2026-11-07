@@ -13,12 +13,13 @@ import 'package:sqflite/sqflite.dart';
 /// Version 8: Delivery recipient name and phone on orders.
 /// Version 9: Server catalog cache and app settings.
 /// Version 10: Delivery area on saved addresses.
+/// Version 11: Saved address ID on orders.
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 10;
+  static const int databaseVersion = 11;
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -177,6 +178,7 @@ class MilkDatabaseService {
     await _createCheckoutReconciliationsTable(db);
     await _createCatalogCacheTables(db);
     await _addAddressAreaColumn(db);
+    await _addOrderAddressIdColumn(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -241,6 +243,26 @@ class MilkDatabaseService {
     if (oldVersion < 10) {
       await _addAddressAreaColumn(db);
     }
+
+    if (oldVersion < 11) {
+      await _addOrderAddressIdColumn(db);
+    }
+  }
+
+  /// Version 11: the saved address an order goes to.
+  ///
+  /// Nullable, like the v8 recipient columns: older orders have
+  /// none, and CustomerOrder.toMap() omits it when null.
+  Future<void> _addOrderAddressIdColumn(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info($ordersTable)');
+    if (columns.isEmpty || columns.any((c) => c['name'] == 'address_id')) {
+      return;
+    }
+
+    await db.execute('''
+      ALTER TABLE $ordersTable
+      ADD COLUMN address_id TEXT
+    ''');
   }
 
   /// Version 10: delivery area on saved addresses.
@@ -264,7 +286,6 @@ class MilkDatabaseService {
   }
 
   /// Version 9: Server catalog cache and app settings.
-/// Version 10: Delivery area on saved addresses.
   ///
   /// `catalog_cache` keeps the last catalog received so the app
   /// works offline. `app_settings` is a small key/value store

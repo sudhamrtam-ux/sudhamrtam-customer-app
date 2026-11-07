@@ -40,6 +40,11 @@ class CustomerOrder {
   final String? recipientName;
   final String? recipientPhone;
 
+  // The saved address the order goes to (schema v11). The server
+  // needs it to check the delivery area. Null for orders placed
+  // before v11 and for orders saved on the phone only.
+  final String? addressId;
+
   // Optional customer instructions.
   final String? notes;
 
@@ -53,6 +58,7 @@ class CustomerOrder {
     this.deliveryAddress,
     this.recipientName,
     this.recipientPhone,
+    this.addressId,
     this.notes,
   }) : items = List<OrderItem>.unmodifiable(items) {
     if (id.trim().isEmpty) {
@@ -95,6 +101,7 @@ class CustomerOrder {
       deliveryAddress: deliveryAddress,
       recipientName: recipientName,
       recipientPhone: recipientPhone,
+      addressId: addressId,
       notes: notes,
     );
   }
@@ -115,6 +122,8 @@ class CustomerOrder {
       // Durable pending payloads are compared byte-for-byte.
       if (recipientName != null) 'recipient_name': recipientName,
       if (recipientPhone != null) 'recipient_phone': recipientPhone,
+      // Same rule for the address ID (v11).
+      if (addressId != null) 'address_id': addressId,
       'notes': notes,
       'subtotal': subtotal,
     };
@@ -139,6 +148,7 @@ class CustomerOrder {
       deliveryAddress: map['delivery_address'] as String?,
       recipientName: map['recipient_name'] as String?,
       recipientPhone: map['recipient_phone'] as String?,
+      addressId: map['address_id'] as String?,
       notes: map['notes'] as String?,
     );
   }

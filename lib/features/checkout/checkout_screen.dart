@@ -3,32 +3,50 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import '../../database/customer_address_database_service.dart';
+import '../../database/pending_order_submission_service.dart';
 import '../../models/customer_address.dart';
 import '../../models/customer_order.dart';
+import '../../services/order_api_client.dart';
+import '../../services/phone_auth_service.dart';
 import '../account/address_form_screen.dart';
+import '../account/phone_login_screen.dart';
 import '../orders/order_details_screen.dart';
 import 'checkout_fault_injector.dart';
 import 'checkout_order_session.dart';
 import 'checkout_validator.dart';
 import 'durable_checkout_coordinator.dart';
+import 'order_destination.dart';
 import 'order_preparation_service.dart';
 
 const _brandGreen = Color(0xFF82B440);
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({
+  CheckoutScreen({
     super.key,
     this.enableTestOrders = kDebugMode,
+    bool? sendsToServer,
     this.coordinator,
     this.orderSession,
-  });
+    PhoneAuthGateway? auth,
+    Future<OrderRules> Function()? loadRules,
+  }) : sendsToServer = sendsToServer ?? OrderDestination.sendsToServer,
+       auth = auth ?? sudhamrtamAuth,
+       loadRules = loadRules ?? OrderDestination.server?.fetchRules;
 
-  /// Local test orders are allowed only in debug builds
-  /// until checkout safety has been signed off.
-  ///
-  /// Test orders are saved on this phone only. They are
-  /// not sent to Sudhamrtam and no payment is taken.
+  /// Without a server, local test orders are allowed only in
+  /// debug builds. They are saved on this phone only, are not
+  /// sent to Sudhamrtam, and no payment is taken.
   final bool enableTestOrders;
+
+  /// Orders go to the Sudhamrtam server (see OrderDestination).
+  /// Then ordering is enabled in every build, for signed-in
+  /// customers, with home delivery and Cash on Delivery only.
+  final bool sendsToServer;
+
+  final PhoneAuthGateway? auth;
+
+  /// Loads the owner's order rules (minimum order, cut-off).
+  final Future<OrderRules> Function()? loadRules;
 
   /// Optional overrides for deterministic testing.
   final DurableCheckoutCoordinator? coordinator;
@@ -76,6 +94,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isSubmitting = false;
   String? _submissionError;
 
+  /// Set when the server refused the order: retrying the same
+  /// order cannot work, so the customer may cancel it instead.
+  OrderRejectedException? _rejection;
+
+  OrderRules? _rules;
+
+  bool get _serverMode => widget.sendsToServer;
+
+  bool get _ordersEnabled => _serverMode || widget.enableTestOrders;
+
+  bool get _signedIn => widget.auth?.currentUser != null;
+
   CustomerAddress? get _selectedAddress {
     for (final address in _savedAddresses) {
       if (address.id == _selectedAddressId) {
@@ -89,6 +119,188 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void initState() {
     super.initState();
     _loadSavedAddresses();
+    _loadRules();
+  }
+
+  Future<void> _loadRules() async {
+    final load = widget.loadRules;
+    if (load == null) return;
+    try {
+      final rules = await load();
+      if (mounted) setState(() => _rules = rules);
+    } catch (_) {
+      // Offline: the server still checks the rules.
+    }
+  }
+
+  Future<void> _signIn() async {
+    final auth = widget.auth;
+    if (auth == null) return;
+
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => PhoneLoginScreen(auth: auth)),
+    );
+
+    if (!mounted) return;
+    setState(() {});
+    // Signing in replaces the phone's addresses with the account's.
+    await sudhamrtamAccount.syncNow();
+    if (mounted) await _loadSavedAddresses();
+  }
+
+  Future<void> _editAddress(CustomerAddress address) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (context) => AddressFormScreen(existingAddress: address),
+      ),
+    );
+    if (mounted) await _loadSavedAddresses();
+  }
+
+  /// Things the customer must fix before a server order can be
+  /// placed, each with an optional action.
+  List<({String message, String? action, VoidCallback? onAction})>
+  _serverRequirements(CustomerAddress? address) {
+    if (!_serverMode) return const [];
+
+    final rules = _rules;
+    final subtotal = sudhamrtamCart.subtotal;
+
+    return [
+      if (!_signedIn)
+        (
+          message: 'Sign in with your mobile number to place your order.',
+          action: 'Sign in',
+          onAction: _signIn,
+        ),
+      if (address != null && address.areaId == null)
+        (
+          message:
+              'Choose the delivery area for this address so we know '
+              'which route delivers to you.',
+          action: 'Edit address',
+          onAction: () => _editAddress(address),
+        ),
+      if (rules != null && subtotal < rules.minimumOrderRupees)
+        (
+          message:
+              'The minimum order for delivery is '
+              '₹${rules.minimumOrderRupees.toStringAsFixed(0)}. '
+              'Add ₹${(rules.minimumOrderRupees - subtotal).toStringAsFixed(2)} '
+              'more to place your order.',
+          action: null,
+          onAction: null,
+        ),
+    ];
+  }
+
+  Widget _serverRequirementsCard(
+    List<({String message, String? action, VoidCallback? onAction})> items,
+  ) {
+    return Container(
+      key: const Key('serverRequirements'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8F0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFD8A8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final item in items) ...[
+            Text(
+              item.message,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF8A5200)),
+            ),
+            if (item.action != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _isSubmitting ? null : item.onAction,
+                  child: Text(item.action!),
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Cancels an order the server refused, keeping the cart, so
+  /// the customer can review it and check out again.
+  Future<void> _cancelRejectedOrder() async {
+    final order = _orderSession.currentOrder;
+    final rejection = _rejection;
+    if (order == null || rejection == null || _isSubmitting) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      if (!await OrderDestination.canDiscard(order.id)) {
+        if (!mounted) return;
+        setState(() {
+          _rejection = null;
+          _submissionError =
+              'Sudhamrtam already has this order. Tap Retry Order to '
+              'finish it.';
+        });
+        return;
+      }
+
+      final cancelled = await PendingOrderSubmissionService.instance
+          .cancelUnsavedSubmission(order.id);
+
+      if (!cancelled) {
+        if (!mounted) return;
+        setState(() {
+          _submissionError =
+              'The order could not be cancelled because its state '
+              'changed. Please tap Retry Order.';
+          _rejection = null;
+        });
+        return;
+      }
+
+      _orderSession.markCompleted(order.id);
+      sudhamrtamCart.endCheckoutRecoveryLock();
+
+      // New prices reach the cart through the catalog.
+      if (rejection.isPriceChange) await sudhamrtamCatalog.refresh();
+
+      if (!mounted) return;
+      setState(() {
+        _rejection = null;
+        _submissionError = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order cancelled. Please review your cart.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _submissionError =
+            'The order could not be cancelled: '
+            '${error is OrderApiException ? error.message : error}';
+      });
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  String _deliveryDateText(OrderRules rules) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final date = rules.deliveryDateFor(DateTime.now());
+    return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} '
+        '(morning)';
   }
 
   @override
@@ -186,6 +398,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() {
       _isSubmitting = true;
       _submissionError = null;
+      _rejection = null;
     });
 
     try {
@@ -202,6 +415,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               : null,
           recipientName: isDelivery ? _selectedAddress?.recipientName : null,
           recipientPhone: isDelivery ? _selectedAddress?.phoneNumber : null,
+          addressId: isDelivery ? _selectedAddress?.id : null,
           deliveryInstructions: isDelivery
               ? _deliveryInstructionsController.text
               : null,
@@ -222,6 +436,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           builder: (context) => OrderDetailsScreen(order: saved),
         ),
       );
+    } on OrderRejectedException catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _rejection = error;
+        _submissionError = error.message;
+      });
+    } on OrderApiException catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _submissionError = error.message;
+      });
     } catch (error) {
       if (!mounted) return;
 
@@ -325,7 +552,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           const SizedBox(height: 8),
           Text(error, style: const TextStyle(fontSize: 13)),
-          if (isProtected) ...[
+          if (_rejection != null) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'This order cannot be placed as it is. Cancel it to '
+              'review your cart; your products stay in the cart.',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              key: const Key('cancelRejectedOrder'),
+              onPressed: _isSubmitting ? null : _cancelRejectedOrder,
+              icon: const Icon(Icons.undo),
+              label: const Text('Cancel Order and Review Cart'),
+            ),
+          ] else if (isProtected) ...[
             const SizedBox(height: 8),
             const Text(
               'Your cart is locked to protect this order. '
@@ -623,9 +864,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final fulfillmentText = isDelivery ? 'Home Delivery' : 'Store Pickup';
 
-    final paymentText = _paymentMethod == OrderPaymentMethod.cashOnDelivery
-        ? 'Cash on Delivery / Pickup'
-        : 'Online Payment';
+    final paymentText = _paymentMethod == OrderPaymentMethod.online
+        ? 'Online Payment'
+        : _serverMode
+        ? 'Cash on Delivery'
+        : 'Cash on Delivery / Pickup';
+
+    final rules = _rules;
 
     final addressText = _addressesLoading
         ? 'Loading saved addresses...'
@@ -694,6 +939,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                   const Divider(),
 
+                  if (_serverMode && rules != null) ...[
+                    _reviewRow(
+                      label: 'Delivery',
+                      value: _deliveryDateText(rules),
+                      icon: Icons.event_outlined,
+                    ),
+                    const Divider(),
+                  ],
+
                   _reviewRow(
                     label: 'Instructions',
                     value: instructions.isEmpty
@@ -740,7 +994,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         const SizedBox(height: 8),
 
         Text(
-          widget.enableTestOrders
+          _serverMode
+              ? 'Pay in cash when your order is delivered.'
+              : widget.enableTestOrders
               ? 'Test mode: orders are saved on this phone only. '
                     'No payment is taken.'
               : 'This summary is for review only. '
@@ -835,6 +1091,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ? 'Please review the checkout requirements '
                       'above. Order placement is currently '
                       'unavailable.'
+                : _serverMode
+                ? 'Ready to place your order. It is sent to '
+                      'Sudhamrtam and paid in cash on delivery.'
                 : !widget.enableTestOrders
                 ? 'Initial checkout checks passed. '
                       'Order placement remains disabled '
@@ -917,8 +1176,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             deliveryAddress: deliveryAddressForValidation,
           );
 
+          final serverRequirements = _serverRequirements(selectedAddress);
+
           final checkoutReady =
               validation.isValid &&
+              serverRequirements.isEmpty &&
               (_fulfillmentMethod == FulfillmentMethod.pickup ||
                   (!_addressesLoading &&
                       _addressError == null &&
@@ -929,15 +1191,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           final isRetry = sudhamrtamCart.isCheckoutRecoveryLocked;
 
           final canPlaceOrder =
-              widget.enableTestOrders &&
+              _ordersEnabled &&
               !_isSubmitting &&
+              _rejection == null &&
+              (!_serverMode || _signedIn) &&
               (isRetry ||
                   (checkoutReady &&
                       !sudhamrtamCart.isCheckoutLocked &&
                       _paymentMethod == OrderPaymentMethod.cashOnDelivery));
 
-          final placeOrderLabel = !widget.enableTestOrders
+          final placeOrderLabel = !_ordersEnabled
               ? 'Place Order — Coming Soon'
+              : _serverMode
+              ? (_isSubmitting
+                    ? 'Placing Order...'
+                    : isRetry
+                    ? 'Retry Order'
+                    : 'Place Order')
               : _isSubmitting
               ? 'Placing Test Order...'
               : isRetry
@@ -1059,7 +1329,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
 
               const SizedBox(height: 24),
-              _sectionTitle('Delivery or Pickup'),
+              _sectionTitle(_serverMode ? 'Delivery' : 'Delivery or Pickup'),
 
               _optionCard(
                 title: 'Home Delivery',
@@ -1074,17 +1344,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 },
               ),
 
-              _optionCard(
-                title: 'Store Pickup',
-                subtitle: 'Collect your order from Sudhamrtam',
-                icon: Icons.storefront_outlined,
-                selected: _fulfillmentMethod == FulfillmentMethod.pickup,
-                onTap: () {
-                  setState(() {
-                    _fulfillmentMethod = FulfillmentMethod.pickup;
-                  });
-                },
-              ),
+              // Delivery only at launch (owner decision).
+              if (!_serverMode)
+                _optionCard(
+                  title: 'Store Pickup',
+                  subtitle: 'Collect your order from Sudhamrtam',
+                  icon: Icons.storefront_outlined,
+                  selected: _fulfillmentMethod == FulfillmentMethod.pickup,
+                  onTap: () {
+                    setState(() {
+                      _fulfillmentMethod = FulfillmentMethod.pickup;
+                    });
+                  },
+                ),
 
               if (_fulfillmentMethod == FulfillmentMethod.delivery) ...[
                 const SizedBox(height: 20),
@@ -1099,7 +1371,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               _sectionTitle('Payment Method'),
 
               _optionCard(
-                title: 'Cash on Delivery / Pickup',
+                title: _serverMode
+                    ? 'Cash on Delivery'
+                    : 'Cash on Delivery / Pickup',
                 subtitle: 'Pay when you receive your order',
                 icon: Icons.payments_outlined,
                 selected: _paymentMethod == OrderPaymentMethod.cashOnDelivery,
@@ -1110,17 +1384,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 },
               ),
 
-              _optionCard(
-                title: 'Online Payment',
-                subtitle: 'UPI, cards and other online options',
-                icon: Icons.credit_card_outlined,
-                selected: _paymentMethod == OrderPaymentMethod.online,
-                onTap: () {
-                  setState(() {
-                    _paymentMethod = OrderPaymentMethod.online;
-                  });
-                },
-              ),
+              // Online payment is not available yet.
+              if (!_serverMode)
+                _optionCard(
+                  title: 'Online Payment',
+                  subtitle: 'UPI, cards and other online options',
+                  icon: Icons.credit_card_outlined,
+                  selected: _paymentMethod == OrderPaymentMethod.online,
+                  onTap: () {
+                    setState(() {
+                      _paymentMethod = OrderPaymentMethod.online;
+                    });
+                  },
+                ),
 
               const SizedBox(height: 24),
 
@@ -1134,6 +1410,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
               if (!validation.isValid) ...[
                 _validationCard(validation.errors),
+                const SizedBox(height: 24),
+              ],
+
+              if (serverRequirements.isNotEmpty && !isRetry) ...[
+                _serverRequirementsCard(serverRequirements),
                 const SizedBox(height: 24),
               ],
 
@@ -1160,7 +1441,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Icon(
-                        !widget.enableTestOrders
+                        !_ordersEnabled
                             ? Icons.lock_outline
                             : isRetry
                             ? Icons.refresh
@@ -1177,7 +1458,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 12),
 
               Text(
-                widget.enableTestOrders
+                _serverMode
+                    ? 'Your order is sent to Sudhamrtam. '
+                          'Cash on Delivery.'
+                    : widget.enableTestOrders
                     ? 'Test order — saved on this phone only. '
                           'Not sent to Sudhamrtam. No payment is taken.'
                     : 'No order or payment will be created '

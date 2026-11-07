@@ -1,8 +1,13 @@
 import '../../database/order_database_service.dart';
 import '../../models/customer_order.dart';
+import 'order_destination.dart';
 import 'order_snapshot_equivalence.dart';
 
-/// Coordinates local order submission.
+/// Coordinates order submission.
+///
+/// By default an order is saved through [OrderDestination]:
+/// sent to the server first when one is configured, then saved
+/// on the phone.
 ///
 /// A prepared order is submitted using its existing ID.
 /// The same ID must be reused when retrying a submission.
@@ -13,7 +18,7 @@ class OrderSubmissionService {
   OrderSubmissionService({
     Future<void> Function(CustomerOrder)? saveOrder,
     Future<CustomerOrder?> Function(String)? getOrderById,
-  }) : _saveOrder = saveOrder ?? OrderDatabaseService.instance.saveOrder,
+  }) : _saveOrder = saveOrder ?? OrderDestination.save,
        _getOrderById =
            getOrderById ?? OrderDatabaseService.instance.getOrderById;
 

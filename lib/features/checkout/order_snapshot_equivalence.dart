@@ -38,6 +38,10 @@ class OrderSnapshotEquivalence {
       return false;
     }
 
+    if (prepared.addressId != saved.addressId) {
+      return false;
+    }
+
     if (prepared.notes != saved.notes) {
       return false;
     }

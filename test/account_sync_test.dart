@@ -435,6 +435,6 @@ void main() {
 
     final db = await MilkDatabaseService.instance.database;
     final version = await db.rawQuery('PRAGMA user_version');
-    expect(version.first.values.first, 10);
+    expect(version.first.values.first, MilkDatabaseService.databaseVersion);
   });
 }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Sudhamrtam customer app: a Flutter (Android first, iOS later) shopping app for a premium organic dairy/oil brand. Android package: `com.sudhamrtam.customer`. Data lives on the phone in SQLite (`sqflite`). A build can optionally talk to the Sudhamrtam backend (`../sudhamrtam_backend`, Node/PostgreSQL) for the catalog, phone login, and the profile and saved addresses; orders, payments and subscriptions are still local-only. Brand primary green is `#82B440` (premium, organic, pastoral style).
+Sudhamrtam customer app: a Flutter (Android first, iOS later) shopping app for a premium organic dairy/oil brand. Android package: `com.sudhamrtam.customer`. Data lives on the phone in SQLite (`sqflite`). A build can optionally talk to the Sudhamrtam backend (`../sudhamrtam_backend`, Node/PostgreSQL) for the catalog, phone login, the profile and saved addresses, and placing orders (Cash on Delivery); payments, order history and subscriptions are still local-only. Brand primary green is `#82B440` (premium, organic, pastoral style).
 
 `AGENTS.md` and `SUDHAMRTAM_CODEX_HANDOFF.md` hold the original working agreement. **The handoff doc is badly out of date** (it describes a Step 45 scaffold with only a Home screen). Trust the source tree, not the doc's status sections.
 
@@ -38,7 +38,7 @@ The root-level `verify_*.dart` / `verify_*.py` scripts are one-off manual checks
 Global singletons live in `lib/app/sudhamrtam_app.dart`: `sudhamrtamCart` (`CartManager`) and `sudhamrtamMilkSubscriptions`. Both are `ChangeNotifier`s that screens listen to directly. There is no state-management package.
 
 ### Single SQLite database (`lib/database/milk_database_service.dart`)
-Despite the name, `MilkDatabaseService.instance` owns the **one** app database (`sudhamrtam_milk.db`) for all tables: subscriptions, cart, orders, profiles/addresses, pending submissions, checkout reconciliations. Schema is versioned (currently **v10**; the version history is in the class doc comment).
+Despite the name, `MilkDatabaseService.instance` owns the **one** app database (`sudhamrtam_milk.db`) for all tables: subscriptions, cart, orders, profiles/addresses, pending submissions, checkout reconciliations. Schema is versioned (currently **v11**; the version history is in the class doc comment).
 - New installs: `_createTables`. Upgrades: `_upgradeDatabase` with cumulative `if (oldVersion < N)` blocks that must never drop customer data.
 - A schema change means bumping `databaseVersion`, adding to both create and upgrade paths, and adding tests (see `sqlite_v8_order_recipient_test.dart` for a self-contained example; older v5–v7 tests depend on fixture DBs under `C:\Sudhamrtam\backups\`).
 - `CustomerOrder.toMap()` omits recipient keys when null, because durable pending payloads are compared byte-for-byte. Keep new optional order fields backward-compatible the same way.
@@ -58,7 +58,8 @@ Invariants to preserve: never generate a new order ID on retry; never clear the 
 
 - `CheckoutScreen` gets the order to submit from `CheckoutOrderSession` (durable pending order first, then the in-session order while recovery-locked, else a fresh one).
 - An order prepared but never saved shows the **Unfinished Order** screen at startup. The customer picks Finish (`CheckoutRecoveryExecutor.finishAwaitingSubmission`) or Cancel (`cancelAwaitingSubmission`, which keeps the cart).
-- **Place Order is enabled only in debug builds** (`CheckoutScreen.enableTestOrders` defaults to `kDebugMode`). The owner decided to keep it disabled in release until a backend order API exists. Debug builds also show a one-shot failure simulator (`CheckoutFaultInjector`) for device recovery tests.
+- **Where orders go:** `OrderDestination` (`lib/features/checkout/order_destination.dart`), set by main(). With a server, `OrderSubmissionService`'s default `saveOrder` sends `PUT /v1/orders/{id}` first (`OrderApiClient`, idempotent) and saves on the phone only after the server accepted it; retries reuse the same ID and request body (built only from the order snapshot). `CustomerOrder.addressId` (v11, omitted from `toMap()` when null) tells the server which saved address. `cancelAwaitingSubmission` asks the server first: an order the server has is finished, not cancelled; if the server can't be reached nothing is cancelled. `OrderRejectedException` (400/409/422, e.g. `PRICE_CHANGED`) means retrying can't help: checkout offers "Cancel Order and Review Cart". `OrderApiException` means retry later.
+- **Place Order:** with a server (`CheckoutScreen.sendsToServer`), enabled in every build for signed-in customers: delivery only, Cash on Delivery only, address must have a delivery area, ₹200 minimum and 9 PM cut-off from `GET /v1/order-rules` (owner rules, kept in the backend). Without a server, local test orders only in debug builds (`enableTestOrders` defaults to `kDebugMode`); release builds without `API_BASE_URL` still cannot order. Debug builds also show a one-shot failure simulator (`CheckoutFaultInjector`) for device recovery tests.
 
 ### Backend connection and login
 - The server is used only when the build sets `--dart-define=API_BASE_URL=...` (`lib/services/catalog_api_client.dart`). Release builds currently set none, so they make no network calls. On the phone in development: run the backend, `adb reverse tcp:3000 tcp:3000`, then `flutter run -d <device-id> --dart-define=API_BASE_URL=http://127.0.0.1:3000` (cleartext HTTP is allowed in debug builds only).

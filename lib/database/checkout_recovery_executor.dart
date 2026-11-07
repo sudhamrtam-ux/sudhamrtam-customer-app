@@ -1,3 +1,4 @@
+import '../features/checkout/order_destination.dart';
 import '../features/checkout/order_snapshot_equivalence.dart';
 import '../features/checkout/order_submission_service.dart';
 import 'checkout_reconciliation_service.dart';
@@ -153,9 +154,39 @@ class CheckoutRecoveryExecutor {
   /// The cart is kept unchanged. If the order turns out
   /// to be saved already, nothing is cancelled and normal
   /// recovery is reported instead.
+  ///
+  /// When orders go to the server, the server is asked first:
+  /// an order it already has is never discarded (it is finished
+  /// instead), and if the server cannot be asked, nothing is
+  /// cancelled.
   Future<CheckoutRecoveryExecutionResult> cancelAwaitingSubmission(
     String orderId,
   ) async {
+    final bool canDiscard;
+    try {
+      canDiscard = await OrderDestination.canDiscard(orderId);
+    } catch (error) {
+      return CheckoutRecoveryExecutionResult(
+        status: CheckoutRecoveryExecutionStatus.awaitingSubmission,
+        orderId: orderId,
+        message:
+            'We could not check with Sudhamrtam whether this order '
+            'was received, so it was not cancelled. Please connect '
+            'to the internet and try again. ($error)',
+      );
+    }
+
+    if (!canDiscard) {
+      final finished = await finishAwaitingSubmission(orderId);
+      return CheckoutRecoveryExecutionResult(
+        status: finished.status,
+        orderId: finished.orderId,
+        message:
+            'Sudhamrtam had already received this order, so it '
+            'was kept, not cancelled. ${finished.message}',
+      );
+    }
+
     final cancelled = await PendingOrderSubmissionService.instance
         .cancelUnsavedSubmission(orderId);
 
