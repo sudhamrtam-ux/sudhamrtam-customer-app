@@ -35,7 +35,8 @@ void main() {
             SizedBox(
               height: 100,
               child: ProductImage(
-                productId: 'curd',
+                // A product added later, before its photo.
+                productId: 'new_product',
                 icon: Icons.breakfast_dining_outlined,
               ),
             ),

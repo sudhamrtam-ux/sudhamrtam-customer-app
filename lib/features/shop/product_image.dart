@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 /// Product photos bundled with the app, by product ID.
 ///
 /// The photos come from the Sudhamrtam website
-/// (sudhamrtam.in/admin/uploads/products/), resized for the app.
-/// Products without a photo (e.g. curd) show their icon instead.
+/// (sudhamrtam.in/admin/uploads/products/), resized for the app;
+/// the curd photo was supplied by the owner.
+/// Products without a photo show their icon instead.
 const Map<String, String> productImageAssets = {
   'buffalo_milk': 'assets/images/products/buffalo_milk.jpg',
   'cow_milk': 'assets/images/products/cow_milk.jpg',
+  'curd': 'assets/images/products/curd.jpg',
   'buffalo_ghee': 'assets/images/products/buffalo_ghee.jpg',
   'cow_ghee': 'assets/images/products/cow_ghee.jpg',
   'raw_honey': 'assets/images/products/raw_honey.jpg',
