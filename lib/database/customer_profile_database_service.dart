@@ -96,6 +96,51 @@ class CustomerProfileDatabaseService {
     return updatedRows > 0;
   }
 
+  /// Mirrors the signed-in account's profile on the phone.
+  ///
+  /// Unlike [saveProfile], the name may be empty: an account can
+  /// exist before the customer has entered a name.
+  Future<void> saveSyncedProfile({
+    required String customerId,
+    required String fullName,
+    String? phoneNumber,
+    String? email,
+  }) async {
+    final db = await MilkDatabaseService.instance.database;
+    final now = DateTime.now().toIso8601String();
+
+    await db.rawInsert(
+      '''
+      INSERT INTO ${MilkDatabaseService.customerProfilesTable} (
+        id, full_name, phone_number, email, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        full_name = excluded.full_name,
+        phone_number = excluded.phone_number,
+        email = excluded.email,
+        updated_at = excluded.updated_at
+    ''',
+      [customerId, fullName, phoneNumber, email, now, now],
+    );
+  }
+
+  /// Deletes the profile and, through the foreign key, its
+  /// saved addresses.
+  Future<void> deleteProfile(String customerId) async {
+    final db = await MilkDatabaseService.instance.database;
+    await db.delete(
+      MilkDatabaseService.customerAddressesTable,
+      where: 'customer_id = ?',
+      whereArgs: [customerId],
+    );
+    await db.delete(
+      MilkDatabaseService.customerProfilesTable,
+      where: 'id = ?',
+      whereArgs: [customerId],
+    );
+  }
+
   /// Checks whether a customer profile exists.
   Future<bool> profileExists(String customerId) async {
     if (customerId.trim().isEmpty) {

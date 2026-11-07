@@ -12,12 +12,13 @@ import 'package:sqflite/sqflite.dart';
 /// Version 7: Checkout reconciliation tracking.
 /// Version 8: Delivery recipient name and phone on orders.
 /// Version 9: Server catalog cache and app settings.
+/// Version 10: Delivery area on saved addresses.
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 9;
+  static const int databaseVersion = 10;
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -175,6 +176,7 @@ class MilkDatabaseService {
     await _createPendingOrderSubmissionsTable(db);
     await _createCheckoutReconciliationsTable(db);
     await _createCatalogCacheTables(db);
+    await _addAddressAreaColumn(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -235,9 +237,34 @@ class MilkDatabaseService {
     if (oldVersion < 9) {
       await _createCatalogCacheTables(db);
     }
+
+    if (oldVersion < 10) {
+      await _addAddressAreaColumn(db);
+    }
+  }
+
+  /// Version 10: delivery area on saved addresses.
+  ///
+  /// Nullable: addresses saved before areas existed have none.
+  /// Holds a server area ID such as `nizampet`.
+  Future<void> _addAddressAreaColumn(Database db) async {
+    final columns = await db.rawQuery(
+      'PRAGMA table_info($customerAddressesTable)',
+    );
+    // Missing table (only in partial test databases) or column
+    // already added: nothing to do.
+    if (columns.isEmpty || columns.any((c) => c['name'] == 'area_id')) {
+      return;
+    }
+
+    await db.execute('''
+      ALTER TABLE $customerAddressesTable
+      ADD COLUMN area_id TEXT
+    ''');
   }
 
   /// Version 9: Server catalog cache and app settings.
+/// Version 10: Delivery area on saved addresses.
   ///
   /// `catalog_cache` keeps the last catalog received so the app
   /// works offline. `app_settings` is a small key/value store

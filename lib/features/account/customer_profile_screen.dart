@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../app/sudhamrtam_app.dart';
 import '../../database/customer_profile_database_service.dart';
-import '../../models/customer_profile.dart';
+import '../../services/account_api_client.dart';
+import '../../services/account_sync_service.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
-  const CustomerProfileScreen({super.key});
+  CustomerProfileScreen({super.key, AccountSyncService? account})
+    : account = account ?? sudhamrtamAccount;
+
+  final AccountSyncService account;
 
   @override
   State<CustomerProfileScreen> createState() => _CustomerProfileScreenState();
@@ -13,8 +18,7 @@ class CustomerProfileScreen extends StatefulWidget {
 class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   static const Color _brandGreen = Color(0xFF82B440);
 
-  // Temporary local identity until OTP authentication is added.
-  static const String _localCustomerId = 'local_customer';
+  static const String _localCustomerId = AccountSyncService.localCustomerId;
 
   final _formKey = GlobalKey<FormState>();
 
@@ -24,7 +28,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
 
   final _profileService = CustomerProfileDatabaseService.instance;
 
-  CustomerProfile? _existingProfile;
+  /// The OTP-verified number when signed in (not editable).
+  String? get _verifiedPhone => widget.account.verifiedPhone;
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -65,10 +70,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
 
       if (!mounted) return;
 
-      _existingProfile = profile;
-
       _nameController.text = profile?.fullName ?? '';
-      _phoneController.text = profile?.phoneNumber ?? '';
+      _phoneController.text = _verifiedPhone ?? profile?.phoneNumber ?? '';
       _emailController.text = profile?.email ?? '';
 
       _savedName = _nameController.text.trim();
@@ -152,26 +155,17 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     });
 
     try {
-      final now = DateTime.now();
-
       final name = _nameController.text.trim();
       final phone = _phoneController.text.trim();
       final email = _emailController.text.trim();
 
-      final profile = CustomerProfile(
-        id: _localCustomerId,
+      await widget.account.saveProfile(
         fullName: name,
-        phoneNumber: phone.isEmpty ? null : phone,
         email: email.isEmpty ? null : email,
-        createdAt: _existingProfile?.createdAt ?? now,
-        updatedAt: now,
+        phoneNumber: phone.isEmpty ? null : phone,
       );
 
-      await _profileService.saveProfile(profile);
-
       if (!mounted) return;
-
-      _existingProfile = profile;
 
       _nameController.text = name;
       _phoneController.text = phone;
@@ -184,6 +178,15 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Profile saved successfully.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on AccountApiException catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Profile not saved: ${error.message}'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -349,17 +352,23 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           const SizedBox(height: 12),
 
           TextFormField(
+            key: const Key('profilePhoneField'),
             controller: _phoneController,
             enabled: !_isSaving,
+            readOnly: _verifiedPhone != null,
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.next,
             maxLength: 10,
-            decoration: const InputDecoration(
-              labelText: 'Mobile Number (Optional)',
+            decoration: InputDecoration(
+              labelText: _verifiedPhone != null
+                  ? 'Mobile Number'
+                  : 'Mobile Number (Optional)',
               hintText: '10-digit mobile number',
-              prefixIcon: Icon(Icons.phone_outlined),
-              border: OutlineInputBorder(),
-              helperText: 'Not OTP-verified',
+              prefixIcon: const Icon(Icons.phone_outlined),
+              border: const OutlineInputBorder(),
+              helperText: _verifiedPhone != null
+                  ? 'Verified when you signed in'
+                  : 'Not OTP-verified',
             ),
             validator: _validatePhone,
             onChanged: (_) => setState(() {}),
@@ -390,17 +399,18 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               color: _brandGreen.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline, color: _brandGreen),
-                SizedBox(width: 12),
+                const Icon(Icons.info_outline, color: _brandGreen),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Your profile is saved locally on this device. '
-                    'Phone number verification will be added '
-                    'with OTP authentication.',
-                    style: TextStyle(fontSize: 13),
+                    widget.account.isSignedIn
+                        ? 'Your profile is saved to your Sudhamrtam account.'
+                        : 'Your profile is saved on this phone only. '
+                              'Sign in to keep it in your account.',
+                    style: const TextStyle(fontSize: 13),
                   ),
                 ),
               ],

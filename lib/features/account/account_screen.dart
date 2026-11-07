@@ -26,7 +26,7 @@ class AccountScreen extends StatelessWidget {
   void _openCustomerProfile(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => const CustomerProfileScreen(),
+        builder: (context) => CustomerProfileScreen(),
       ),
     );
   }
@@ -35,7 +35,7 @@ class AccountScreen extends StatelessWidget {
   void _openSavedAddresses(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => const SavedAddressesScreen(),
+        builder: (context) => SavedAddressesScreen(),
       ),
     );
   }

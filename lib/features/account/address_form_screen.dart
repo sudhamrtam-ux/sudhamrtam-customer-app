@@ -1,12 +1,30 @@
 import 'package:flutter/material.dart';
 
-import '../../database/customer_address_database_service.dart';
+import '../../app/sudhamrtam_app.dart';
 import '../../models/customer_address.dart';
+import '../../services/account_api_client.dart';
+import '../../services/account_sync_service.dart';
+import '../../services/catalog_api_client.dart';
+
+/// Loads the delivery areas for the area choice; null when this
+/// build has no server.
+typedef DeliveryAreaLoader = Future<List<DeliveryArea>> Function();
+
+DeliveryAreaLoader? _defaultAreaLoader() =>
+    CatalogApiClient.fromEnvironment()?.fetchAreas;
 
 class AddressFormScreen extends StatefulWidget {
-  const AddressFormScreen({super.key, this.existingAddress});
+  AddressFormScreen({
+    super.key,
+    this.existingAddress,
+    AccountSyncService? account,
+    DeliveryAreaLoader? loadAreas,
+  }) : account = account ?? sudhamrtamAccount,
+       loadAreas = loadAreas ?? _defaultAreaLoader();
 
   final CustomerAddress? existingAddress;
+  final AccountSyncService account;
+  final DeliveryAreaLoader? loadAreas;
 
   @override
   State<AddressFormScreen> createState() => _AddressFormScreenState();
@@ -14,9 +32,8 @@ class AddressFormScreen extends StatefulWidget {
 
 class _AddressFormScreenState extends State<AddressFormScreen> {
   static const Color _brandGreen = Color(0xFF82B440);
-  static const String _customerId = 'local_customer';
+  static const String _customerId = AccountSyncService.localCustomerId;
 
-  final _addressService = CustomerAddressDatabaseService.instance;
   final _formKey = GlobalKey<FormState>();
 
   final _recipientController = TextEditingController();
@@ -32,14 +49,23 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   bool _isDefault = false;
   bool _isSaving = false;
 
+  // Delivery area. Required once the list of areas is known.
+  String? _areaId;
+  List<DeliveryArea>? _areas;
+  bool _areasLoading = false;
+  String? _areasError;
+
   bool get _isEditing => widget.existingAddress != null;
 
   @override
   void initState() {
     super.initState();
+    _loadAreas();
 
     final address = widget.existingAddress;
     if (address == null) return;
+
+    _areaId = address.areaId;
 
     _addressLabel = ['Home', 'Office', 'Other'].contains(address.label)
         ? address.label
@@ -54,6 +80,79 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _stateController.text = address.state;
     _postalCodeController.text = address.postalCode;
     _isDefault = address.isDefault;
+  }
+
+  Future<void> _loadAreas() async {
+    final load = widget.loadAreas;
+    if (load == null) return;
+
+    setState(() {
+      _areasLoading = true;
+      _areasError = null;
+    });
+
+    try {
+      final areas = await load();
+      if (!mounted) return;
+      setState(() {
+        _areas = areas;
+        _areasLoading = false;
+        // Drop an area that is no longer served.
+        if (_areaId != null && !areas.any((a) => a.id == _areaId)) {
+          _areaId = null;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _areasLoading = false;
+        _areasError = 'Could not load delivery areas.';
+      });
+    }
+  }
+
+  Widget _buildAreaField() {
+    final areas = _areas;
+
+    if (widget.loadAreas == null) return const SizedBox.shrink();
+
+    if (_areasLoading) {
+      return const Padding(
+        padding: EdgeInsets.only(bottom: 16),
+        child: LinearProgressIndicator(color: _brandGreen),
+      );
+    }
+
+    if (areas == null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          children: [
+            Expanded(child: Text(_areasError ?? '')),
+            TextButton(onPressed: _loadAreas, child: const Text('Retry')),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: DropdownButtonFormField<String>(
+        key: const Key('areaField'),
+        initialValue: _areaId,
+        decoration: const InputDecoration(
+          labelText: 'Delivery Area',
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          for (final area in areas)
+            DropdownMenuItem(value: area.id, child: Text(area.name)),
+        ],
+        onChanged: _isSaving ? null : (value) => setState(() => _areaId = value),
+        validator: (value) =>
+            value == null ? 'Please choose your delivery area' : null,
+      ),
+    );
   }
 
   @override
@@ -135,6 +234,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       final address = CustomerAddress(
         id: existing?.id ?? 'address_${now.microsecondsSinceEpoch}',
         customerId: existing?.customerId ?? _customerId,
+        areaId: _areaId,
         label: _addressLabel,
         recipientName: _recipientController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
@@ -158,27 +258,20 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         updatedAt: now,
       );
 
-      if (_isEditing) {
-        await _addressService.updateAddress(address);
-      } else {
-        final saved = await _addressService.saveAddress(address);
-
-        if (!saved) {
-          if (!mounted) return;
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Unable to create address. Please try again.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-          return;
-        }
-      }
+      await widget.account.saveAddress(address);
 
       if (!mounted) return;
 
       Navigator.of(context).pop(true);
+    } on AccountApiException catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Address not saved: ${error.message}'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
 
@@ -248,6 +341,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             ),
 
             const SizedBox(height: 24),
+
+            _buildAreaField(),
 
             _buildTextField(
               controller: _recipientController,

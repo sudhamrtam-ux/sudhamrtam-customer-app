@@ -6,7 +6,7 @@ import 'milk_database_service.dart';
 /// Manages locally saved customer delivery addresses.
 ///
 /// All addresses belong to an existing local customer profile.
-/// Authentication and server synchronization are not implemented here.
+/// Server synchronization is done by AccountSyncService.
 class CustomerAddressDatabaseService {
   CustomerAddressDatabaseService._();
 
@@ -153,6 +153,7 @@ class CustomerAddressDatabaseService {
       final updated = await txn.update(
         _table,
         {
+          'area_id': address.areaId,
           'label': address.label,
           'recipient_name': address.recipientName,
           'phone_number': address.phoneNumber,
@@ -240,6 +241,40 @@ class CustomerAddressDatabaseService {
     );
 
     return deleted > 0;
+  }
+
+  /// Replaces all of a customer's addresses with [addresses]
+  /// in one transaction (used to mirror the server's list).
+  Future<void> replaceAllAddresses(
+    String customerId,
+    List<CustomerAddress> addresses,
+  ) async {
+    for (final address in addresses) {
+      _validateAddress(address);
+      if (address.customerId != customerId) {
+        throw ArgumentError('Address ${address.id} belongs to another customer.');
+      }
+    }
+
+    final db = await MilkDatabaseService.instance.database;
+
+    await db.transaction((txn) async {
+      await _requireCustomer(txn, customerId);
+      await txn.delete(
+        _table,
+        where: 'customer_id = ?',
+        whereArgs: [customerId],
+      );
+      for (final address in addresses) {
+        await txn.insert(_table, address.toMap());
+      }
+    });
+  }
+
+  /// Deletes every saved address of a customer.
+  Future<void> deleteAllAddresses(String customerId) async {
+    final db = await MilkDatabaseService.instance.database;
+    await db.delete(_table, where: 'customer_id = ?', whereArgs: [customerId]);
   }
 
   /// Removes the default flag from every address belonging

@@ -7,6 +7,7 @@ import '../features/shell/customer_shell.dart';
 import '../models/cart_manager.dart';
 import '../models/catalog_repository.dart';
 import '../models/milk_subscription_manager.dart';
+import '../services/account_sync_service.dart';
 import '../services/catalog_api_client.dart';
 import '../services/phone_auth_service.dart';
 
@@ -14,6 +15,10 @@ import '../services/phone_auth_service.dart';
 /// (API_BASE_URL) or the saved login could not be read. The app
 /// still works; sign-in shows as unavailable. Set by main().
 PhoneAuthGateway? sudhamrtamAuth;
+
+/// The phone's profile and saved addresses, synced with the
+/// signed-in account when there is a server. Set by main().
+AccountSyncService sudhamrtamAccount = AccountSyncService.localOnly();
 
 /// Uses the server only when the build sets API_BASE_URL.
 final CatalogRepository sudhamrtamCatalog = CatalogRepository(

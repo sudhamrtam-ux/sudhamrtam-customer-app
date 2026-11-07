@@ -151,7 +151,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _addNewAddress() async {
     final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(builder: (context) => const AddressFormScreen()),
+      MaterialPageRoute<bool>(builder: (context) => AddressFormScreen()),
     );
 
     if (!mounted) return;

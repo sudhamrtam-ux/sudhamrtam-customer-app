@@ -1,11 +1,15 @@
 /// Represents a locally saved customer delivery address.
 ///
-/// Addresses belong to a local customer profile.
-/// Authentication and server synchronization will be
-/// integrated in a later milestone.
+/// Addresses belong to the phone's local customer profile. When
+/// the customer is signed in, AccountSyncService keeps them in
+/// step with the server.
 class CustomerAddress {
   final String id;
   final String customerId;
+
+  /// Server delivery area ID (e.g. `nizampet`); null if unknown.
+  final String? areaId;
+
   final String label;
   final String recipientName;
   final String phoneNumber;
@@ -27,6 +31,7 @@ class CustomerAddress {
   const CustomerAddress({
     required this.id,
     required this.customerId,
+    this.areaId,
     required this.label,
     required this.recipientName,
     required this.phoneNumber,
@@ -51,6 +56,7 @@ class CustomerAddress {
   /// Nullable fields use explicit clear flags so they
   /// can be removed without affecting other properties.
   CustomerAddress copyWith({
+    String? areaId,
     String? label,
     String? recipientName,
     String? phoneNumber,
@@ -70,6 +76,7 @@ class CustomerAddress {
     return CustomerAddress(
       id: id,
       customerId: customerId,
+      areaId: areaId ?? this.areaId,
       label: label ?? this.label,
       recipientName: recipientName ?? this.recipientName,
       phoneNumber: phoneNumber ?? this.phoneNumber,
@@ -107,6 +114,7 @@ class CustomerAddress {
     return {
       'id': id,
       'customer_id': customerId,
+      'area_id': areaId,
       'label': label,
       'recipient_name': recipientName,
       'phone_number': phoneNumber,
@@ -129,6 +137,7 @@ class CustomerAddress {
     return CustomerAddress(
       id: map['id'] as String,
       customerId: map['customer_id'] as String,
+      areaId: map['area_id'] as String?,
       label: map['label'] as String,
       recipientName: map['recipient_name'] as String,
       phoneNumber: map['phone_number'] as String,

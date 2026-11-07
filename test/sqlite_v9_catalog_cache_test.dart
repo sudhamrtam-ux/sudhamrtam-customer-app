@@ -42,7 +42,7 @@ void main() {
     final db = await service.database;
 
     final version = await db.rawQuery('PRAGMA user_version');
-    expect(version.first.values.first, 9);
+    expect(version.first.values.first, MilkDatabaseService.databaseVersion);
 
     expect(
       await tables(db),
@@ -79,7 +79,7 @@ void main() {
     final db = await service.database;
 
     final version = await db.rawQuery('PRAGMA user_version');
-    expect(version.first.values.first, 9);
+    expect(version.first.values.first, MilkDatabaseService.databaseVersion);
 
     expect(await tables(db), containsAll(['catalog_cache', 'app_settings']));
 

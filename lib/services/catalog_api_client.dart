@@ -13,6 +13,14 @@ import '../database/catalog_cache_service.dart';
 /// app does not contact any server.
 const String apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
+/// A delivery area served by Sudhamrtam (e.g. Nizampet).
+class DeliveryArea {
+  final String id;
+  final String name;
+
+  const DeliveryArea({required this.id, required this.name});
+}
+
 class CatalogApiException implements Exception {
   final String message;
   const CatalogApiException(this.message);
@@ -63,6 +71,28 @@ class CatalogApiClient {
       throw CatalogApiException('Invalid product data: ${error.message}');
     } on TypeError {
       throw const CatalogApiException('Invalid product data.');
+    }
+  }
+
+  /// Delivery areas, for choosing an address's area.
+  Future<List<DeliveryArea>> fetchAreas() async {
+    final json = await _getJson(_baseUri.resolve('v1/areas'));
+    final areas = json['areas'];
+
+    if (areas is! List) {
+      throw const CatalogApiException('Malformed areas response.');
+    }
+
+    try {
+      return [
+        for (final area in areas)
+          DeliveryArea(
+            id: (area as Map)['id'] as String,
+            name: area['name'] as String,
+          ),
+      ];
+    } on TypeError {
+      throw const CatalogApiException('Invalid area data.');
     }
   }
 

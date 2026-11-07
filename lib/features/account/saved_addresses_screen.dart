@@ -1,11 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../app/sudhamrtam_app.dart';
 import '../../database/customer_address_database_service.dart';
 import '../../models/customer_address.dart';
+import '../../services/account_api_client.dart';
+import '../../services/account_sync_service.dart';
 import 'address_form_screen.dart';
 
 class SavedAddressesScreen extends StatefulWidget {
-  const SavedAddressesScreen({super.key});
+  SavedAddressesScreen({super.key, AccountSyncService? account})
+    : account = account ?? sudhamrtamAccount;
+
+  final AccountSyncService account;
 
   @override
   State<SavedAddressesScreen> createState() => _SavedAddressesScreenState();
@@ -13,7 +21,7 @@ class SavedAddressesScreen extends StatefulWidget {
 
 class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
   static const Color _brandGreen = Color(0xFF82B440);
-  static const String _customerId = 'local_customer';
+  static const String _customerId = AccountSyncService.localCustomerId;
 
   final _addressService = CustomerAddressDatabaseService.instance;
 
@@ -27,8 +35,25 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
   @override
   void initState() {
     super.initState();
+    widget.account.addListener(_onAccountChanged);
     _loadAddresses();
+    // Fetch the latest from the account (no-op when signed out).
+    unawaited(widget.account.syncNow());
   }
+
+  @override
+  void dispose() {
+    widget.account.removeListener(_onAccountChanged);
+    super.dispose();
+  }
+
+  void _onAccountChanged() {
+    if (!_isDeleting && !_isUpdatingDefault) _loadAddresses();
+  }
+
+  /// A readable message for a failed change.
+  String _reason(Object error) =>
+      error is AccountApiException ? error.message : '$error';
 
   Future<void> _loadAddresses() async {
     if (!mounted) return;
@@ -73,7 +98,9 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     if (_isDeleting || _isUpdatingDefault) return;
 
     final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(builder: (context) => const AddressFormScreen()),
+      MaterialPageRoute<bool>(
+        builder: (context) => AddressFormScreen(account: widget.account),
+      ),
     );
 
     if (!mounted) return;
@@ -92,7 +119,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
 
     final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (context) => AddressFormScreen(existingAddress: address),
+        builder: (context) =>
+            AddressFormScreen(existingAddress: address, account: widget.account),
       ),
     );
 
@@ -117,10 +145,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     });
 
     try {
-      await _addressService.setDefaultAddress(
-        customerId: _customerId,
-        addressId: address.id,
-      );
+      await widget.account.setDefaultAddress(address.id);
 
       if (!mounted) return;
 
@@ -130,7 +155,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
 
       _showMessage('Default delivery address updated successfully!');
     } catch (error) {
-      _showMessage('Unable to set default address: $error');
+      _showMessage('Unable to set default address: ${_reason(error)}');
     } finally {
       if (mounted) {
         setState(() {
@@ -215,10 +240,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
         return;
       }
 
-      await _addressService.deleteAddress(
-        customerId: _customerId,
-        addressId: address.id,
-      );
+      await widget.account.deleteAddress(address.id);
 
       if (!mounted) return;
 
@@ -228,7 +250,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
 
       _showMessage('Delivery address deleted successfully!');
     } catch (error) {
-      _showMessage('Unable to delete address: $error');
+      _showMessage('Unable to delete address: ${_reason(error)}');
     } finally {
       if (mounted) {
         setState(() {

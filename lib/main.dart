@@ -7,6 +7,8 @@ import 'app/sudhamrtam_app.dart';
 import 'core/theme/app_theme.dart';
 import 'database/checkout_recovery_executor.dart';
 import 'features/checkout/checkout_recovery_gate_screen.dart';
+import 'services/account_api_client.dart';
+import 'services/account_sync_service.dart';
 import 'services/api_phone_auth_gateway.dart';
 import 'services/catalog_api_client.dart';
 
@@ -24,6 +26,13 @@ Future<void> main() async {
       );
       await auth.restore();
       sudhamrtamAuth = auth;
+      sudhamrtamAccount = AccountSyncService(
+        api: AccountApiClient(
+          baseUrl: apiBaseUrl,
+          token: () => auth.sessionToken,
+        ),
+        auth: auth,
+      );
       unawaited(auth.checkSession());
     } catch (error) {
       debugPrint('Sign-in could not start: $error');
@@ -36,6 +45,10 @@ Future<void> main() async {
   );
 
   final startupResult = await startupController.start();
+
+  // After checkout recovery: refresh the profile and addresses
+  // from the account (in the background; works offline too).
+  sudhamrtamAccount.attach();
 
   if (startupController.isReady) {
     runApp(const SudhamrtamApp());
