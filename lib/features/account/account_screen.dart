@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import '../../services/phone_auth_service.dart';
+import '../milk_bills/milk_bills_screen.dart';
 import '../orders/order_history_screen.dart';
 import 'customer_profile_screen.dart';
 import 'phone_login_screen.dart';
@@ -26,6 +27,13 @@ class AccountScreen extends StatelessWidget {
   void _openCustomerProfile(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (context) => CustomerProfileScreen()),
+    );
+  }
+
+  /// Opens the customer's monthly milk bills.
+  void _openMilkBills(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (context) => const MilkBillsScreen()),
     );
   }
 
@@ -151,6 +159,14 @@ class AccountScreen extends StatelessWidget {
           title: 'My Orders',
           subtitle: 'View your order history and order status',
           onTap: () => _openOrderHistory(context),
+        ),
+
+        // Milk Bills — monthly bills from the server.
+        _buildAccountTile(
+          icon: Icons.request_quote_outlined,
+          title: 'Milk Bills',
+          subtitle: 'See and pay your monthly milk bills',
+          onTap: () => _openMilkBills(context),
         ),
 
         const SizedBox(height: 20),

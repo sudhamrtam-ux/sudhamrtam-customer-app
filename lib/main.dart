@@ -12,6 +12,7 @@ import 'services/account_api_client.dart';
 import 'services/account_sync_service.dart';
 import 'services/api_phone_auth_gateway.dart';
 import 'services/catalog_api_client.dart';
+import 'services/milk_bill_api_client.dart';
 import 'services/milk_plan_api_client.dart';
 import 'services/milk_plan_sync_service.dart';
 import 'services/order_api_client.dart';
@@ -44,6 +45,10 @@ Future<void> main() async {
           token: () => auth.sessionToken,
         ),
         auth: auth,
+      );
+      sudhamrtamMilkBills = MilkBillApiClient(
+        baseUrl: apiBaseUrl,
+        token: () => auth.sessionToken,
       );
       // Orders go to the server (before startup recovery, so an
       // unfinished order is finished on the server too).

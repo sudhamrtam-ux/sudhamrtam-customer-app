@@ -1,0 +1,373 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+
+import 'package:sudhamrtam_customer_app/features/milk_bills/milk_bills_screen.dart';
+import 'package:sudhamrtam_customer_app/features/payment/payment_launcher.dart';
+import 'package:sudhamrtam_customer_app/services/milk_bill_api_client.dart';
+import 'package:sudhamrtam_customer_app/services/order_api_client.dart';
+
+Map<String, dynamic> billJson({
+  String id = 'b1',
+  String month = '2026-10',
+  String status = 'issued',
+  int total = 23000,
+  String due = '2026-11-08',
+  String? method,
+  bool overdue = false,
+  bool withLines = true,
+}) => {
+  'id': id,
+  'month': month,
+  'status': status,
+  'total_paise': total,
+  'total_ml': 2500,
+  'due_date': due,
+  'payment_method': method,
+  'overdue': overdue,
+  'milk': [
+    {
+      'product_id': 'buffalo_milk',
+      'product_name': 'Buffalo Milk',
+      'quantity_ml': 1500,
+      'amount_paise': 13500,
+    },
+    {
+      'product_id': 'cow_milk',
+      'product_name': 'Cow Milk',
+      'quantity_ml': 1000,
+      'amount_paise': 9500,
+    },
+  ],
+  if (withLines)
+    'lines': [
+      {
+        'delivery_date': '2026-10-05',
+        'shift': 'morning',
+        'product_id': 'buffalo_milk',
+        'product_name': 'Buffalo Milk',
+        'quantity_ml': 1500,
+        'unit_price_paise': 9000,
+        'amount_paise': 13500,
+      },
+      {
+        'delivery_date': '2026-10-05',
+        'shift': 'evening',
+        'product_id': 'cow_milk',
+        'product_name': 'Cow Milk',
+        'quantity_ml': 1000,
+        'unit_price_paise': 9500,
+        'amount_paise': 9500,
+      },
+    ],
+};
+
+class FakeBillServer {
+  List<Map<String, dynamic>> bills = [billJson()];
+  bool down = false;
+  bool expired = false;
+
+  /// How many checks answer "not paid" before [paid] takes effect.
+  bool paid = false;
+  int checksUntilPaid = 0;
+  int checks = 0;
+  Map<String, dynamic>? startError;
+  final requests = <String>[];
+
+  late final client = MockClient((request) async {
+    requests.add('${request.method} ${request.url.path}');
+    if (down) throw http.ClientException('down');
+    http.Response json(int status, Object body) => http.Response(
+      jsonEncode(body),
+      status,
+      headers: {'content-type': 'application/json'},
+    );
+    if (expired) return json(401, {'error': 'UNAUTHORIZED'});
+
+    if (request.url.path == '/v1/milk-bills') {
+      return json(200, {'bills': bills});
+    }
+    if (request.url.path.endsWith('/payment')) {
+      if (startError != null) return json(409, startError!);
+      return json(200, {
+        'order_id': 'bill_b1_1',
+        'payment_session_id': 'session_1',
+        'environment': 'sandbox',
+      });
+    }
+    if (request.url.path.endsWith('/payment/check')) {
+      checks++;
+      final done = paid && checks > checksUntilPaid;
+      if (done) {
+        bills = [billJson(status: 'paid', method: 'online')];
+      }
+      return json(200, {
+        'bill': done
+            ? billJson(status: 'paid', method: 'online', withLines: false)
+            : billJson(withLines: false),
+      });
+    }
+    return json(404, {'error': 'NOT_FOUND', 'message': 'Not found'});
+  });
+}
+
+class FakeLauncher implements PaymentLauncher {
+  FakeLauncher(this.result);
+
+  final PaymentLaunchResult result;
+  final sessions = <PaymentSession>[];
+
+  @override
+  Future<PaymentLaunchResult> launch(PaymentSession session) async {
+    sessions.add(session);
+    return result;
+  }
+}
+
+void main() {
+  late FakeBillServer server;
+  late MilkBillApiClient api;
+  String? token;
+
+  setUp(() {
+    server = FakeBillServer();
+    token = 'tok';
+    api = MilkBillApiClient(
+      baseUrl: 'https://api.test',
+      token: () => token,
+      httpClient: server.client,
+    );
+  });
+
+  Future<void> show(WidgetTester tester, Widget child) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: child)));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openBill(WidgetTester tester, PaymentLauncher launcher) async {
+    final bill = (await api.fetchBills()).first;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MilkBillScreen(
+          bill: bill,
+          api: api,
+          launcher: launcher,
+          confirmDelay: Duration.zero,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  group('labels', () {
+    test('months, dates, money and litres', () {
+      expect(billMonthLabel('2026-10'), 'October 2026');
+      expect(billDateLabel('2026-11-08'), '8 Nov 2026');
+      expect(billRupees(23000), '₹230');
+      expect(billRupees(23050), '₹230.50');
+      expect(billRupees(23005), '₹230.05');
+      expect(billLitres(1500), '1.5 L');
+      expect(billLitres(2000), '2 L');
+    });
+  });
+
+  group('reminder on the Milk Plan tab', () {
+    testWidgets('shows nothing when signed out or with no bills', (tester) async {
+      token = null;
+      await show(tester, MilkBillsReminder(api: api));
+      expect(find.byKey(const Key('milkBillsReminder')), findsNothing);
+      expect(server.requests, isEmpty);
+
+      token = 'tok';
+      server.bills = [];
+      await tester.pumpWidget(const SizedBox());
+      await show(tester, MilkBillsReminder(api: api));
+      expect(find.byKey(const Key('milkBillsReminder')), findsNothing);
+    });
+
+    testWidgets('a connection problem shows no error here', (tester) async {
+      server.down = true;
+      await show(tester, MilkBillsReminder(api: api));
+      expect(find.byKey(const Key('milkBillsReminder')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('one unpaid bill: amount and due date', (tester) async {
+      await show(tester, MilkBillsReminder(api: api));
+      expect(find.text('October 2026 milk bill: ₹230'), findsOneWidget);
+      expect(find.text('Due by 8 Nov 2026. Tap to pay.'), findsOneWidget);
+    });
+
+    testWidgets('overdue says so; milk is not mentioned as stopped', (tester) async {
+      server.bills = [billJson(overdue: true)];
+      await show(tester, MilkBillsReminder(api: api));
+      expect(find.text('Was due by 8 Nov 2026. Tap to pay.'), findsOneWidget);
+    });
+
+    testWidgets('several unpaid bills are added up', (tester) async {
+      server.bills = [billJson(), billJson(id: 'b2', month: '2026-09', total: 10000)];
+      await show(tester, MilkBillsReminder(api: api));
+      expect(find.text('2 unpaid milk bills: ₹330'), findsOneWidget);
+    });
+
+    testWidgets('all paid is a quiet link', (tester) async {
+      server.bills = [billJson(status: 'paid', method: 'cash')];
+      await show(tester, MilkBillsReminder(api: api));
+      expect(find.text('All paid. Tap to see your bills.'), findsOneWidget);
+    });
+
+    testWidgets('opens the bills and refreshes on return', (tester) async {
+      await show(tester, MilkBillsReminder(api: api, launcher: FakeLauncher(const PaymentLaunchFinished())));
+      await tester.tap(find.byKey(const Key('milkBillsReminder')));
+      await tester.pumpAndSettle();
+      expect(find.text('Milk Bills'), findsOneWidget);
+      expect(find.text('October 2026 · ₹230'), findsOneWidget);
+
+      server.bills = [billJson(status: 'paid', method: 'online')];
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('All paid. Tap to see your bills.'), findsOneWidget);
+    });
+  });
+
+  group('bills list', () {
+    testWidgets('shows each bill with its status', (tester) async {
+      server.bills = [
+        billJson(),
+        billJson(id: 'b2', month: '2026-09', status: 'paid', method: 'cash'),
+        billJson(id: 'b3', month: '2026-08', status: 'paid', method: 'online'),
+        billJson(id: 'b4', month: '2026-07', overdue: true),
+      ];
+      await tester.pumpWidget(MaterialApp(home: MilkBillsScreen(api: api)));
+      await tester.pumpAndSettle();
+      expect(find.text('Payment due'), findsOneWidget);
+      expect(find.text('Paid in cash'), findsOneWidget);
+      expect(find.text('Paid online'), findsOneWidget);
+      expect(find.text('Overdue'), findsOneWidget);
+      expect(find.text('Buffalo Milk 1.5 L, Cow Milk 1 L'), findsNWidgets(4));
+    });
+
+    testWidgets('explains an empty list', (tester) async {
+      server.bills = [];
+      await tester.pumpWidget(MaterialApp(home: MilkBillsScreen(api: api)));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('No bills yet.'), findsOneWidget);
+    });
+
+    testWidgets('a failure can be retried', (tester) async {
+      server.down = true;
+      await tester.pumpWidget(MaterialApp(home: MilkBillsScreen(api: api)));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Could not reach Sudhamrtam'), findsOneWidget);
+
+      server.down = false;
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      expect(find.text('October 2026 · ₹230'), findsOneWidget);
+    });
+
+    testWidgets('asks to sign in', (tester) async {
+      token = null;
+      await tester.pumpWidget(MaterialApp(home: MilkBillsScreen(api: api)));
+      await tester.pumpAndSettle();
+      expect(find.text('Please sign in to see your milk bills.'), findsOneWidget);
+
+      token = 'old';
+      server.expired = true;
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+      expect(find.text('Please sign in again to see your milk bills.'), findsOneWidget);
+    });
+
+    testWidgets('no server in this build', (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: MilkBillsScreen()));
+      await tester.pumpAndSettle();
+      expect(find.text('Milk bills need a connection to Sudhamrtam.'), findsOneWidget);
+    });
+  });
+
+  group('one bill', () {
+    testWidgets('shows the bill day by day', (tester) async {
+      await openBill(tester, FakeLauncher(const PaymentLaunchFinished()));
+      expect(find.text('Bill for October 2026'), findsOneWidget);
+      expect(find.text('₹230'), findsOneWidget);
+      expect(find.text('Due by 8 Nov 2026'), findsOneWidget);
+      expect(find.text('Buffalo Milk: 1.5 L · ₹135'), findsOneWidget);
+      expect(find.textContaining('Buffalo Milk 1.5 L at ₹90 per litre'), findsOneWidget);
+      expect(find.textContaining('5 Oct 2026 · Evening'), findsOneWidget);
+      expect(find.text('You can also pay in cash to Sudhamrtam staff.'), findsOneWidget);
+    });
+
+    testWidgets('pays online; only the server says it is paid', (tester) async {
+      final launcher = FakeLauncher(const PaymentLaunchFinished());
+      server.paid = true;
+      server.checksUntilPaid = 2; // Cashfree needs a moment.
+      await openBill(tester, launcher);
+
+      await tester.tap(find.byKey(const Key('payBillOnline')));
+      await tester.pumpAndSettle();
+      expect(launcher.sessions.single.orderId, 'bill_b1_1');
+      expect(server.checks, 3);
+      expect(find.byKey(const Key('billPaid')), findsOneWidget);
+      expect(find.byKey(const Key('payBillOnline')), findsNothing);
+      expect(find.text('Paid online'), findsOneWidget);
+      // The lines stay, though the check leaves them out.
+      expect(find.textContaining('at ₹90 per litre'), findsOneWidget);
+      expect(find.byKey(const Key('billSandboxBanner')), findsOneWidget);
+    });
+
+    testWidgets('reported success without the server stays unpaid', (tester) async {
+      await openBill(tester, FakeLauncher(const PaymentLaunchFinished()));
+      await tester.tap(find.byKey(const Key('payBillOnline')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('billPaid')), findsNothing);
+      expect(find.textContaining('We have not received the payment'), findsOneWidget);
+
+      // It arrives later.
+      server.paid = true;
+      await tester.tap(find.text('Check Payment'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('billPaid')), findsOneWidget);
+    });
+
+    testWidgets('a failed payment can be tried again', (tester) async {
+      await openBill(tester, FakeLauncher(const PaymentLaunchFailed('Cancelled by you.')));
+      await tester.tap(find.byKey(const Key('payBillOnline')));
+      await tester.pumpAndSettle();
+      expect(find.text('Cancelled by you.'), findsOneWidget);
+      expect(find.byKey(const Key('payBillOnline')), findsOneWidget);
+    });
+
+    testWidgets('already paid: shows it paid', (tester) async {
+      server.startError = {'error': 'ALREADY_PAID', 'message': 'This bill is already paid.'};
+      server.paid = true;
+      final launcher = FakeLauncher(const PaymentLaunchFinished());
+      await openBill(tester, launcher);
+      await tester.tap(find.byKey(const Key('payBillOnline')));
+      await tester.pumpAndSettle();
+      expect(launcher.sessions, isEmpty);
+      expect(find.byKey(const Key('billPaid')), findsOneWidget);
+    });
+
+    testWidgets('online payment off: says so', (tester) async {
+      server.startError = {
+        'error': 'PAYMENT_NOT_OFFERED',
+        'message': 'Online payment is not available right now.',
+      };
+      await openBill(tester, FakeLauncher(const PaymentLaunchFinished()));
+      await tester.tap(find.byKey(const Key('payBillOnline')));
+      await tester.pumpAndSettle();
+      expect(find.text('Online payment is not available right now.'), findsOneWidget);
+    });
+
+    testWidgets('a paid bill has no pay button', (tester) async {
+      server.bills = [billJson(status: 'paid', method: 'cash')];
+      await openBill(tester, FakeLauncher(const PaymentLaunchFinished()));
+      expect(find.byKey(const Key('payBillOnline')), findsNothing);
+      expect(find.text('Paid in cash'), findsOneWidget);
+    });
+  });
+}

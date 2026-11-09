@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../services/milk_plan_api_client.dart';
 import '../account/phone_login_screen.dart';
+import '../milk_bills/milk_bills_screen.dart';
 import '../../models/milk_subscription.dart';
 import '../../models/milk_subscription_manager.dart';
 import '../../models/milk_plan_merge.dart';
@@ -26,6 +27,8 @@ class MilkPlanScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            const MilkBillsReminder(),
+
             // Main heading
             Text(
               'Fresh Milk, Morning & Evening',
