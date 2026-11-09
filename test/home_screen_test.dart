@@ -46,6 +46,7 @@ void main() {
     void Function(String?)? onOpenShop,
     VoidCallback? onOpenMilkPlan,
     OrderRulesLoader? loadRules,
+    OffersLoader? loadOffers,
     DateTime? now,
   }) async {
     tester.view.physicalSize = const Size(1080, 5000);
@@ -66,6 +67,7 @@ void main() {
             onOpenShop: onOpenShop,
             onOpenMilkPlan: onOpenMilkPlan,
             loadRules: loadRules,
+            loadOffers: loadOffers,
             clock: now == null ? null : () => now,
           ),
         ),
@@ -93,6 +95,32 @@ void main() {
     await drainSaves(tester);
     await tester.pumpWidget(const SizedBox());
   }
+
+  testWidgets('shows the offer line when there are offers', (tester) async {
+    await pumpHome(
+      tester,
+      loadOffers: () async => ['Fresh paneer', 'Ghee offer'],
+    );
+    expect(find.byKey(const Key('offer-ticker')), findsOneWidget);
+    expect(find.text('Fresh paneer   •   Ghee offer'), findsOneWidget);
+    // It stays above the page, which scrolls under it.
+    expect(
+      tester.getTopLeft(find.byKey(const Key('offer-ticker'))).dy,
+      lessThan(tester.getTopLeft(find.text('Welcome to Sudhamrtam')).dy),
+    );
+    await finish(tester);
+  });
+
+  testWidgets('no offer line without offers or when offline', (tester) async {
+    await pumpHome(tester, loadOffers: () async => []);
+    expect(find.byKey(const Key('offer-ticker')), findsNothing);
+    await finish(tester);
+
+    await pumpHome(tester, loadOffers: () async => throw Exception('offline'));
+    expect(find.byKey(const Key('offer-ticker')), findsNothing);
+    expect(find.text('Welcome to Sudhamrtam'), findsOneWidget);
+    await finish(tester);
+  });
 
   testWidgets('shortcuts open the shop, a category and the milk plan', (
     tester,
