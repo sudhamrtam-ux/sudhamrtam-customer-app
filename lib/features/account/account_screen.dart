@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import '../../services/phone_auth_service.dart';
+import '../feedback/feedback_screen.dart';
 import '../milk_bills/milk_bills_screen.dart';
 import '../orders/order_history_screen.dart';
 import 'customer_profile_screen.dart';
@@ -18,9 +19,9 @@ class AccountScreen extends StatelessWidget {
 
   /// Opens the existing customer order history screen.
   void _openOrderHistory(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (context) => OrderHistoryScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (context) => OrderHistoryScreen()));
   }
 
   /// Opens the customer profile screen.
@@ -34,6 +35,12 @@ class AccountScreen extends StatelessWidget {
   void _openMilkBills(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (context) => const MilkBillsScreen()),
+    );
+  }
+
+  void _openFeedback(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (context) => const FeedbackScreen()),
     );
   }
 
@@ -182,6 +189,14 @@ class AccountScreen extends StatelessWidget {
         ),
 
         const SizedBox(height: 12),
+
+        // Send Feedback — stars, topic and message to the team.
+        _buildAccountTile(
+          icon: Icons.rate_review_outlined,
+          title: 'Send Feedback',
+          subtitle: 'Tell us how we are doing',
+          onTap: () => _openFeedback(context),
+        ),
 
         // Help & Support — placeholder.
         _buildAccountTile(

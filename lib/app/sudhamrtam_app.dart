@@ -9,6 +9,7 @@ import '../models/catalog_repository.dart';
 import '../models/milk_subscription_manager.dart';
 import '../services/account_sync_service.dart';
 import '../services/catalog_api_client.dart';
+import '../services/feedback_api_client.dart';
 import '../services/milk_bill_api_client.dart';
 import '../services/milk_plan_sync_service.dart';
 import '../services/phone_auth_service.dart';
@@ -68,6 +69,10 @@ Future<void> initializeCatalogAndCart() async {
 /// Monthly milk bills, or null when this build has no server.
 /// Set by main().
 MilkBillApiClient? sudhamrtamMilkBills;
+
+/// Customer feedback, or null when this build has no server.
+/// Set by main().
+FeedbackApiClient? sudhamrtamFeedback;
 
 final MilkSubscriptionManager sudhamrtamMilkSubscriptions =
     MilkSubscriptionManager();

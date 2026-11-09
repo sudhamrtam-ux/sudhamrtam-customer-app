@@ -12,6 +12,7 @@ import 'services/account_api_client.dart';
 import 'services/account_sync_service.dart';
 import 'services/api_phone_auth_gateway.dart';
 import 'services/catalog_api_client.dart';
+import 'services/feedback_api_client.dart';
 import 'services/milk_bill_api_client.dart';
 import 'services/milk_plan_api_client.dart';
 import 'services/milk_plan_sync_service.dart';
@@ -47,6 +48,10 @@ Future<void> main() async {
         auth: auth,
       );
       sudhamrtamMilkBills = MilkBillApiClient(
+        baseUrl: apiBaseUrl,
+        token: () => auth.sessionToken,
+      );
+      sudhamrtamFeedback = FeedbackApiClient(
         baseUrl: apiBaseUrl,
         token: () => auth.sessionToken,
       );
