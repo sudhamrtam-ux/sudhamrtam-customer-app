@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import '../home/home_screen.dart';
+import '../messages/messages_screen.dart';
 import '../shop/product_image.dart';
 import '../shop/shop_screen.dart';
 import '../cart/cart_screen.dart';
@@ -55,6 +56,8 @@ class _CustomerShellState extends State<CustomerShell> {
 
         // Temporary button for SQLite testing.
         actions: [
+          // Messages from Sudhamrtam; hidden without a server.
+          const MessagesBell(),
           IconButton(
             tooltip: 'SQLite Test',
             icon: const Icon(Icons.storage_outlined),

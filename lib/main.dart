@@ -8,11 +8,13 @@ import 'core/theme/app_theme.dart';
 import 'database/checkout_recovery_executor.dart';
 import 'features/checkout/order_destination.dart';
 import 'features/checkout/checkout_recovery_gate_screen.dart';
+import 'features/messages/message_inbox.dart';
 import 'services/account_api_client.dart';
 import 'services/account_sync_service.dart';
 import 'services/api_phone_auth_gateway.dart';
 import 'services/catalog_api_client.dart';
 import 'services/feedback_api_client.dart';
+import 'services/message_api_client.dart';
 import 'services/milk_bill_api_client.dart';
 import 'services/milk_plan_api_client.dart';
 import 'services/milk_plan_sync_service.dart';
@@ -55,6 +57,12 @@ Future<void> main() async {
         baseUrl: apiBaseUrl,
         token: () => auth.sessionToken,
       );
+      sudhamrtamMessages = MessageInbox(
+        api: MessageApiClient(
+          baseUrl: apiBaseUrl,
+          token: () => auth.sessionToken,
+        ),
+      )..attach(auth.authStateChanges());
       // Orders go to the server (before startup recovery, so an
       // unfinished order is finished on the server too).
       OrderDestination.server = OrderApiClient(

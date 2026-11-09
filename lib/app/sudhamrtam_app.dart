@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
+import '../features/messages/message_inbox.dart';
 import '../features/shell/customer_shell.dart';
 import '../models/cart_manager.dart';
 import '../models/catalog_repository.dart';
@@ -73,6 +74,10 @@ MilkBillApiClient? sudhamrtamMilkBills;
 /// Customer feedback, or null when this build has no server.
 /// Set by main().
 FeedbackApiClient? sudhamrtamFeedback;
+
+/// Messages from Sudhamrtam (the bell), or null when this build has
+/// no server. Set by main().
+MessageInbox? sudhamrtamMessages;
 
 final MilkSubscriptionManager sudhamrtamMilkSubscriptions =
     MilkSubscriptionManager();
