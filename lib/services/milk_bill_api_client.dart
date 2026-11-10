@@ -123,6 +123,135 @@ class MilkBill {
   );
 }
 
+/// One milk in one delivery.
+class MilkDeliveryItem {
+  final String productName;
+  final int quantityMl;
+
+  /// Per litre, as the bill charges it; null if the milk has no price.
+  final int? unitPricePaise;
+
+  /// Charged only when delivered.
+  final int amountPaise;
+
+  const MilkDeliveryItem({
+    required this.productName,
+    required this.quantityMl,
+    required this.unitPricePaise,
+    required this.amountPaise,
+  });
+
+  factory MilkDeliveryItem.fromJson(Map<String, dynamic> json) =>
+      MilkDeliveryItem(
+        productName: json['name'] as String,
+        quantityMl: json['quantity_ml'] as int,
+        unitPricePaise: json['unit_price_paise'] as int?,
+        amountPaise: json['amount_paise'] as int,
+      );
+}
+
+/// One delivery (one date and shift) in the customer's milk history.
+class MilkDelivery {
+  /// "2026-11-08".
+  final String date;
+
+  /// early_morning, morning or evening.
+  final String shift;
+
+  /// delivered, not_delivered, or null while not marked yet.
+  final String? outcome;
+  final String? reason;
+  final List<MilkDeliveryItem> items;
+
+  const MilkDelivery({
+    required this.date,
+    required this.shift,
+    required this.outcome,
+    required this.reason,
+    required this.items,
+  });
+
+  bool get isDelivered => outcome == 'delivered';
+  bool get isMissed => outcome == 'not_delivered';
+
+  int get quantityMl => items.fold(0, (sum, i) => sum + i.quantityMl);
+  int get amountPaise => items.fold(0, (sum, i) => sum + i.amountPaise);
+
+  factory MilkDelivery.fromJson(Map<String, dynamic> json) => MilkDelivery(
+    date: json['date'] as String,
+    shift: json['shift'] as String,
+    outcome: json['outcome'] as String?,
+    reason: json['reason'] as String?,
+    items: [
+      for (final item in json['items'] as List)
+        MilkDeliveryItem.fromJson(item as Map<String, dynamic>),
+    ],
+  );
+}
+
+/// A month of milk deliveries, before the bill too.
+class MilkDeliveryMonth {
+  /// "2026-11".
+  final String month;
+  final List<MilkDelivery> deliveries;
+  final int deliveredCount;
+  final int missedCount;
+  final int notMarkedCount;
+  final int deliveredMl;
+
+  /// What delivered milk comes to; the bill is final.
+  final int amountPaise;
+
+  /// The month's bill once sent.
+  final String? billId;
+  final int? billTotalPaise;
+
+  const MilkDeliveryMonth({
+    required this.month,
+    required this.deliveries,
+    required this.deliveredCount,
+    required this.missedCount,
+    required this.notMarkedCount,
+    required this.deliveredMl,
+    required this.amountPaise,
+    required this.billId,
+    required this.billTotalPaise,
+  });
+
+  /// The deliveries on [date] ("2026-11-08"), early morning first.
+  List<MilkDelivery> on(String date) => [
+    for (final d in deliveries)
+      if (d.date == date) d,
+  ];
+
+  /// The rates charged this month, per litre (usually one).
+  Set<int> get rates => {
+    for (final d in deliveries)
+      if (d.isDelivered)
+        for (final i in d.items)
+          if (i.unitPricePaise != null) i.unitPricePaise!,
+  };
+
+  factory MilkDeliveryMonth.fromJson(Map<String, dynamic> json) {
+    final totals = json['totals'] as Map<String, dynamic>;
+    final bill = json['bill'] as Map<String, dynamic>?;
+    return MilkDeliveryMonth(
+      month: json['month'] as String,
+      deliveries: [
+        for (final d in json['deliveries'] as List)
+          MilkDelivery.fromJson(d as Map<String, dynamic>),
+      ],
+      deliveredCount: totals['delivered'] as int,
+      missedCount: totals['not_delivered'] as int,
+      notMarkedCount: totals['not_marked'] as int,
+      deliveredMl: totals['delivered_ml'] as int,
+      amountPaise: totals['amount_paise'] as int,
+      billId: bill?['id'] as String?,
+      billTotalPaise: bill?['total_paise'] as int?,
+    );
+  }
+}
+
 /// The Sudhamrtam server's milk bill API (`/v1/milk-bills`).
 class MilkBillApiClient {
   MilkBillApiClient({
@@ -149,6 +278,12 @@ class MilkBillApiClient {
       for (final bill in json['bills'] as List)
         MilkBill.fromJson(bill as Map<String, dynamic>),
     ];
+  }
+
+  /// The milk delivered (or missed) in [month] ("2026-11"), day by day.
+  Future<MilkDeliveryMonth> fetchDeliveries(String month) async {
+    final json = await _send('GET', 'v1/milk-deliveries?month=$month');
+    return MilkDeliveryMonth.fromJson(json);
   }
 
   /// Starts or resumes paying a bill online.

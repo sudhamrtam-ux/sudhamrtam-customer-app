@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../services/milk_bill_api_client.dart';
 import '../payment/payment_launcher.dart';
+import 'milk_calendar.dart';
 
 const _green = Color(0xFF4E8A1E);
 const _brandGreen = Color(0xFF82B440);
@@ -35,10 +36,20 @@ String billDateLabel(String date) {
   return '${int.parse(parts[2])} $name ${parts[0]}';
 }
 
-/// 23000 → "₹230", 23050 → "₹230.50".
+/// 23000 → "₹230", 23050 → "₹230.50", 139500 → "₹1,395",
+/// 12345600 → "₹1,23,456" (Indian grouping).
 String billRupees(int paise) {
-  final whole = paise ~/ 100;
+  final digits = (paise ~/ 100).toString();
   final rest = paise % 100;
+  var whole = digits;
+  if (digits.length > 3) {
+    final head = digits.substring(0, digits.length - 3);
+    final groups = <String>[];
+    for (var end = head.length; end > 0; end -= 2) {
+      groups.insert(0, head.substring(end - 2 < 0 ? 0 : end - 2, end));
+    }
+    whole = '${groups.join(',')},${digits.substring(digits.length - 3)}';
+  }
   return rest == 0 ? '₹$whole' : '₹$whole.${rest.toString().padLeft(2, '0')}';
 }
 
@@ -169,10 +180,13 @@ class _MilkBillsReminderState extends State<MilkBillsReminder> {
 
 /// The customer's monthly milk bills.
 class MilkBillsScreen extends StatefulWidget {
-  const MilkBillsScreen({super.key, this.api, this.launcher});
+  const MilkBillsScreen({super.key, this.api, this.launcher, this.today});
 
   final MilkBillApiClient? api;
   final PaymentLauncher? launcher;
+
+  /// For tests; defaults to now.
+  final DateTime Function()? today;
 
   @override
   State<MilkBillsScreen> createState() => _MilkBillsScreenState();
@@ -248,6 +262,15 @@ class _MilkBillsScreenState extends State<MilkBillsScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+                    MilkCalendar(api: _api!, today: widget.today),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                      child: Text(
+                        'Bills',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                     if (bills.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(32),
