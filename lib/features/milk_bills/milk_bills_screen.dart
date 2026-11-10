@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../services/milk_bill_api_client.dart';
 import '../payment/payment_launcher.dart';
+import 'bill_pdf.dart';
 import 'milk_calendar.dart';
 
 const _green = Color(0xFF4E8A1E);
@@ -449,6 +450,10 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
         month: fresh.month,
         status: fresh.status,
         totalPaise: fresh.totalPaise,
+        subtotalPaise: fresh.subtotalPaise,
+        discountPaise: fresh.discountPaise,
+        discountPercentBp: fresh.discountPercentBp,
+        gstPaise: fresh.gstPaise,
         dueDate: fresh.dueDate,
         paymentMethod: fresh.paymentMethod,
         overdue: fresh.overdue,
@@ -456,6 +461,34 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
         lines: fresh.lines.isEmpty ? _bill.lines : fresh.lines,
       );
     });
+  }
+
+  /// The bill as a PDF, like the paper bill, to save or share.
+  Future<void> _download() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final data = await widget.api.fetchPrint(_bill.id);
+      final bytes = await buildBillPdf(data, logo: await billLogo());
+      await outputBillPdf(
+        bytes,
+        'Sudhamrtam milk bill ${_bill.month}',
+        share: true,
+      );
+    } on MilkBillException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not make the PDF. Try again.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _pay() async {
@@ -527,7 +560,18 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text('Bill for ${billMonthLabel(bill.month)}')),
+      appBar: AppBar(
+        title: Text('Bill for ${billMonthLabel(bill.month)}'),
+        actions: [
+          if (bill.status != 'cancelled')
+            IconButton(
+              key: const Key('downloadBill'),
+              tooltip: 'Download bill (PDF)',
+              onPressed: _busy ? null : _download,
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+            ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),

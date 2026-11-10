@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:sudhamrtam_customer_app/features/milk_bills/bill_pdf.dart';
 import 'package:sudhamrtam_customer_app/features/milk_bills/milk_bills_screen.dart';
 import 'package:sudhamrtam_customer_app/features/payment/payment_launcher.dart';
 import 'package:sudhamrtam_customer_app/services/milk_bill_api_client.dart';
@@ -146,6 +147,27 @@ class FakeBillServer {
     if (request.url.path == '/v1/milk-deliveries') {
       final month = request.url.queryParameters['month']!;
       return json(200, history[month] ?? historyJson(month, []));
+    }
+    if (request.url.path.endsWith('/print')) {
+      return json(200, {
+        'bill': bills.first,
+        'customer': {
+          'name': 'Asha',
+          'phone': '+919876543210',
+          'address': 'Flat 101, Hyderabad',
+        },
+        'plans': <Object>[],
+        'deliveries': <Object>[],
+        'settings': {
+          'account_name': 'Test Account',
+          'account_number': '12345678901',
+          'bank_name': 'Test Bank',
+          'ifsc': 'ABCD0123456',
+          'payee_phone': '9876500000',
+          'upi_id': 'test.payee@ybl',
+          'gstin': null,
+        },
+      });
     }
     if (request.url.path.endsWith('/payment')) {
       if (startError != null) return json(409, startError!);
@@ -540,6 +562,19 @@ void main() {
   });
 
   group('one bill', () {
+    testWidgets('downloads the bill as a PDF', (tester) async {
+      final outputs = <(int, String, bool)>[];
+      outputBillPdf = (bytes, name, {required share}) async =>
+          outputs.add((bytes.length, name, share));
+      await openBill(tester, FakeLauncher(const PaymentLaunchFinished()));
+      await tester.tap(find.byKey(const Key('downloadBill')));
+      await tester.pumpAndSettle();
+      expect(server.requests, contains('GET /v1/milk-bills/b1/print'));
+      expect(outputs.single.$2, 'Sudhamrtam milk bill 2026-10');
+      expect(outputs.single.$3, isTrue);
+      expect(outputs.single.$1, greaterThan(5000));
+    });
+
     testWidgets('actual amount, discount, GST and total', (tester) async {
       server.bills = [
         {

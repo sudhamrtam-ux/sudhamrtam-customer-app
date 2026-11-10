@@ -309,6 +309,10 @@ class MilkBillApiClient {
     return MilkDeliveryMonth.fromJson(json);
   }
 
+  /// Everything the printed bill shows (a sent or paid bill).
+  Future<Map<String, dynamic>> fetchPrint(String billId) =>
+      _send('GET', 'v1/milk-bills/$billId/print');
+
   /// Starts or resumes paying a bill online.
   Future<PaymentSession> startPayment(String billId) async {
     final json = await _send('POST', 'v1/milk-bills/$billId/payment');
