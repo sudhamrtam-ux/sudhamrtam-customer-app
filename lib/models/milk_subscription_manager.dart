@@ -436,8 +436,8 @@ class MilkSubscriptionManager extends ChangeNotifier {
       return false;
     }
 
-    // Only Morning and Evening are supported.
-    if (schedules.length > 2) {
+    // At most one schedule per shift.
+    if (schedules.length > MilkDeliveryShift.values.length) {
       return false;
     }
 

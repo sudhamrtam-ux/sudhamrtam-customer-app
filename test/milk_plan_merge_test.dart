@@ -553,6 +553,9 @@ void main() {
                 plans: [
                   plan('b', [evening(500)], productId: 'buffalo_milk'),
                   plan('a', [morning(1000)], productId: 'buffalo_milk'),
+                  plan('c', [
+                    shift(MilkDeliveryShift.earlyMorning, 500),
+                  ], productId: 'buffalo_milk'),
                 ],
               ),
             ),
@@ -561,12 +564,17 @@ void main() {
       );
 
       expect(find.text('Buffalo Milk'), findsOneWidget);
+      expect(find.text('Early morning Delivery'), findsOneWidget);
       expect(find.text('Morning Delivery'), findsOneWidget);
       expect(find.text('Evening Delivery'), findsOneWidget);
-      expect(find.text('Total: 1.5 L every day'), findsOneWidget);
+      expect(find.text('Total: 2 L every day'), findsOneWidget);
       // Each plan keeps its own Pause button.
-      expect(find.text('Pause'), findsNWidgets(2));
-      // Morning is listed first.
+      expect(find.text('Pause'), findsNWidgets(3));
+      // Early morning, then morning, then evening.
+      expect(
+        tester.getTopLeft(find.text('Early morning Delivery')).dy,
+        lessThan(tester.getTopLeft(find.text('Morning Delivery')).dy),
+      );
       expect(
         tester.getTopLeft(find.text('Morning Delivery')).dy,
         lessThan(tester.getTopLeft(find.text('Evening Delivery')).dy),

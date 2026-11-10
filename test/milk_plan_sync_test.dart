@@ -203,6 +203,23 @@ void main() {
       expect(back.shiftSchedules.first.endDate, DateTime(2026, 12, 31));
     });
 
+    test('early morning is "early_morning" on the server', () {
+      final json = MilkPlanApiClient.planToJson(
+        plan('p2', [shift(MilkDeliveryShift.earlyMorning, 1000), morning(500)]),
+      );
+      expect((json['shifts'] as List).map((s) => s['shift']), [
+        'early_morning',
+        'morning',
+      ]);
+      final back = MilkPlanApiClient.planFromJson(
+        jsonDecode(jsonEncode(json)) as Map<String, dynamic>,
+      );
+      expect(back.shiftSchedules.map((s) => s.shift), [
+        MilkDeliveryShift.earlyMorning,
+        MilkDeliveryShift.morning,
+      ]);
+    });
+
     test('refusals keep their code; outages say nothing changed', () async {
       Future<MilkPlanSyncException> failure(MockClient client) async {
         final api = MilkPlanApiClient(

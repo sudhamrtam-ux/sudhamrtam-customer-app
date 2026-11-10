@@ -2,8 +2,20 @@ enum MilkDeliveryFrequency { daily, alternateDays, selectedDays, randomDays }
 
 enum MilkSubscriptionStatus { active, paused, cancelled }
 
-// Morning and Evening delivery shifts.
-enum MilkDeliveryShift { morning, evening }
+/// Delivery shifts, in delivery order. Early morning milk is the
+/// evening before's milk, kept cold overnight; changes to it close
+/// at 9 PM the evening before (the server fixes the list then).
+enum MilkDeliveryShift {
+  earlyMorning,
+  morning,
+  evening;
+
+  /// The server's name: early_morning, morning, evening.
+  String get apiName => this == earlyMorning ? 'early_morning' : name;
+
+  static MilkDeliveryShift fromApi(String value) =>
+      value == 'early_morning' ? earlyMorning : values.byName(value);
+}
 
 // Each shift has its own quantity and delivery schedule.
 class MilkShiftSchedule {
@@ -61,7 +73,7 @@ class MilkSubscription {
   final String productId;
 
   // NEW: Independent delivery schedules.
-  // A subscription may contain Morning, Evening, or both.
+  // A subscription may contain any of Early morning, Morning, Evening.
   final List<MilkShiftSchedule> shiftSchedules;
 
   // LEGACY FIELDS:

@@ -14,12 +14,13 @@ import 'package:sqflite/sqflite.dart';
 /// Version 9: Server catalog cache and app settings.
 /// Version 10: Delivery area on saved addresses.
 /// Version 11: Saved address ID on orders.
+/// Version 12: Early morning delivery shift on milk plan schedules.
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 11;
+  static const int databaseVersion = 12;
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -125,50 +126,7 @@ class MilkDatabaseService {
       )
     ''');
 
-    await db.execute('''
-      CREATE TABLE $schedulesTable (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        subscription_id TEXT NOT NULL,
-        shift TEXT NOT NULL
-          CHECK (
-            shift IN (
-              'morning',
-              'evening'
-            )
-          ),
-        quantity_ml INTEGER NOT NULL
-          CHECK (
-            quantity_ml >= 500
-            AND quantity_ml <= 10000
-            AND quantity_ml % 500 = 0
-          ),
-        frequency TEXT NOT NULL
-          CHECK (
-            frequency IN (
-              'daily',
-              'alternateDays',
-              'selectedDays',
-              'randomDays'
-            )
-          ),
-        selected_weekdays TEXT NOT NULL DEFAULT '[]',
-        selected_random_dates TEXT NOT NULL DEFAULT '[]',
-        start_date TEXT NOT NULL,
-        end_date TEXT,
-        FOREIGN KEY (subscription_id)
-          REFERENCES $subscriptionsTable(id)
-          ON DELETE CASCADE,
-        UNIQUE (
-          subscription_id,
-          shift
-        )
-      )
-    ''');
-
-    await db.execute('''
-      CREATE INDEX idx_milk_shift_subscription
-      ON $schedulesTable(subscription_id)
-    ''');
+    await _createSchedulesTable(db);
 
     await _createCartTable(db);
     await _createOrderTables(db);
@@ -247,6 +205,96 @@ class MilkDatabaseService {
     if (oldVersion < 11) {
       await _addOrderAddressIdColumn(db);
     }
+
+    if (oldVersion < 12) {
+      await _allowEarlyMorningShift(db);
+    }
+  }
+
+  /// Milk plan shift schedules, with the shift index. [name] lets
+  /// the v12 upgrade build the new table beside the old one.
+  Future<void> _createSchedulesTable(
+    DatabaseExecutor db, {
+    String name = schedulesTable,
+  }) async {
+    await db.execute('''
+      CREATE TABLE $name (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subscription_id TEXT NOT NULL,
+        shift TEXT NOT NULL
+          CHECK (
+            shift IN (
+              'earlyMorning',
+              'morning',
+              'evening'
+            )
+          ),
+        quantity_ml INTEGER NOT NULL
+          CHECK (
+            quantity_ml >= 500
+            AND quantity_ml <= 10000
+            AND quantity_ml % 500 = 0
+          ),
+        frequency TEXT NOT NULL
+          CHECK (
+            frequency IN (
+              'daily',
+              'alternateDays',
+              'selectedDays',
+              'randomDays'
+            )
+          ),
+        selected_weekdays TEXT NOT NULL DEFAULT '[]',
+        selected_random_dates TEXT NOT NULL DEFAULT '[]',
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        FOREIGN KEY (subscription_id)
+          REFERENCES $subscriptionsTable(id)
+          ON DELETE CASCADE,
+        UNIQUE (
+          subscription_id,
+          shift
+        )
+      )
+    ''');
+
+    if (name != schedulesTable) return;
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_milk_shift_subscription
+      ON $schedulesTable(subscription_id)
+    ''');
+  }
+
+  /// Version 12: allow the early morning shift.
+  ///
+  /// SQLite cannot change a CHECK, so the schedules table is
+  /// rebuilt and every row copied as it is; no plan changes.
+  Future<void> _allowEarlyMorningShift(Database db) async {
+    final existing = await db.rawQuery(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [schedulesTable],
+    );
+    if (existing.isEmpty) {
+      await _createSchedulesTable(db);
+      return;
+    }
+    const rebuilt = '${schedulesTable}_v12';
+    await db.execute('DROP TABLE IF EXISTS $rebuilt');
+    await _createSchedulesTable(db, name: rebuilt);
+    await db.execute('''
+      INSERT INTO $rebuilt (id, subscription_id, shift, quantity_ml,
+        frequency, selected_weekdays, selected_random_dates,
+        start_date, end_date)
+      SELECT id, subscription_id, shift, quantity_ml, frequency,
+        selected_weekdays, selected_random_dates, start_date, end_date
+      FROM $schedulesTable
+    ''');
+    await db.execute('DROP TABLE $schedulesTable');
+    await db.execute('ALTER TABLE $rebuilt RENAME TO $schedulesTable');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_milk_shift_subscription
+      ON $schedulesTable(subscription_id)
+    ''');
   }
 
   /// Version 11: the saved address an order goes to.

@@ -657,7 +657,7 @@ class _MilkPlanCard extends StatelessWidget {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Choose your milk, quantity and morning or evening.',
+                      'Choose your milk, quantity and delivery time.',
                       style: TextStyle(fontSize: 12, color: Colors.black54),
                     ),
                   ],

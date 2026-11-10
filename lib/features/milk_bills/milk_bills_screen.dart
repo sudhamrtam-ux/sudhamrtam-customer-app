@@ -39,12 +39,17 @@ String billDateLabel(String date) {
 String billRupees(int paise) {
   final whole = paise ~/ 100;
   final rest = paise % 100;
-  return rest == 0
-      ? '₹$whole'
-      : '₹$whole.${rest.toString().padLeft(2, '0')}';
+  return rest == 0 ? '₹$whole' : '₹$whole.${rest.toString().padLeft(2, '0')}';
 }
 
 /// 1500 → "1.5 L".
+/// "Early morning", "Morning" or "Evening".
+String billShiftLabel(String shift) => switch (shift) {
+  'early_morning' => 'Early morning',
+  'morning' => 'Morning',
+  _ => 'Evening',
+};
+
 String billLitres(int ml) {
   final value = ml / 1000;
   return value == value.roundToDouble()
@@ -278,7 +283,11 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12),
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -551,7 +560,7 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
                     Expanded(
                       child: Text(
                         '${billDateLabel(line.deliveryDate)} · '
-                        '${line.shift == 'morning' ? 'Morning' : 'Evening'}\n'
+                        '${billShiftLabel(line.shift)}\n'
                         '${line.productName} ${billLitres(line.quantityMl)} at '
                         '${billRupees(line.unitPricePaise)} per litre',
                       ),

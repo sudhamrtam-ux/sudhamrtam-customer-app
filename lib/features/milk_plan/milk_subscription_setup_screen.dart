@@ -80,15 +80,24 @@ class MilkSubscriptionSetupScreen extends StatefulWidget {
 
 class _MilkSubscriptionSetupScreenState
     extends State<MilkSubscriptionSetupScreen> {
+  late _ShiftDraft _earlyMorning;
   late _ShiftDraft _morning;
   late _ShiftDraft _evening;
   bool _isSaving = false;
+
+  /// Each shift's draft, in delivery order.
+  Map<MilkDeliveryShift, _ShiftDraft> get _drafts => {
+    MilkDeliveryShift.earlyMorning: _earlyMorning,
+    MilkDeliveryShift.morning: _morning,
+    MilkDeliveryShift.evening: _evening,
+  };
 
   bool get _isEditing => widget.existingSubscription != null;
 
   @override
   void initState() {
     super.initState();
+    _earlyMorning = _ShiftDraft();
     _morning = _ShiftDraft(enabled: true, quantityMl: 1000);
     _evening = _ShiftDraft();
 
@@ -96,6 +105,12 @@ class _MilkSubscriptionSetupScreenState
     if (existing == null) return;
 
     if (existing.shiftSchedules.isNotEmpty) {
+      final earlySchedule = existing.scheduleFor(
+        MilkDeliveryShift.earlyMorning,
+      );
+      _earlyMorning = earlySchedule == null
+          ? _ShiftDraft()
+          : _ShiftDraft.fromSchedule(earlySchedule);
       final morningSchedule = existing.scheduleFor(MilkDeliveryShift.morning);
       final eveningSchedule = existing.scheduleFor(MilkDeliveryShift.evening);
       _morning = morningSchedule == null
@@ -179,13 +194,12 @@ class _MilkSubscriptionSetupScreenState
   Future<void> _saveMilkSubscription() async {
     if (_isSaving) return;
 
-    if (!_morning.enabled && !_evening.enabled) {
-      _showError('Enable Morning, Evening, or both delivery shifts.');
+    if (!_drafts.values.any((draft) => draft.enabled)) {
+      _showError('Choose at least one delivery time.');
       return;
     }
-    if (!_validateDraft(_morning, 'Morning') ||
-        !_validateDraft(_evening, 'Evening')) {
-      return;
+    for (final MapEntry(key: shift, value: draft) in _drafts.entries) {
+      if (!_validateDraft(draft, shiftText(shift))) return;
     }
 
     // A disabled Save button also prevents duplicate requests.
@@ -198,8 +212,8 @@ class _MilkSubscriptionSetupScreenState
           (widget.productName == 'Buffalo Milk' ? 'buffalo_milk' : 'cow_milk');
 
       final schedules = <MilkShiftSchedule>[
-        if (_morning.enabled) _morning.toSchedule(MilkDeliveryShift.morning),
-        if (_evening.enabled) _evening.toSchedule(MilkDeliveryShift.evening),
+        for (final MapEntry(key: shift, value: draft) in _drafts.entries)
+          if (draft.enabled) draft.toSchedule(shift),
       ];
 
       // Maintain the legacy fields while the remaining screens migrate.
@@ -342,11 +356,8 @@ class _MilkSubscriptionSetupScreenState
     }
   }
 
-  Widget _shiftCard({
-    required String title,
-    required IconData icon,
-    required _ShiftDraft draft,
-  }) {
+  Widget _shiftCard(MilkDeliveryShift shift, _ShiftDraft draft) {
+    final title = shiftText(shift);
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final dates = draft.randomDates.toList()..sort();
 
@@ -358,19 +369,33 @@ class _MilkSubscriptionSetupScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SwitchListTile(
+              key: Key('shift-${shift.name}'),
               contentPadding: EdgeInsets.zero,
-              secondary: Icon(icon, color: _brandGreen),
+              secondary: Icon(shiftIcon(shift), color: _brandGreen),
               title: Text(
                 '$title Delivery',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              subtitle: Text(draft.enabled ? 'Enabled' : 'Not selected'),
+              subtitle: Text(
+                [
+                  if (shift == MilkDeliveryShift.earlyMorning)
+                    'Last evening\'s milk, kept cold overnight.',
+                  draft.enabled ? 'Enabled' : 'Not selected',
+                ].join('\n'),
+              ),
               value: draft.enabled,
               activeTrackColor: const Color(0xFFE5F0D7),
               activeThumbColor: _brandGreen,
               onChanged: (enabled) => setState(() => draft.enabled = enabled),
             ),
             if (draft.enabled) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  shiftDeadlineText(shift),
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ),
               const Divider(),
               const SizedBox(height: 12),
               const Text(
@@ -496,9 +521,9 @@ class _MilkSubscriptionSetupScreenState
 
   @override
   Widget build(BuildContext context) {
-    final totalMl =
-        (_morning.enabled ? _morning.quantityMl : 0) +
-        (_evening.enabled ? _evening.quantityMl : 0);
+    final totalMl = _drafts.values
+        .where((draft) => draft.enabled)
+        .fold<int>(0, (sum, draft) => sum + draft.quantityMl);
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -530,7 +555,7 @@ class _MilkSubscriptionSetupScreenState
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Choose Morning, Evening, or both shifts.',
+                    'Choose Early morning, Morning, Evening, or more than one.',
                     textAlign: TextAlign.center,
                   ),
                   if (_isEditing) ...[
@@ -541,16 +566,8 @@ class _MilkSubscriptionSetupScreenState
               ),
             ),
             const SizedBox(height: 24),
-            _shiftCard(
-              title: 'Morning',
-              icon: Icons.wb_twilight_outlined,
-              draft: _morning,
-            ),
-            _shiftCard(
-              title: 'Evening',
-              icon: Icons.nights_stay_outlined,
-              draft: _evening,
-            ),
+            for (final MapEntry(key: shift, value: draft) in _drafts.entries)
+              _shiftCard(shift, draft),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -561,7 +578,7 @@ class _MilkSubscriptionSetupScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Combined quantity when both shifts deliver',
+                    'Combined quantity when all chosen shifts deliver',
                     style: TextStyle(color: Colors.black54),
                   ),
                   const SizedBox(height: 8),

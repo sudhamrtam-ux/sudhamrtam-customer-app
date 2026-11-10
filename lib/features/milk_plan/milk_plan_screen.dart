@@ -31,7 +31,7 @@ class MilkPlanScreen extends StatelessWidget {
 
             // Main heading
             Text(
-              'Fresh Milk, Morning & Evening',
+              'Fresh Milk, Early Morning to Evening',
               style: Theme.of(context).textTheme.headlineSmall
                   ?.copyWith(fontWeight: FontWeight.bold),
             ),
@@ -511,7 +511,7 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // =================================================
-        // MORNING / EVENING DELIVERY SCHEDULES
+        // DELIVERY SCHEDULES, EARLY MORNING TO EVENING
         // =================================================
         if (subscription.shiftSchedules.isNotEmpty) ...[
           for (final shift in MilkDeliveryShift.values)
@@ -755,7 +755,6 @@ class _ShiftScheduleSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const brandGreen = Color(0xFF82B440);
-    final isMorning = schedule.shift == MilkDeliveryShift.morning;
 
     return Container(
       width: double.infinity,
@@ -769,17 +768,11 @@ class _ShiftScheduleSummary extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                isMorning
-                    ? Icons.wb_sunny_outlined
-                    : Icons.nights_stay_outlined,
-                color: brandGreen,
-                size: 22,
-              ),
+              Icon(shiftIcon(schedule.shift), color: brandGreen, size: 22),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  isMorning ? 'Morning Delivery' : 'Evening Delivery',
+                  '${shiftText(schedule.shift)} Delivery',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),

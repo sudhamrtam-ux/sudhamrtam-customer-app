@@ -79,7 +79,7 @@ class MilkPlanApiClient implements MilkPlanRemote {
     'shifts': [
       for (final shift in plan.shiftSchedules)
         {
-          'shift': shift.shift.name,
+          'shift': shift.shift.apiName,
           'quantity_ml': shift.quantityMl,
           'frequency': _frequencies[shift.frequency],
           'weekdays': shift.frequency == MilkDeliveryFrequency.selectedDays
@@ -99,7 +99,7 @@ class MilkPlanApiClient implements MilkPlanRemote {
     final shifts = [
       for (final s in (json['shifts'] as List).cast<Map<String, dynamic>>())
         MilkShiftSchedule(
-          shift: MilkDeliveryShift.values.byName(s['shift'] as String),
+          shift: MilkDeliveryShift.fromApi(s['shift'] as String),
           quantityMl: s['quantity_ml'] as int,
           frequency: _frequencies.entries
               .firstWhere((e) => e.value == s['frequency'])

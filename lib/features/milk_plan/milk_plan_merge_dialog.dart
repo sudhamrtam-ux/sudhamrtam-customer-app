@@ -13,8 +13,24 @@ String litresText(int ml) {
       : '${litres.toStringAsFixed(1)} L';
 }
 
-String shiftText(MilkDeliveryShift shift) =>
-    shift == MilkDeliveryShift.morning ? 'Morning' : 'Evening';
+String shiftText(MilkDeliveryShift shift) => switch (shift) {
+  MilkDeliveryShift.earlyMorning => 'Early morning',
+  MilkDeliveryShift.morning => 'Morning',
+  MilkDeliveryShift.evening => 'Evening',
+};
+
+IconData shiftIcon(MilkDeliveryShift shift) => switch (shift) {
+  MilkDeliveryShift.earlyMorning => Icons.bedtime_outlined,
+  MilkDeliveryShift.morning => Icons.wb_sunny_outlined,
+  MilkDeliveryShift.evening => Icons.nights_stay_outlined,
+};
+
+/// When changes to a shift's delivery close.
+String shiftDeadlineText(MilkDeliveryShift shift) => switch (shift) {
+  MilkDeliveryShift.earlyMorning => 'Changes close at 9 PM the evening before.',
+  MilkDeliveryShift.morning => 'Changes close at 6 AM that morning.',
+  MilkDeliveryShift.evening => 'Changes close at 6 PM that evening.',
+};
 
 /// "every day", "on alternate days", "on Mon, Thu", ...
 String deliveryDaysText(MilkShiftSchedule schedule) {
