@@ -540,10 +540,46 @@ void main() {
   });
 
   group('one bill', () {
+    testWidgets('actual amount, discount, GST and total', (tester) async {
+      server.bills = [
+        {
+          ...billJson(total: 21180),
+          'subtotal_paise': 23000,
+          'discount_paise': 2300,
+          'discount_percent_bp': 1000,
+          'gst_paise': 480,
+        },
+      ];
+      await openBill(tester, FakeLauncher(const PaymentLaunchFinished()));
+      final amounts = find.byKey(const Key('billAmounts'));
+      String text() => tester
+          .widgetList<Text>(
+            find.descendant(of: amounts, matching: find.byType(Text)),
+          )
+          .map((t) => t.data)
+          .join(' | ');
+      expect(
+        text(),
+        'Actual amount | ₹230 | Discount (10%) | − ₹23 | GST | + ₹4.80 | '
+        'Total | ₹211.80',
+      );
+      expect(find.text('Pay ₹211.80 online'), findsOneWidget);
+    });
+
+    testWidgets('a bill from before GST shows its total as the actual amount', (
+      tester,
+    ) async {
+      await openBill(tester, FakeLauncher(const PaymentLaunchFinished()));
+      expect(find.text('Actual amount'), findsOneWidget);
+      expect(find.text('+ ₹0'), findsOneWidget);
+      expect(find.text('Discount (10%)'), findsNothing);
+    });
+
     testWidgets('shows the bill day by day', (tester) async {
       await openBill(tester, FakeLauncher(const PaymentLaunchFinished()));
       expect(find.text('Bill for October 2026'), findsOneWidget);
-      expect(find.text('₹230'), findsOneWidget);
+      // The amount due, the actual amount and the total.
+      expect(find.text('₹230'), findsNWidgets(3));
       expect(find.text('Due by 8 Nov 2026'), findsOneWidget);
       expect(find.text('Buffalo Milk: 1.5 L · ₹135'), findsOneWidget);
       expect(

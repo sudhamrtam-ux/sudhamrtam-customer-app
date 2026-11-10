@@ -80,7 +80,17 @@ class MilkBill {
 
   /// issued (waiting for payment), paid or cancelled.
   final String status;
+
+  /// What is paid: actual amount − discount + GST.
   final int totalPaise;
+
+  /// Actual amount: the delivered milk at its price.
+  final int subtotalPaise;
+  final int discountPaise;
+
+  /// Set when the discount is a percentage (basis points, 10% = 1000).
+  final int? discountPercentBp;
+  final int gstPaise;
   final String? dueDate;
 
   /// online or cash, once paid.
@@ -94,12 +104,16 @@ class MilkBill {
     required this.month,
     required this.status,
     required this.totalPaise,
+    int? subtotalPaise,
+    this.discountPaise = 0,
+    this.discountPercentBp,
+    this.gstPaise = 0,
     required this.dueDate,
     required this.paymentMethod,
     required this.overdue,
     required this.milk,
     required this.lines,
-  });
+  }) : subtotalPaise = subtotalPaise ?? totalPaise;
 
   bool get isPaid => status == 'paid';
   bool get isUnpaid => status == 'issued';
@@ -109,6 +123,10 @@ class MilkBill {
     month: json['month'] as String,
     status: json['status'] as String,
     totalPaise: json['total_paise'] as int,
+    subtotalPaise: json['subtotal_paise'] as int?,
+    discountPaise: json['discount_paise'] as int? ?? 0,
+    discountPercentBp: json['discount_percent_bp'] as int?,
+    gstPaise: json['gst_paise'] as int? ?? 0,
     dueDate: json['due_date'] as String?,
     paymentMethod: json['payment_method'] as String?,
     overdue: json['overdue'] as bool? ?? false,

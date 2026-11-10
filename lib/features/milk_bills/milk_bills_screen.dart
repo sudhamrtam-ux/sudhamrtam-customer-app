@@ -290,6 +290,66 @@ class _MilkBillsScreenState extends State<MilkBillsScreen> {
   }
 }
 
+/// 1000 → "10%", 250 → "2.5%".
+String billPercent(int basisPoints) {
+  final value = basisPoints / 100;
+  return value == value.roundToDouble()
+      ? '${value.toStringAsFixed(0)}%'
+      : '${value.toStringAsFixed(basisPoints % 10 == 0 ? 1 : 2)}%';
+}
+
+/// Actual amount − discount + GST = total, as on the paper bill.
+class _BillAmounts extends StatelessWidget {
+  const _BillAmounts({required this.bill});
+
+  final MilkBill bill;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget row(String label, String value, {bool bold = false}) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: bold ? const TextStyle(fontWeight: FontWeight.bold) : null,
+            ),
+          ),
+          Text(
+            value,
+            style: bold ? const TextStyle(fontWeight: FontWeight.bold) : null,
+          ),
+        ],
+      ),
+    );
+    final percent = bill.discountPercentBp;
+    return Container(
+      key: const Key('billAmounts'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F8F0),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          row('Actual amount', billRupees(bill.subtotalPaise)),
+          if (bill.discountPaise > 0)
+            row(
+              percent == null
+                  ? 'Discount'
+                  : 'Discount (${billPercent(percent)})',
+              '− ${billRupees(bill.discountPaise)}',
+            ),
+          row('GST', '+ ${billRupees(bill.gstPaise)}'),
+          const Divider(),
+          row('Total', billRupees(bill.totalPaise), bold: true),
+        ],
+      ),
+    );
+  }
+}
+
 class _StatusPill extends StatelessWidget {
   const _StatusPill(this.bill);
 
@@ -514,6 +574,8 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
                 '${m.productName}: ${billLitres(m.quantityMl)} · '
                 '${billRupees(m.amountPaise)}',
               ),
+            const SizedBox(height: 12),
+            _BillAmounts(bill: bill),
             const SizedBox(height: 16),
             if (bill.status == 'cancelled')
               const Text('This bill was cancelled by Sudhamrtam.')
