@@ -158,7 +158,8 @@ class MilkDelivery {
   /// early_morning, morning or evening.
   final String shift;
 
-  /// delivered, not_delivered, or null while not marked yet.
+  /// delivered, not_delivered, paused (the plan was paused), or null
+  /// while not marked yet (today).
   final String? outcome;
   final String? reason;
   final List<MilkDeliveryItem> items;
@@ -173,6 +174,7 @@ class MilkDelivery {
 
   bool get isDelivered => outcome == 'delivered';
   bool get isMissed => outcome == 'not_delivered';
+  bool get isPaused => outcome == 'paused';
 
   int get quantityMl => items.fold(0, (sum, i) => sum + i.quantityMl);
   int get amountPaise => items.fold(0, (sum, i) => sum + i.amountPaise);
@@ -196,6 +198,7 @@ class MilkDeliveryMonth {
   final List<MilkDelivery> deliveries;
   final int deliveredCount;
   final int missedCount;
+  final int pausedCount;
   final int notMarkedCount;
   final int deliveredMl;
 
@@ -211,6 +214,7 @@ class MilkDeliveryMonth {
     required this.deliveries,
     required this.deliveredCount,
     required this.missedCount,
+    required this.pausedCount,
     required this.notMarkedCount,
     required this.deliveredMl,
     required this.amountPaise,
@@ -243,6 +247,7 @@ class MilkDeliveryMonth {
       ],
       deliveredCount: totals['delivered'] as int,
       missedCount: totals['not_delivered'] as int,
+      pausedCount: totals['paused'] as int? ?? 0,
       notMarkedCount: totals['not_marked'] as int,
       deliveredMl: totals['delivered_ml'] as int,
       amountPaise: totals['amount_paise'] as int,

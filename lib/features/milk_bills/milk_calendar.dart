@@ -8,6 +8,8 @@ const _deliveredFill = Color(0xFFE5F0D7);
 const _missedFill = Color(0xFFFDE2E1);
 const _missedText = Color(0xFFC62828);
 const _pendingFill = Color(0xFFFFF4D6);
+const _pausedFill = Color(0xFFECEFF1);
+const _pausedText = Color(0xFF607D8B);
 const _pendingText = Color(0xFF8A6D00);
 
 /// Months of history the server keeps for customers.
@@ -28,6 +30,7 @@ String missedReasonLabel(String? reason) => switch (reason) {
   'customer_not_available' => 'Nobody was available',
   'customer_refused' => 'Refused at the door',
   'address_not_found' => 'Address not found',
+  // Nobody marked it that day: not delivered, not charged.
   _ => 'Not delivered',
 };
 
@@ -318,6 +321,10 @@ class _DayCell extends StatelessWidget {
       fill = _missedFill;
       lines = const ['Missed'];
       textColor = _missedText;
+    } else if (deliveries.every((d) => d.isPaused)) {
+      fill = _pausedFill;
+      lines = const ['Paused'];
+      textColor = _pausedText;
     } else {
       fill = _pendingFill;
       lines = const ['Pending'];
@@ -402,6 +409,7 @@ class _Legend extends StatelessWidget {
       children: [
         item(_deliveredFill, 'Delivered'),
         item(_missedFill, 'Missed'),
+        item(_pausedFill, 'Paused'),
         item(_pendingFill, 'Not marked yet'),
       ],
     );
@@ -432,6 +440,7 @@ class _MonthTotals extends StatelessWidget {
     final counts = [
       '${data.deliveredCount} delivered',
       if (data.missedCount > 0) '${data.missedCount} missed',
+      if (data.pausedCount > 0) '${data.pausedCount} paused',
       if (data.notMarkedCount > 0) '${data.notMarkedCount} not marked yet',
     ].join(' · ');
 
@@ -499,6 +508,7 @@ class _DeliveryDetail extends StatelessWidget {
     final (status, color) = switch (delivery.outcome) {
       'delivered' => ('Delivered', _green),
       'not_delivered' => (missedReasonLabel(delivery.reason), _missedText),
+      'paused' => ('Paused', _pausedText),
       _ => ('Not marked yet', _pendingText),
     };
     return Padding(

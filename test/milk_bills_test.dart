@@ -106,6 +106,7 @@ Map<String, dynamic> historyJson(
       'not_delivered': deliveries
           .where((d) => d['outcome'] == 'not_delivered')
           .length,
+      'paused': deliveries.where((d) => d['outcome'] == 'paused').length,
       'not_marked': deliveries.where((d) => d['outcome'] == null).length,
       'delivered_ml': sum(delivered, 'quantity_ml'),
       'amount_paise': sum(delivered, 'amount_paise'),
@@ -327,6 +328,12 @@ void main() {
           outcome: 'not_delivered',
           reason: 'customer_refused',
         ),
+        deliveryJson('2026-11-05', outcome: 'paused'),
+        deliveryJson(
+          '2026-11-06',
+          outcome: 'not_delivered',
+          reason: 'not_marked',
+        ),
         deliveryJson('2026-11-10', outcome: null),
       ]);
     }
@@ -369,9 +376,12 @@ void main() {
       expect(cell(tester, '2026-11-03'), '3 Missed');
       expect(cell(tester, '2026-11-10'), '10 Pending');
       expect(cell(tester, '2026-11-04'), '4');
+      expect(cell(tester, '2026-11-05'), '5 Paused');
+      // Nobody marked the 6th: not delivered, not charged.
+      expect(cell(tester, '2026-11-06'), '6 Missed');
 
       expect(
-        find.text('3 delivered · 1 missed · 1 not marked yet'),
+        find.text('3 delivered · 2 missed · 1 paused · 1 not marked yet'),
         findsOneWidget,
       );
       expect(find.text('2 L'), findsOneWidget);
@@ -386,6 +396,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('3 Nov 2026'), findsOneWidget);
       expect(find.text('Refused at the door'), findsOneWidget);
+      await tester.tapAt(const Offset(200, 50));
+      await tester.pumpAndSettle();
+
+      // Not marked that day: not delivered.
+      await tester.tap(find.byKey(const Key('day-2026-11-06')));
+      await tester.pumpAndSettle();
+      expect(find.text('Not delivered'), findsOneWidget);
       await tester.tapAt(const Offset(200, 50));
       await tester.pumpAndSettle();
 
