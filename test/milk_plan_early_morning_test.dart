@@ -7,8 +7,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sudhamrtam_customer_app/app/sudhamrtam_app.dart';
 import 'package:sudhamrtam_customer_app/database/milk_database_service.dart';
 import 'package:sudhamrtam_customer_app/database/milk_subscription_repository.dart';
+import 'package:sudhamrtam_customer_app/features/milk_plan/milk_plan_screen.dart';
 import 'package:sudhamrtam_customer_app/features/milk_plan/milk_subscription_setup_screen.dart';
 import 'package:sudhamrtam_customer_app/models/milk_subscription.dart';
+import 'package:sudhamrtam_customer_app/models/milk_subscription_manager.dart';
 
 /// Early morning deliveries (owner decision 2026-11-10): last
 /// evening's milk, kept cold; changes close at 9 PM the evening before.
@@ -38,6 +40,89 @@ void main() {
     await directory.delete(recursive: true);
   });
 
+  test(
+    'vacation: pause with a return date, kept on the phone; resume clears it',
+    () async {
+      final manager = MilkSubscriptionManager();
+      await manager.loadSavedSubscriptions(const []);
+      final plan = MilkSubscription(
+        id: 'v1',
+        productId: 'buffalo_milk',
+        shiftSchedules: [
+          MilkShiftSchedule(
+            shift: MilkDeliveryShift.morning,
+            quantityMl: 1000,
+            frequency: MilkDeliveryFrequency.daily,
+            startDate: DateTime(2026, 11, 8),
+          ),
+        ],
+        quantity: 1,
+        frequency: MilkDeliveryFrequency.daily,
+        startDate: DateTime(2026, 11, 8),
+      );
+      expect(await manager.addSubscription(plan), isTrue);
+      expect(
+        await manager.pauseSubscription('v1', resumeOn: DateTime(2026, 11, 20)),
+        isTrue,
+      );
+      var saved =
+          (await MilkSubscriptionRepository().loadSubscriptions()).single;
+      expect(saved.status, MilkSubscriptionStatus.paused);
+      expect(saved.resumeOn, DateTime(2026, 11, 20));
+
+      expect(await manager.resumeSubscription('v1'), isTrue);
+      saved = (await MilkSubscriptionRepository().loadSubscriptions()).single;
+      expect(saved.status, MilkSubscriptionStatus.active);
+      expect(saved.resumeOn, isNull);
+
+      // A plain pause has no return date.
+      expect(await manager.pauseSubscription('v1'), isTrue);
+      expect(manager.subscriptions.single.resumeOn, isNull);
+    },
+  );
+
+  test('a cancelled plan keeps when it was cancelled', () async {
+    final repo = MilkSubscriptionRepository();
+    final plan = MilkSubscription(
+      id: 'p1',
+      productId: 'cow_milk',
+      shiftSchedules: [
+        MilkShiftSchedule(
+          shift: MilkDeliveryShift.morning,
+          quantityMl: 1000,
+          frequency: MilkDeliveryFrequency.daily,
+          startDate: DateTime(2026, 11, 8),
+        ),
+      ],
+      quantity: 1,
+      frequency: MilkDeliveryFrequency.daily,
+      startDate: DateTime(2026, 11, 8),
+    );
+    await repo.saveChanges(saves: [plan]);
+    expect((await repo.loadSubscriptions()).single.cancelledAt, isNull);
+
+    // Cancelled on the phone: today.
+    await repo.saveChanges(saves: const [], cancelIds: ['p1']);
+    final cancelled = (await repo.loadSubscriptions()).single;
+    expect(cancelled.status, MilkSubscriptionStatus.cancelled);
+    expect(cancelled.cancelledAt, isNotNull);
+
+    // The server's copy wins.
+    await repo.replaceAll([
+      cancelled.copyWith(cancelledAt: DateTime(2026, 11, 10, 9, 30)),
+    ]);
+    final mirrored = (await repo.loadSubscriptions()).single;
+    expect(mirrored.cancelledAt, DateTime(2026, 11, 10, 9, 30));
+    expect(
+      planDatesText(mirrored),
+      'Started 8 Nov 2026 · Cancelled 10 Nov 2026',
+    );
+    expect(
+      planDatesText(mirrored.copyWith(status: MilkSubscriptionStatus.active)),
+      'Started 8 Nov 2026 · Cancelled 10 Nov 2026',
+    );
+  });
+
   /// SQLite runs outside the test clock: alternate real waiting
   /// with frames until [done] (up to about 10 seconds).
   Future<void> waitUntil(WidgetTester tester, bool Function() done) async {
@@ -49,7 +134,7 @@ void main() {
     }
   }
 
-  test('v11 to v12 keeps milk plans and allows early morning', () async {
+  test('v11 to the latest keeps milk plans and allows early morning', () async {
     final path = '${directory.path}${Platform.pathSeparator}milk.db';
     // A v11 phone: the schedules table allows only morning and evening.
     final old = await databaseFactoryFfi.openDatabase(
@@ -114,7 +199,12 @@ void main() {
     await old.close();
 
     final db = await MilkDatabaseService.instance.database;
-    expect(await db.getVersion(), 12);
+    expect(await db.getVersion(), MilkDatabaseService.databaseVersion);
+    // v13: the cancel date column, empty for old plans.
+    expect(
+      (await db.query('milk_subscriptions')).single,
+      containsPair('cancelled_at', null),
+    );
     final rows = await db.query('milk_shift_schedules');
     expect(rows.single, containsPair('shift', 'evening'));
     expect(rows.single, containsPair('quantity_ml', 1500));

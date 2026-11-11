@@ -294,10 +294,22 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
 
   Future<void> _changeStatus({required bool pause}) async {
     if (_isProcessing) return;
+    DateTime? resumeOn;
+    if (pause) {
+      final choice = await askPauseKind(context);
+      if (choice == null || !mounted) return;
+      if (choice == PauseKind.vacation) {
+        resumeOn = await pickReturnDate(context);
+        if (resumeOn == null || !mounted) return;
+      }
+    }
     setState(() => _isProcessing = true);
     try {
       final success = pause
-          ? await sudhamrtamMilkSubscriptions.pauseSubscription(subscription.id)
+          ? await sudhamrtamMilkSubscriptions.pauseSubscription(
+              subscription.id,
+              resumeOn: resumeOn,
+            )
           : await sudhamrtamMilkSubscriptions.resumeSubscription(
               subscription.id,
             );
@@ -305,7 +317,10 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
       _showMessage(
         success
             ? (pause
-                  ? 'Milk subscription paused.'
+                  ? (resumeOn == null
+                        ? 'Milk subscription paused.'
+                        : 'Enjoy your trip! Milk restarts on '
+                              '${planDateText(resumeOn)}.')
                   : 'Milk subscription resumed.')
             : 'Unable to change subscription status. Please try again.',
       );
@@ -513,6 +528,26 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
         // =================================================
         // DELIVERY SCHEDULES, EARLY MORNING TO EVENING
         // =================================================
+        if (subscription.isOnVacation(DateTime.now())) ...[
+          Container(
+            key: const Key('vacationNote'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE3F2FD),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              'On vacation · milk restarts on '
+              '${planDateText(subscription.resumeOn!)}',
+              style: const TextStyle(
+                color: Color(0xFF1565C0),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (subscription.shiftSchedules.isNotEmpty) ...[
           for (final shift in MilkDeliveryShift.values)
             for (final schedule in subscription.shiftSchedules.where(
@@ -1061,8 +1096,11 @@ class MilkProductCard extends StatelessWidget {
     final active = plans
         .where((p) => p.status == MilkSubscriptionStatus.active)
         .toList();
+    final today = DateTime.now();
     final status = active.length == plans.length
         ? 'Active'
+        : active.isEmpty && plans.every((p) => p.isOnVacation(today))
+        ? 'On vacation'
         : active.isEmpty
         ? 'Paused'
         : 'Partly paused';
@@ -1172,6 +1210,76 @@ String milkTotalText(List<MilkSubscription> plans) {
       : 'Up to ${litresText(total)} on days with both deliveries$note';
 }
 
+enum PauseKind { untilResumed, vacation }
+
+/// Asks how to pause: until the customer resumes, or a vacation with
+/// a return date.
+Future<PauseKind?> askPauseKind(BuildContext context) {
+  return showModalBottomSheet<PauseKind>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            key: const Key('pauseVacation'),
+            leading: const Icon(Icons.luggage_outlined),
+            title: const Text('Going on vacation'),
+            subtitle: const Text(
+              'Choose your return date. Milk restarts by itself that day.',
+            ),
+            onTap: () => Navigator.pop(context, PauseKind.vacation),
+          ),
+          ListTile(
+            key: const Key('pauseUntilResumed'),
+            leading: const Icon(Icons.pause_circle_outline),
+            title: const Text('Pause until I resume'),
+            subtitle: const Text('Milk stops until you tap Resume.'),
+            onTap: () => Navigator.pop(context, PauseKind.untilResumed),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// The first day milk should come again: tomorrow to 180 days ahead.
+/// Tests replace it.
+Future<DateTime?> Function(BuildContext context) pickReturnDate = (context) {
+  final today = DateUtils.dateOnly(DateTime.now());
+  return showDatePicker(
+    context: context,
+    initialDate: today.add(const Duration(days: 7)),
+    firstDate: today.add(const Duration(days: 1)),
+    lastDate: today.add(const Duration(days: 180)),
+    helpText: 'Milk restarts on',
+  );
+};
+
+/// "8 Nov 2026".
+String planDateText(DateTime date) {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+/// "Started 8 Nov 2026 · Cancelled 10 Nov 2026" for a cancelled plan.
+String planDatesText(MilkSubscription plan) {
+  final start = plan.shiftSchedules.isEmpty
+      ? plan.startDate
+      : plan.shiftSchedules
+            .map((s) => s.startDate)
+            .reduce((a, b) => a.isBefore(b) ? a : b);
+  final cancelled = plan.cancelledAt;
+  return [
+    'Started ${planDateText(start)}',
+    if (cancelled != null) 'Cancelled ${planDateText(cancelled)}',
+  ].join(' · ');
+}
+
 /// Cancelled plans, listed briefly at the bottom.
 class _CancelledPlans extends StatelessWidget {
   const _CancelledPlans({required this.plans});
@@ -1197,13 +1305,16 @@ class _CancelledPlans extends StatelessWidget {
             leading: const Icon(Icons.history, color: Colors.black38),
             title: Text(milkName(plan.productId)),
             subtitle: Text(
-              plan.shiftSchedules
-                  .map(
-                    (s) =>
-                        '${shiftText(s.shift)} ${litresText(s.quantityMl)} '
-                        '${deliveryDaysText(s)}',
-                  )
-                  .join(', '),
+              [
+                plan.shiftSchedules
+                    .map(
+                      (s) =>
+                          '${shiftText(s.shift)} ${litresText(s.quantityMl)} '
+                          '${deliveryDaysText(s)}',
+                    )
+                    .join(', '),
+                planDatesText(plan),
+              ].join('\n'),
             ),
           ),
       ],

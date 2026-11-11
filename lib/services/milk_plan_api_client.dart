@@ -76,6 +76,10 @@ class MilkPlanApiClient implements MilkPlanRemote {
     'id': plan.id,
     'product_id': plan.productId,
     'status': plan.status.name,
+    'resume_on':
+        plan.status == MilkSubscriptionStatus.paused && plan.resumeOn != null
+        ? _date(plan.resumeOn!)
+        : null,
     'shifts': [
       for (final shift in plan.shiftSchedules)
         {
@@ -134,6 +138,12 @@ class MilkPlanApiClient implements MilkPlanRemote {
       selectedRandomDates: first.selectedRandomDates,
       startDate: start,
       status: MilkSubscriptionStatus.values.byName(json['status'] as String),
+      cancelledAt: json['cancelled_at'] == null
+          ? null
+          : DateTime.parse(json['cancelled_at'] as String).toLocal(),
+      resumeOn: json['resume_on'] == null
+          ? null
+          : _parseDate(json['resume_on'] as String),
     );
   }
 

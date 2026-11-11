@@ -89,6 +89,14 @@ class MilkSubscription {
 
   final MilkSubscriptionStatus status;
 
+  /// When the plan was cancelled; null while open (or unknown for
+  /// plans cancelled before the phone kept it).
+  final DateTime? cancelledAt;
+
+  /// Vacation: a paused plan delivers again from this date (the
+  /// server restarts it). Null: paused until the customer resumes.
+  final DateTime? resumeOn;
+
   const MilkSubscription({
     required this.id,
     required this.productId,
@@ -100,7 +108,19 @@ class MilkSubscription {
     required this.startDate,
     this.endDate,
     this.status = MilkSubscriptionStatus.active,
+    this.cancelledAt,
+    this.resumeOn,
   });
+
+  /// Paused with a return date that has not come yet.
+  bool isOnVacation(DateTime today) =>
+      status == MilkSubscriptionStatus.paused &&
+      resumeOn != null &&
+      DateTime(
+        resumeOn!.year,
+        resumeOn!.month,
+        resumeOn!.day,
+      ).isAfter(DateTime(today.year, today.month, today.day));
 
   // Retrieve a schedule for a specific shift.
   MilkShiftSchedule? scheduleFor(MilkDeliveryShift shift) {
@@ -141,6 +161,9 @@ class MilkSubscription {
     DateTime? endDate,
     bool clearEndDate = false,
     MilkSubscriptionStatus? status,
+    DateTime? cancelledAt,
+    DateTime? resumeOn,
+    bool clearResumeOn = false,
   }) {
     return MilkSubscription(
       id: id ?? this.id,
@@ -153,6 +176,8 @@ class MilkSubscription {
       startDate: startDate ?? this.startDate,
       endDate: clearEndDate ? null : (endDate ?? this.endDate),
       status: status ?? this.status,
+      cancelledAt: cancelledAt ?? this.cancelledAt,
+      resumeOn: clearResumeOn ? null : (resumeOn ?? this.resumeOn),
     );
   }
 }

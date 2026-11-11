@@ -11,6 +11,8 @@ import '../../services/offer_api_client.dart';
 import '../../services/order_api_client.dart';
 import '../checkout/order_destination.dart';
 import '../shop/product_image.dart';
+import '../../models/milk_subscription_manager.dart';
+import 'account_status.dart';
 import 'offer_ticker.dart';
 
 const _green = Color(0xFF82B440);
@@ -38,6 +40,7 @@ class HomeScreen extends StatefulWidget {
     this.onOpenCart,
     this.catalog,
     this.cart,
+    this.milkPlans,
     OrderRulesLoader? loadRules,
     OffersLoader? loadOffers,
     DateTime Function()? clock,
@@ -53,6 +56,9 @@ class HomeScreen extends StatefulWidget {
   /// Overrides for tests; default to the app's catalog and cart.
   final CatalogRepository? catalog;
   final CartManager? cart;
+
+  /// Override for tests; defaults to the app's milk plans.
+  final MilkSubscriptionManager? milkPlans;
 
   /// Null when the app has no server: the delivery card is hidden.
   final OrderRulesLoader? loadRules;
@@ -179,6 +185,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 8),
           const Text('Pure farm goodness delivered to your doorstep.'),
+          const SizedBox(height: 16),
+          AccountStatusCard(
+            plans: widget.milkPlans,
+            onOpen: widget.onOpenMilkPlan,
+            today: widget.clock,
+          ),
           const SizedBox(height: 20),
           _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
           if (_rules != null) ...[

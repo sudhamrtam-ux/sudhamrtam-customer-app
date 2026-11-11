@@ -9,12 +9,14 @@ import 'database/checkout_recovery_executor.dart';
 import 'features/checkout/order_destination.dart';
 import 'features/checkout/checkout_recovery_gate_screen.dart';
 import 'features/messages/message_inbox.dart';
+import 'features/account/profile_photo.dart';
 import 'services/account_api_client.dart';
 import 'services/account_sync_service.dart';
 import 'services/api_phone_auth_gateway.dart';
 import 'services/catalog_api_client.dart';
 import 'services/feedback_api_client.dart';
 import 'services/message_api_client.dart';
+import 'services/profile_photo_api_client.dart';
 import 'services/milk_bill_api_client.dart';
 import 'services/milk_plan_api_client.dart';
 import 'services/milk_plan_sync_service.dart';
@@ -59,6 +61,12 @@ Future<void> main() async {
       );
       sudhamrtamMessages = MessageInbox(
         api: MessageApiClient(
+          baseUrl: apiBaseUrl,
+          token: () => auth.sessionToken,
+        ),
+      )..attach(auth.authStateChanges());
+      sudhamrtamProfilePhoto = ProfilePhoto(
+        api: ProfilePhotoApiClient(
           baseUrl: apiBaseUrl,
           token: () => auth.sessionToken,
         ),

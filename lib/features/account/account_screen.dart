@@ -7,6 +7,7 @@ import '../milk_bills/milk_bills_screen.dart';
 import '../orders/order_history_screen.dart';
 import 'customer_profile_screen.dart';
 import 'phone_login_screen.dart';
+import 'profile_photo.dart';
 import 'saved_addresses_screen.dart';
 
 class AccountScreen extends StatelessWidget {
@@ -98,8 +99,8 @@ class AccountScreen extends StatelessWidget {
       children: [
         const SizedBox(height: 16),
 
-        // Account header.
-        const Icon(Icons.account_circle_outlined, size: 76, color: _brandGreen),
+        // Account header: the photo (tap to change) when signed in.
+        const Center(child: ProfilePhotoAvatar()),
 
         const SizedBox(height: 12),
 

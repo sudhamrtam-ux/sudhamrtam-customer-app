@@ -203,6 +203,43 @@ void main() {
       expect(back.shiftSchedules.first.endDate, DateTime(2026, 12, 31));
     });
 
+    test('vacation: the return date goes to the server only when paused', () {
+      final away = plan(
+        'p5',
+        [morning(500)],
+        status: MilkSubscriptionStatus.paused,
+      ).copyWith(resumeOn: DateTime(2026, 11, 20));
+      expect(MilkPlanApiClient.planToJson(away)['resume_on'], '2026-11-20');
+      expect(
+        MilkPlanApiClient.planToJson(
+          away.copyWith(status: MilkSubscriptionStatus.active),
+        )['resume_on'],
+        isNull,
+      );
+      final back = MilkPlanApiClient.planFromJson(
+        MilkPlanApiClient.planToJson(away),
+      );
+      expect(back.resumeOn, DateTime(2026, 11, 20));
+      expect(back.isOnVacation(DateTime(2026, 11, 19, 23)), isTrue);
+      expect(back.isOnVacation(DateTime(2026, 11, 20, 1)), isFalse);
+    });
+
+    test('a cancelled plan from the server keeps its cancel date', () {
+      final back = MilkPlanApiClient.planFromJson({
+        ...MilkPlanApiClient.planToJson(
+          plan('p3', [morning(500)], status: MilkSubscriptionStatus.cancelled),
+        ),
+        'cancelled_at': '2026-11-10T04:00:00.000Z',
+      });
+      expect(back.cancelledAt, DateTime.utc(2026, 11, 10, 4).toLocal());
+      expect(
+        MilkPlanApiClient.planFromJson(
+          MilkPlanApiClient.planToJson(plan('p4', [morning(500)])),
+        ).cancelledAt,
+        isNull,
+      );
+    });
+
     test('early morning is "early_morning" on the server', () {
       final json = MilkPlanApiClient.planToJson(
         plan('p2', [shift(MilkDeliveryShift.earlyMorning, 1000), morning(500)]),

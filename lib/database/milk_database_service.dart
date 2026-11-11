@@ -15,12 +15,14 @@ import 'package:sqflite/sqflite.dart';
 /// Version 10: Delivery area on saved addresses.
 /// Version 11: Saved address ID on orders.
 /// Version 12: Early morning delivery shift on milk plan schedules.
+/// Version 13: When a milk plan was cancelled.
+/// Version 14: A paused plan's return date (vacation).
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 12;
+  static const int databaseVersion = 14;
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -137,6 +139,8 @@ class MilkDatabaseService {
     await _createCatalogCacheTables(db);
     await _addAddressAreaColumn(db);
     await _addOrderAddressIdColumn(db);
+    await _addPlanCancelledAtColumn(db);
+    await _addPlanResumeOnColumn(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -209,6 +213,37 @@ class MilkDatabaseService {
     if (oldVersion < 12) {
       await _allowEarlyMorningShift(db);
     }
+
+    if (oldVersion < 13) {
+      await _addPlanCancelledAtColumn(db);
+    }
+
+    if (oldVersion < 14) {
+      await _addPlanResumeOnColumn(db);
+    }
+  }
+
+  /// Version 14: a paused plan's return date (vacation); nullable.
+  Future<void> _addPlanResumeOnColumn(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info($subscriptionsTable)');
+    if (columns.isEmpty || columns.any((c) => c['name'] == 'resume_on')) {
+      return;
+    }
+    await db.execute(
+      'ALTER TABLE $subscriptionsTable ADD COLUMN resume_on TEXT',
+    );
+  }
+
+  /// Version 13: when a milk plan was cancelled (nullable; older
+  /// cancelled plans have none until the server's copy arrives).
+  Future<void> _addPlanCancelledAtColumn(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info($subscriptionsTable)');
+    if (columns.isEmpty || columns.any((c) => c['name'] == 'cancelled_at')) {
+      return;
+    }
+    await db.execute(
+      'ALTER TABLE $subscriptionsTable ADD COLUMN cancelled_at TEXT',
+    );
   }
 
   /// Milk plan shift schedules, with the shift index. [name] lets

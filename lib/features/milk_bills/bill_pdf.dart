@@ -391,6 +391,8 @@ Future<Uint8List> buildBillPdf(
               pw.Expanded(
                 child: pw.Column(
                   children: [
+                    if (customer['reg_no'] != null)
+                      field('Reg No', customer['reg_no'] as String),
                     field('Name', (customer['name'] as String?) ?? '-'),
                     field('Phone No', phone),
                     field('Address', (customer['address'] as String?) ?? '-'),

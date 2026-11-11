@@ -43,7 +43,10 @@ class MilkSubscriptionRepository {
       for (final id in cancelIds) {
         final updated = await txn.update(
           MilkDatabaseService.subscriptionsTable,
-          {'status': MilkSubscriptionStatus.cancelled.name},
+          {
+            'status': MilkSubscriptionStatus.cancelled.name,
+            'cancelled_at': DateTime.now().toIso8601String(),
+          },
           where: 'id = ?',
           whereArgs: [id],
         );
@@ -79,6 +82,8 @@ class MilkSubscriptionRepository {
       'product_id': subscription.productId,
       'status': subscription.status.name,
       'created_at': subscription.startDate.toIso8601String(),
+      'cancelled_at': subscription.cancelledAt?.toIso8601String(),
+      'resume_on': subscription.resumeOn?.toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     // Replacing the parent row may cascade-delete old shifts; explicitly
@@ -167,6 +172,12 @@ class MilkSubscriptionRepository {
             status: MilkSubscriptionStatus.values.byName(
               row['status'] as String,
             ),
+            cancelledAt: row['cancelled_at'] == null
+                ? null
+                : DateTime.parse(row['cancelled_at'] as String),
+            resumeOn: row['resume_on'] == null
+                ? null
+                : DateTime.parse(row['resume_on'] as String),
           );
         })
         .toList(growable: false);

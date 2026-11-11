@@ -258,7 +258,10 @@ class MilkSubscriptionManager extends ChangeNotifier {
     for (var i = 0; i < _subscriptions.length; i++) {
       if (cancelIds.contains(_subscriptions[i].id)) {
         _subscriptions[i] = _copyWithScheduleSnapshots(
-          _subscriptions[i].copyWith(status: MilkSubscriptionStatus.cancelled),
+          _subscriptions[i].copyWith(
+            status: MilkSubscriptionStatus.cancelled,
+            cancelledAt: _subscriptions[i].cancelledAt ?? DateTime.now(),
+          ),
         );
       }
     }
@@ -589,11 +592,15 @@ class MilkSubscriptionManager extends ChangeNotifier {
   // PAUSE SUBSCRIPTION
   // ============================================================
 
-  Future<bool> pauseSubscription(String subscriptionId) => _updateStatus(
-    subscriptionId,
-    MilkSubscriptionStatus.active,
-    MilkSubscriptionStatus.paused,
-  );
+  /// Pauses a plan; with [resumeOn] (vacation) milk comes again from
+  /// that date by itself.
+  Future<bool> pauseSubscription(String subscriptionId, {DateTime? resumeOn}) =>
+      _updateStatus(
+        subscriptionId,
+        MilkSubscriptionStatus.active,
+        MilkSubscriptionStatus.paused,
+        resumeOn: resumeOn,
+      );
 
   // ============================================================
   // RESUME SUBSCRIPTION
@@ -628,8 +635,9 @@ class MilkSubscriptionManager extends ChangeNotifier {
   Future<bool> _updateStatus(
     String subscriptionId,
     MilkSubscriptionStatus requiredStatus,
-    MilkSubscriptionStatus newStatus,
-  ) async {
+    MilkSubscriptionStatus newStatus, {
+    DateTime? resumeOn,
+  }) async {
     if (_isWriting) return false;
     final index = _subscriptions.indexWhere(
       (item) => item.id == subscriptionId,
@@ -637,15 +645,21 @@ class MilkSubscriptionManager extends ChangeNotifier {
     if (index == -1 || _subscriptions[index].status != requiredStatus) {
       return false;
     }
-    return _persistStatus(index, newStatus);
+    return _persistStatus(index, newStatus, resumeOn: resumeOn);
   }
 
   Future<bool> _persistStatus(
     int index,
-    MilkSubscriptionStatus newStatus,
-  ) async {
+    MilkSubscriptionStatus newStatus, {
+    DateTime? resumeOn,
+  }) async {
     final updated = _copyWithScheduleSnapshots(
-      _subscriptions[index].copyWith(status: newStatus),
+      _subscriptions[index].copyWith(
+        status: newStatus,
+        resumeOn: resumeOn,
+        // A return date belongs to a pause only.
+        clearResumeOn: resumeOn == null,
+      ),
     );
     if (updated.shiftSchedules.isEmpty) return false;
 
