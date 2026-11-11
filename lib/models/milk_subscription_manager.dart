@@ -600,6 +600,39 @@ class MilkSubscriptionManager extends ChangeNotifier {
       );
 
   // ============================================================
+  // VACATION DAYS
+  // ============================================================
+
+  /// Sets a plan's vacation days (owner decision 2026-11-11): no
+  /// milk on [days]; the plan stays as it is otherwise. An empty
+  /// list removes them. Throws [MilkPlanSyncException] when the
+  /// server cannot be reached or refuses.
+  Future<bool> setVacationDates(
+    String subscriptionId,
+    List<DateTime> days,
+  ) async {
+    if (_isWriting) return false;
+    final index = _subscriptions.indexWhere(
+      (item) => item.id == subscriptionId,
+    );
+    if (index == -1 ||
+        _subscriptions[index].status == MilkSubscriptionStatus.cancelled) {
+      return false;
+    }
+    final sorted = {
+      for (final d in days) DateTime(d.year, d.month, d.day),
+    }.toList()..sort();
+    final updated = _copyWithScheduleSnapshots(
+      _subscriptions[index].copyWith(
+        vacationDates: List<DateTime>.unmodifiable(sorted),
+      ),
+    );
+    if (updated.shiftSchedules.isEmpty) return false;
+    await _commit([updated], const []);
+    return true;
+  }
+
+  // ============================================================
   // RESUME SUBSCRIPTION
   // ============================================================
 

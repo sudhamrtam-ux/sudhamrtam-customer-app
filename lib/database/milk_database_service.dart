@@ -21,12 +21,13 @@ import 'package:sqflite/sqflite.dart';
 /// Version 16: Society, block/tower, flat and independent house on
 /// addresses.
 /// Version 17: 750 ml milk quantities (schedules table rebuilt).
+/// Version 18: Vacation days on milk plans.
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 17;
+  static const int databaseVersion = 18;
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -147,6 +148,7 @@ class MilkDatabaseService {
     await _addPlanResumeOnColumn(db);
     await _addPlanApprovalColumns(db);
     await _addAddressSocietyColumns(db);
+    await _addPlanVacationDatesColumn(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -239,6 +241,23 @@ class MilkDatabaseService {
     if (oldVersion < 17) {
       await _rebuildSchedulesTable(db, 'v17');
     }
+
+    if (oldVersion < 18) {
+      await _addPlanVacationDatesColumn(db);
+    }
+  }
+
+  /// Version 18: a plan's vacation days (JSON list of YYYY-MM-DD);
+  /// existing plans get none.
+  Future<void> _addPlanVacationDatesColumn(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info($subscriptionsTable)');
+    if (columns.isEmpty || columns.any((c) => c['name'] == 'vacation_dates')) {
+      return;
+    }
+    await db.execute(
+      "ALTER TABLE $subscriptionsTable "
+      "ADD COLUMN vacation_dates TEXT NOT NULL DEFAULT '[]'",
+    );
   }
 
   /// Version 16: society, block/tower and flat on addresses (owner

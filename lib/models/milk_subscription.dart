@@ -97,6 +97,11 @@ class MilkSubscription {
   /// server restarts it). Null: paused until the customer resumes.
   final DateTime? resumeOn;
 
+  /// Vacation days (owner decision 2026-11-11): no milk on these
+  /// days (date only, sorted); the plan stays active. Any number of
+  /// separate days or ranges.
+  final List<DateTime> vacationDates;
+
   /// The server's approval: 'pending' (a new plan waiting for
   /// Sudhamrtam: no milk yet), 'approved' or 'rejected' (cancelled,
   /// with [rejectReason]). Null for plans kept only on the phone.
@@ -116,9 +121,24 @@ class MilkSubscription {
     this.status = MilkSubscriptionStatus.active,
     this.cancelledAt,
     this.resumeOn,
+    this.vacationDates = const [],
     this.approval,
     this.rejectReason,
   });
+
+  /// Vacation days from [today] on.
+  List<DateTime> vacationDaysFrom(DateTime today) {
+    final from = DateTime(today.year, today.month, today.day);
+    return [
+      for (final d in vacationDates)
+        if (!d.isBefore(from)) d,
+    ];
+  }
+
+  /// No milk on [day]: one of the vacation days.
+  bool isVacationDay(DateTime day) => vacationDates.any(
+    (d) => d.year == day.year && d.month == day.month && d.day == day.day,
+  );
 
   /// A new plan Sudhamrtam has not approved yet: no milk comes.
   bool get isWaitingForApproval =>
@@ -179,6 +199,7 @@ class MilkSubscription {
     DateTime? cancelledAt,
     DateTime? resumeOn,
     bool clearResumeOn = false,
+    List<DateTime>? vacationDates,
   }) {
     return MilkSubscription(
       id: id ?? this.id,
@@ -193,6 +214,7 @@ class MilkSubscription {
       status: status ?? this.status,
       cancelledAt: cancelledAt ?? this.cancelledAt,
       resumeOn: clearResumeOn ? null : (resumeOn ?? this.resumeOn),
+      vacationDates: vacationDates ?? this.vacationDates,
       approval: approval,
       rejectReason: rejectReason,
     );

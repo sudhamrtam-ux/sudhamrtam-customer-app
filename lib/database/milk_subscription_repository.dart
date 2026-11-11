@@ -6,6 +6,10 @@ import '../models/milk_quantity.dart';
 import '../models/milk_subscription.dart';
 import 'milk_database_service.dart';
 
+/// 2026-11-15 (a vacation day, stored as text).
+String _day(DateTime d) =>
+    DateTime(d.year, d.month, d.day).toIso8601String().substring(0, 10);
+
 /// Persists milk subscriptions and their independent delivery shifts.
 ///
 /// The database stores shift-based subscriptions only. Older single-schedule
@@ -85,6 +89,9 @@ class MilkSubscriptionRepository {
       'created_at': subscription.startDate.toIso8601String(),
       'cancelled_at': subscription.cancelledAt?.toIso8601String(),
       'resume_on': subscription.resumeOn?.toIso8601String(),
+      'vacation_dates': jsonEncode([
+        for (final d in subscription.vacationDates) _day(d),
+      ]),
       'approval': subscription.approval,
       'reject_reason': subscription.rejectReason,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -181,6 +188,12 @@ class MilkSubscriptionRepository {
             resumeOn: row['resume_on'] == null
                 ? null
                 : DateTime.parse(row['resume_on'] as String),
+            vacationDates: List<DateTime>.unmodifiable([
+              for (final d in (jsonDecode(
+                row['vacation_dates'] as String? ?? '[]',
+              ) as List).cast<String>())
+                DateTime.parse(d),
+            ]),
             approval: row['approval'] as String?,
             rejectReason: row['reject_reason'] as String?,
           );

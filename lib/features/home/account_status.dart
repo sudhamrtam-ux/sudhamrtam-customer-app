@@ -50,7 +50,8 @@ String _date(DateTime d) {
 ///
 /// - Active: some milk is coming (a plan back from vacation counts).
 /// - Waiting for approval: only new plans Sudhamrtam has not approved.
-/// - On vacation: every open plan is paused with a return date.
+/// - On vacation: every open plan is paused with a return date, or
+///   has today as a vacation day.
 /// - Paused: open plans, none delivering.
 /// - Inactive: no open plan.
 AccountStatus accountStatusFor(List<MilkSubscription> plans, DateTime today) {
@@ -81,9 +82,16 @@ AccountStatus accountStatusFor(List<MilkSubscription> plans, DateTime today) {
           'is approved.',
     );
   }
+  // Active plans with today as a vacation day.
+  final awayToday = [
+    for (final p in decided)
+      if (p.status == MilkSubscriptionStatus.active && p.isVacationDay(today))
+        p,
+  ];
   final delivering = [
     for (final p in decided)
-      if (p.status == MilkSubscriptionStatus.active ||
+      if ((p.status == MilkSubscriptionStatus.active &&
+              !awayToday.contains(p)) ||
           (p.status == MilkSubscriptionStatus.paused &&
               p.resumeOn != null &&
               !p.isOnVacation(today)))
@@ -91,8 +99,20 @@ AccountStatus accountStatusFor(List<MilkSubscription> plans, DateTime today) {
   ];
   final away = [
     for (final p in decided)
-      if (p.isOnVacation(today)) p,
+      if (p.isOnVacation(today) || awayToday.contains(p)) p,
   ];
+  // The first day milk comes again after a vacation.
+  DateTime backOn(MilkSubscription p) {
+    if (p.resumeOn != null && p.status == MilkSubscriptionStatus.paused) {
+      return p.resumeOn!;
+    }
+    var day = DateTime(today.year, today.month, today.day + 1);
+    while (p.isVacationDay(day)) {
+      day = DateTime(day.year, day.month, day.day + 1);
+    }
+    return day;
+  }
+
   final stopped = [
     for (final p in decided)
       if (!delivering.contains(p) && !away.contains(p)) p,
@@ -102,7 +122,7 @@ AccountStatus accountStatusFor(List<MilkSubscription> plans, DateTime today) {
     final names = {for (final p in delivering) _milk(p.productId)};
     final notes = [
       for (final p in away)
-        '${_milk(p.productId)} on vacation until ${_date(p.resumeOn!.subtract(const Duration(days: 1)))}',
+        '${_milk(p.productId)} on vacation until ${_date(backOn(p).subtract(const Duration(days: 1)))}',
       for (final p in stopped) '${_milk(p.productId)} paused',
       for (final p in waiting) '${_milk(p.productId)} waiting for approval',
     ];
@@ -113,9 +133,7 @@ AccountStatus accountStatusFor(List<MilkSubscription> plans, DateTime today) {
     );
   }
   if (stopped.isEmpty) {
-    final back = away
-        .map((p) => p.resumeOn!)
-        .reduce((a, b) => a.isBefore(b) ? a : b);
+    final back = away.map(backOn).reduce((a, b) => a.isBefore(b) ? a : b);
     return AccountStatus(
       AccountState.vacation,
       'On vacation',

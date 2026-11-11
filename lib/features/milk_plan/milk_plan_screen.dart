@@ -10,6 +10,7 @@ import '../../models/milk_plan_merge.dart';
 import '../../models/milk_quantity.dart';
 import 'milk_plan_merge_dialog.dart';
 import 'milk_subscription_setup_screen.dart';
+import 'vacation_days_screen.dart';
 
 // ============================================================
 // MILK PLAN SCREEN
@@ -301,24 +302,59 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
     );
   }
 
+  /// Vacation days (owner decision 2026-11-11): any days or ranges
+  /// without milk; the plan stays active.
+  Future<void> _editVacation() async {
+    if (_isProcessing) return;
+    final days = await Navigator.of(context).push<List<DateTime>>(
+      MaterialPageRoute(
+        builder: (_) => VacationDaysScreen(
+          milkName: _productName,
+          initial: subscription.vacationDaysFrom(DateTime.now()),
+        ),
+      ),
+    );
+    if (days == null || !mounted) return;
+    setState(() => _isProcessing = true);
+    try {
+      final success = await sudhamrtamMilkSubscriptions.setVacationDates(
+        subscription.id,
+        days,
+      );
+      if (!mounted) return;
+      _showMessage(
+        !success
+            ? 'Unable to save vacation days. Please try again.'
+            : days.isEmpty
+            ? 'Vacation days removed. Milk comes as usual.'
+            : 'Enjoy your trip! No milk on ${vacationDaysText(days)}.',
+      );
+    } catch (error) {
+      debugPrint('Milk vacation error: $error');
+      _showMessage(
+        error is MilkPlanSyncException
+            ? error.message
+            : 'Unable to save vacation days. Please try again.',
+      );
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
   Future<void> _changeStatus({required bool pause}) async {
     if (_isProcessing) return;
-    DateTime? resumeOn;
     if (pause) {
       final choice = await askPauseKind(context);
       if (choice == null || !mounted) return;
       if (choice == PauseKind.vacation) {
-        resumeOn = await pickReturnDate(context);
-        if (resumeOn == null || !mounted) return;
+        await _editVacation();
+        return;
       }
     }
     setState(() => _isProcessing = true);
     try {
       final success = pause
-          ? await sudhamrtamMilkSubscriptions.pauseSubscription(
-              subscription.id,
-              resumeOn: resumeOn,
-            )
+          ? await sudhamrtamMilkSubscriptions.pauseSubscription(subscription.id)
           : await sudhamrtamMilkSubscriptions.resumeSubscription(
               subscription.id,
             );
@@ -326,10 +362,7 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
       _showMessage(
         success
             ? (pause
-                  ? (resumeOn == null
-                        ? 'Milk subscription paused.'
-                        : 'Enjoy your trip! Milk restarts on '
-                              '${planDateText(resumeOn)}.')
+                  ? 'Milk subscription paused.'
                   : 'Milk subscription resumed.')
             : 'Unable to change subscription status. Please try again.',
       );
@@ -573,6 +606,40 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
                 color: Color(0xFF1565C0),
                 fontWeight: FontWeight.w600,
               ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (!isCancelled &&
+            subscription.vacationDaysFrom(DateTime.now()).isNotEmpty) ...[
+          Container(
+            key: const Key('vacationDaysNote'),
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE3F2FD),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.luggage, color: Color(0xFF1565C0), size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Vacation · no milk on '
+                    '${vacationDaysText(subscription.vacationDaysFrom(DateTime.now()))}',
+                    style: const TextStyle(
+                      color: Color(0xFF1565C0),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  key: const Key('vacationDaysChange'),
+                  onPressed: _isProcessing ? null : _editVacation,
+                  child: const Text('Change'),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -1237,8 +1304,8 @@ String milkTotalText(List<MilkSubscription> plans) {
 
 enum PauseKind { untilResumed, vacation }
 
-/// Asks how to pause: until the customer resumes, or a vacation with
-/// a return date.
+/// Asks how to pause: until the customer resumes, or vacation days
+/// (the plan stays active; no milk on the chosen days).
 Future<PauseKind?> askPauseKind(BuildContext context) {
   return showModalBottomSheet<PauseKind>(
     context: context,
@@ -1252,7 +1319,8 @@ Future<PauseKind?> askPauseKind(BuildContext context) {
             leading: const Icon(Icons.luggage_outlined),
             title: const Text('Going on vacation'),
             subtitle: const Text(
-              'Choose your return date. Milk restarts by itself that day.',
+              'Pick the days you are away: one day, several days or a '
+              'date range. Milk comes as usual on the other days.',
             ),
             onTap: () => Navigator.pop(context, PauseKind.vacation),
           ),
@@ -1268,19 +1336,6 @@ Future<PauseKind?> askPauseKind(BuildContext context) {
     ),
   );
 }
-
-/// The first day milk should come again: tomorrow to 180 days ahead.
-/// Tests replace it.
-Future<DateTime?> Function(BuildContext context) pickReturnDate = (context) {
-  final today = DateUtils.dateOnly(DateTime.now());
-  return showDatePicker(
-    context: context,
-    initialDate: today.add(const Duration(days: 7)),
-    firstDate: today.add(const Duration(days: 1)),
-    lastDate: today.add(const Duration(days: 180)),
-    helpText: 'Milk restarts on',
-  );
-};
 
 /// "8 Nov 2026".
 String planDateText(DateTime date) {

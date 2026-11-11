@@ -80,6 +80,10 @@ class MilkPlanApiClient implements MilkPlanRemote {
         plan.status == MilkSubscriptionStatus.paused && plan.resumeOn != null
         ? _date(plan.resumeOn!)
         : null,
+    // Days already past are left out (the server drops them anyway).
+    'vacation_dates': [
+      for (final d in plan.vacationDaysFrom(DateTime.now())) _date(d),
+    ],
     'shifts': [
       for (final shift in plan.shiftSchedules)
         {
@@ -144,6 +148,13 @@ class MilkPlanApiClient implements MilkPlanRemote {
       resumeOn: json['resume_on'] == null
           ? null
           : _parseDate(json['resume_on'] as String),
+      vacationDates: List<DateTime>.unmodifiable(
+        [
+          for (final d
+              in (json['vacation_dates'] as List? ?? const []).cast<String>())
+            _parseDate(d),
+        ]..sort(),
+      ),
       approval: json['approval'] as String?,
       rejectReason: json['reject_reason'] as String?,
     );
