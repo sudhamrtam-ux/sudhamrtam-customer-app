@@ -97,6 +97,12 @@ class MilkSubscription {
   /// server restarts it). Null: paused until the customer resumes.
   final DateTime? resumeOn;
 
+  /// The server's approval: 'pending' (a new plan waiting for
+  /// Sudhamrtam: no milk yet), 'approved' or 'rejected' (cancelled,
+  /// with [rejectReason]). Null for plans kept only on the phone.
+  final String? approval;
+  final String? rejectReason;
+
   const MilkSubscription({
     required this.id,
     required this.productId,
@@ -110,7 +116,16 @@ class MilkSubscription {
     this.status = MilkSubscriptionStatus.active,
     this.cancelledAt,
     this.resumeOn,
+    this.approval,
+    this.rejectReason,
   });
+
+  /// A new plan Sudhamrtam has not approved yet: no milk comes.
+  bool get isWaitingForApproval =>
+      approval == 'pending' && status != MilkSubscriptionStatus.cancelled;
+
+  /// Sudhamrtam did not approve this plan; see [rejectReason].
+  bool get isRejected => approval == 'rejected';
 
   /// Paused with a return date that has not come yet.
   bool isOnVacation(DateTime today) =>
@@ -178,6 +193,8 @@ class MilkSubscription {
       status: status ?? this.status,
       cancelledAt: cancelledAt ?? this.cancelledAt,
       resumeOn: clearResumeOn ? null : (resumeOn ?? this.resumeOn),
+      approval: approval,
+      rejectReason: rejectReason,
     );
   }
 }

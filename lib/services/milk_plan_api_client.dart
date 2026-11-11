@@ -144,6 +144,8 @@ class MilkPlanApiClient implements MilkPlanRemote {
       resumeOn: json['resume_on'] == null
           ? null
           : _parseDate(json['resume_on'] as String),
+      approval: json['approval'] as String?,
+      rejectReason: json['reject_reason'] as String?,
     );
   }
 

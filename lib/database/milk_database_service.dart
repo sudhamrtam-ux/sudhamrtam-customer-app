@@ -17,12 +17,13 @@ import 'package:sqflite/sqflite.dart';
 /// Version 12: Early morning delivery shift on milk plan schedules.
 /// Version 13: When a milk plan was cancelled.
 /// Version 14: A paused plan's return date (vacation).
+/// Version 15: A plan's approval and reject reason (from the server).
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 14;
+  static const int databaseVersion = 15;
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -141,6 +142,7 @@ class MilkDatabaseService {
     await _addOrderAddressIdColumn(db);
     await _addPlanCancelledAtColumn(db);
     await _addPlanResumeOnColumn(db);
+    await _addPlanApprovalColumns(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -220,6 +222,21 @@ class MilkDatabaseService {
 
     if (oldVersion < 14) {
       await _addPlanResumeOnColumn(db);
+    }
+
+    if (oldVersion < 15) {
+      await _addPlanApprovalColumns(db);
+    }
+  }
+
+  /// Version 15: the server's approval of a plan and why it was
+  /// rejected; both nullable (null: kept only on the phone).
+  Future<void> _addPlanApprovalColumns(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info($subscriptionsTable)');
+    if (columns.isEmpty) return;
+    for (final name in ['approval', 'reject_reason']) {
+      if (columns.any((c) => c['name'] == name)) continue;
+      await db.execute('ALTER TABLE $subscriptionsTable ADD COLUMN $name TEXT');
     }
   }
 

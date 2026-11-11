@@ -224,6 +224,33 @@ void main() {
       expect(back.isOnVacation(DateTime(2026, 11, 20, 1)), isFalse);
     });
 
+    test('approval comes from the server and is never sent back', () {
+      final json = MilkPlanApiClient.planToJson(plan('p6', [morning(500)]));
+      expect(json.containsKey('approval'), isFalse);
+      final waiting = MilkPlanApiClient.planFromJson({
+        ...json,
+        'approval': 'pending',
+      });
+      expect(waiting.isWaitingForApproval, isTrue);
+      // Pausing it keeps the approval.
+      expect(
+        waiting
+            .copyWith(status: MilkSubscriptionStatus.paused)
+            .isWaitingForApproval,
+        isTrue,
+      );
+      final rejected = MilkPlanApiClient.planFromJson({
+        ...MilkPlanApiClient.planToJson(
+          plan('p7', [morning(500)], status: MilkSubscriptionStatus.cancelled),
+        ),
+        'approval': 'rejected',
+        'reject_reason': 'We do not deliver there yet.',
+      });
+      expect(rejected.isWaitingForApproval, isFalse);
+      expect(rejected.isRejected, isTrue);
+      expect(rejected.rejectReason, 'We do not deliver there yet.');
+    });
+
     test('a cancelled plan from the server keeps its cancel date', () {
       final back = MilkPlanApiClient.planFromJson({
         ...MilkPlanApiClient.planToJson(

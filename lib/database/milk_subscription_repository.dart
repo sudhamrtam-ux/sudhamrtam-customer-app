@@ -84,6 +84,8 @@ class MilkSubscriptionRepository {
       'created_at': subscription.startDate.toIso8601String(),
       'cancelled_at': subscription.cancelledAt?.toIso8601String(),
       'resume_on': subscription.resumeOn?.toIso8601String(),
+      'approval': subscription.approval,
+      'reject_reason': subscription.rejectReason,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     // Replacing the parent row may cascade-delete old shifts; explicitly
@@ -178,6 +180,8 @@ class MilkSubscriptionRepository {
             resumeOn: row['resume_on'] == null
                 ? null
                 : DateTime.parse(row['resume_on'] as String),
+            approval: row['approval'] as String?,
+            rejectReason: row['reject_reason'] as String?,
           );
         })
         .toList(growable: false);

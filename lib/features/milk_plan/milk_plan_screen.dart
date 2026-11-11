@@ -528,6 +528,26 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
         // =================================================
         // DELIVERY SCHEDULES, EARLY MORNING TO EVENING
         // =================================================
+        if (subscription.isWaitingForApproval) ...[
+          Container(
+            key: const Key('approvalNote'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3E5F5),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Text(
+              'Waiting for approval · Sudhamrtam will check your plan. '
+              'Milk starts once it is approved.',
+              style: TextStyle(
+                color: Color(0xFF6A1B9A),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (subscription.isOnVacation(DateTime.now())) ...[
           Container(
             key: const Key('vacationNote'),
@@ -1097,7 +1117,9 @@ class MilkProductCard extends StatelessWidget {
         .where((p) => p.status == MilkSubscriptionStatus.active)
         .toList();
     final today = DateTime.now();
-    final status = active.length == plans.length
+    final status = plans.every((p) => p.isWaitingForApproval)
+        ? 'Waiting for approval'
+        : active.length == plans.length
         ? 'Active'
         : active.isEmpty && plans.every((p) => p.isOnVacation(today))
         ? 'On vacation'
@@ -1276,7 +1298,9 @@ String planDatesText(MilkSubscription plan) {
   final cancelled = plan.cancelledAt;
   return [
     'Started ${planDateText(start)}',
-    if (cancelled != null) 'Cancelled ${planDateText(cancelled)}',
+    if (cancelled != null)
+      '${plan.isRejected ? 'Not approved' : 'Cancelled'} '
+          '${planDateText(cancelled)}',
   ].join(' · ');
 }
 
@@ -1314,6 +1338,8 @@ class _CancelledPlans extends StatelessWidget {
                     )
                     .join(', '),
                 planDatesText(plan),
+                if (plan.isRejected && plan.rejectReason != null)
+                  'Reason: ${plan.rejectReason}',
               ].join('\n'),
             ),
           ),

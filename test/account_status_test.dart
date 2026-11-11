@@ -13,6 +13,7 @@ MilkSubscription plan(
   String product,
   MilkSubscriptionStatus status, {
   DateTime? resumeOn,
+  String? approval,
 }) => MilkSubscription(
   id: id,
   productId: product,
@@ -29,6 +30,7 @@ MilkSubscription plan(
   startDate: DateTime(2026, 11, 1),
   status: status,
   resumeOn: resumeOn,
+  approval: approval,
 );
 
 const active = MilkSubscriptionStatus.active;
@@ -81,6 +83,25 @@ void main() {
       ]);
       expect((s.state, s.label), (AccountState.paused, 'Paused'));
       expect(s.color, const Color(0xFFEF6C00));
+    });
+
+    test('waiting for approval (purple) until Sudhamrtam approves', () {
+      final s = of([plan('a', 'cow_milk', active, approval: 'pending')]);
+      expect(
+        (s.state, s.label),
+        (AccountState.waiting, 'Waiting for approval'),
+      );
+      expect(s.color, const Color(0xFF6A1B9A));
+
+      final both = of([
+        plan('a', 'buffalo_milk', active, approval: 'approved'),
+        plan('b', 'cow_milk', active, approval: 'pending'),
+      ]);
+      expect(both.label, 'Active');
+      expect(
+        both.detail,
+        'Buffalo Milk on the way · Cow Milk waiting for approval',
+      );
     });
 
     test('back from vacation counts as active before the server says so', () {
