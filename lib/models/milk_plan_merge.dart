@@ -1,3 +1,4 @@
+import 'milk_quantity.dart';
 import 'milk_subscription.dart';
 
 /// Rule: one plan per milk *and* shift. Cow Milk morning and Cow
@@ -6,7 +7,7 @@ import 'milk_subscription.dart';
 /// milk in the same shift: those deliveries are merged.
 
 /// Matches MilkSubscriptionManager.maximumQuantityMl (10 L).
-const int maximumShiftQuantityMl = 10000;
+const int maximumShiftQuantityMl = maximumMilkMl;
 
 /// What happens to one delivery shift.
 enum ShiftMergeKind {
@@ -24,6 +25,10 @@ enum ShiftMergeKind {
 
   /// Adding would go over the maximum per delivery.
   overLimit,
+
+  /// Adding makes a quantity that cannot be packed (x.25 L, e.g.
+  /// 0.75 L + 0.5 L).
+  unpackable,
 
   /// One plan is paused and the other active: not merged
   /// automatically.
@@ -142,6 +147,8 @@ MilkPlanChanges planNewSubscription(
         ? ShiftMergeKind.differentSchedule
         : current.quantityMl + added.quantityMl > maximumMl
         ? ShiftMergeKind.overLimit
+        : !isAllowedMilkMl(current.quantityMl + added.quantityMl)
+        ? ShiftMergeKind.unpackable
         : ShiftMergeKind.addQuantity;
 
     if (kind == ShiftMergeKind.addQuantity) {
@@ -208,6 +215,8 @@ MilkPlanChanges? combineSharedShifts(
           ? ShiftMergeKind.differentSchedule
           : schedule.quantityMl + otherSchedule.quantityMl > maximumMl
           ? ShiftMergeKind.overLimit
+          : !isAllowedMilkMl(schedule.quantityMl + otherSchedule.quantityMl)
+          ? ShiftMergeKind.unpackable
           : ShiftMergeKind.addQuantity;
 
       outcomes.add(

@@ -4,6 +4,7 @@ import '../../app/sudhamrtam_app.dart';
 import '../../models/milk_subscription.dart';
 import '../../services/milk_plan_api_client.dart';
 import '../../models/milk_plan_merge.dart';
+import '../../models/milk_quantity.dart';
 import 'milk_plan_merge_dialog.dart';
 
 const _brandGreen = Color(0xFF82B440);
@@ -137,10 +138,7 @@ class _MilkSubscriptionSetupScreenState
     }
   }
 
-  String _quantityLabel(int ml) {
-    if (ml % 1000 == 0) return '${ml ~/ 1000} L';
-    return '${(ml / 1000).toStringAsFixed(1)} L';
-  }
+  String _quantityLabel(int ml) => milkLitresText(ml);
 
   Future<void> _pickDate(_ShiftDraft draft) async {
     final today = DateUtils.dateOnly(DateTime.now());
@@ -162,10 +160,11 @@ class _MilkSubscriptionSetupScreenState
 
   bool _validateDraft(_ShiftDraft draft, String shiftName) {
     if (!draft.enabled) return true;
-    if (draft.quantityMl < 500 ||
-        draft.quantityMl > 10000 ||
-        draft.quantityMl % 500 != 0) {
-      _showError('$shiftName quantity must be between 0.5 L and 10 L.');
+    if (!isAllowedMilkMl(draft.quantityMl)) {
+      _showError(
+        '$shiftName quantity must be between 0.5 L and 10 L '
+        '(whole litres plus 0.5 or 0.75 L).',
+      );
       return false;
     }
     if (draft.frequency == MilkDeliveryFrequency.selectedDays &&
@@ -406,8 +405,13 @@ class _MilkSubscriptionSetupScreenState
               Row(
                 children: [
                   IconButton.filledTonal(
-                    onPressed: draft.quantityMl > 500
-                        ? () => setState(() => draft.quantityMl -= 500)
+                    key: Key('$title-less'),
+                    onPressed: previousMilkMl(draft.quantityMl) != null
+                        ? () => setState(
+                            () => draft.quantityMl = previousMilkMl(
+                              draft.quantityMl,
+                            )!,
+                          )
                         : null,
                     icon: const Icon(Icons.remove),
                   ),
@@ -422,8 +426,13 @@ class _MilkSubscriptionSetupScreenState
                     ),
                   ),
                   IconButton.filledTonal(
-                    onPressed: draft.quantityMl < 10000
-                        ? () => setState(() => draft.quantityMl += 500)
+                    key: Key('$title-more'),
+                    onPressed: nextMilkMl(draft.quantityMl) != null
+                        ? () => setState(
+                            () => draft.quantityMl = nextMilkMl(
+                              draft.quantityMl,
+                            )!,
+                          )
                         : null,
                     icon: const Icon(Icons.add),
                   ),

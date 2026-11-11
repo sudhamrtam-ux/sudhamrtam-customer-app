@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../models/milk_plan_merge.dart';
+import '../../models/milk_quantity.dart';
 import '../../models/milk_subscription.dart';
 
 const _green = Color(0xFF82B440);
 
 /// "1 L", "1.5 L", "0.5 L".
-String litresText(int ml) {
-  final litres = ml / 1000;
-  return litres == litres.roundToDouble()
-      ? '${litres.toStringAsFixed(0)} L'
-      : '${litres.toStringAsFixed(1)} L';
-}
+String litresText(int ml) => milkLitresText(ml);
 
 String shiftText(MilkDeliveryShift shift) => switch (shift) {
   MilkDeliveryShift.earlyMorning => 'Early morning',
@@ -76,6 +72,11 @@ String _line(ShiftMergeOutcome outcome) {
       return '$shift: ${litresText(outcome.existingMl)} + '
           '${litresText(outcome.addedMl)} is more than the '
           '${litresText(maximumShiftQuantityMl)} limit per delivery.';
+    case ShiftMergeKind.unpackable:
+      return '$shift: ${litresText(outcome.existingMl)} + '
+          '${litresText(outcome.addedMl)} makes '
+          '${litresText(outcome.existingMl + outcome.addedMl)}, which we '
+          'cannot pack (we deliver 1 L, 500 ml and 750 ml packets).';
     case ShiftMergeKind.differentStatus:
       return '$shift: one plan is paused and the other is active.';
   }

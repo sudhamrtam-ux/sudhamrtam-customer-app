@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'milk_plan_merge.dart';
+import 'milk_quantity.dart';
 import 'milk_subscription.dart';
 import '../database/milk_subscription_repository.dart';
 import '../services/milk_plan_api_client.dart';
@@ -348,15 +349,11 @@ class MilkSubscriptionManager extends ChangeNotifier {
   // QUANTITY RULES
   // ============================================================
 
-  static const int minimumQuantityMl = 500;
-  static const int maximumQuantityMl = 10000;
-  static const int quantityStepMl = 500;
+  static const int minimumQuantityMl = minimumMilkMl;
+  static const int maximumQuantityMl = maximumMilkMl;
 
-  bool _isValidQuantityMl(int quantityMl) {
-    return quantityMl >= minimumQuantityMl &&
-        quantityMl <= maximumQuantityMl &&
-        quantityMl % quantityStepMl == 0;
-  }
+  /// 0.5 L to 10 L; 750 ml packets too, but no x.25 L.
+  bool _isValidQuantityMl(int quantityMl) => isAllowedMilkMl(quantityMl);
 
   // ============================================================
   // VALIDATE A SINGLE SHIFT

@@ -20,12 +20,13 @@ import 'package:sqflite/sqflite.dart';
 /// Version 15: A plan's approval and reject reason (from the server).
 /// Version 16: Society, block/tower, flat and independent house on
 /// addresses.
+/// Version 17: 750 ml milk quantities (schedules table rebuilt).
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 16;
+  static const int databaseVersion = 17;
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -234,6 +235,10 @@ class MilkDatabaseService {
     if (oldVersion < 16) {
       await _addAddressSocietyColumns(db);
     }
+
+    if (oldVersion < 17) {
+      await _rebuildSchedulesTable(db, 'v17');
+    }
   }
 
   /// Version 16: society, block/tower and flat on addresses (owner
@@ -315,7 +320,8 @@ class MilkDatabaseService {
           CHECK (
             quantity_ml >= 500
             AND quantity_ml <= 10000
-            AND quantity_ml % 500 = 0
+            AND quantity_ml % 250 = 0
+            AND quantity_ml % 1000 != 250
           ),
         frequency TEXT NOT NULL
           CHECK (
@@ -348,19 +354,26 @@ class MilkDatabaseService {
   }
 
   /// Version 12: allow the early morning shift.
-  ///
+  Future<void> _allowEarlyMorningShift(Database db) =>
+      _rebuildSchedulesTable(db, 'v12');
+
   /// SQLite cannot change a CHECK, so the schedules table is
-  /// rebuilt and every row copied as it is; no plan changes.
-  Future<void> _allowEarlyMorningShift(Database db) async {
+  /// rebuilt with today's checks (v12: early morning shift; v17:
+  /// 750 ml quantities) and every row copied as it is; no plan
+  /// changes.
+  Future<void> _rebuildSchedulesTable(Database db, String suffix) async {
     final existing = await db.rawQuery(
-      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
       [schedulesTable],
     );
     if (existing.isEmpty) {
       await _createSchedulesTable(db);
       return;
     }
-    const rebuilt = '${schedulesTable}_v12';
+    // Already has today's checks (made earlier in this upgrade).
+    final sql = existing.single['sql'] as String? ?? '';
+    if (sql.contains('% 1000 != 250')) return;
+    final rebuilt = '${schedulesTable}_$suffix';
     await db.execute('DROP TABLE IF EXISTS $rebuilt');
     await _createSchedulesTable(db, name: rebuilt);
     await db.execute('''

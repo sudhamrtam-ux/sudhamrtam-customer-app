@@ -7,6 +7,7 @@ import '../milk_bills/milk_bills_screen.dart';
 import '../../models/milk_subscription.dart';
 import '../../models/milk_subscription_manager.dart';
 import '../../models/milk_plan_merge.dart';
+import '../../models/milk_quantity.dart';
 import 'milk_plan_merge_dialog.dart';
 import 'milk_subscription_setup_screen.dart';
 
@@ -766,13 +767,7 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
 // SHIFT SCHEDULE DISPLAY
 // ============================================================
 
-String _formatLitres(int millilitres) {
-  final litres = millilitres / 1000;
-  final number = litres == litres.roundToDouble()
-      ? litres.toStringAsFixed(0)
-      : litres.toStringAsFixed(1);
-  return '$number L';
-}
+String _formatLitres(int millilitres) => milkLitresText(millilitres);
 
 class _ShiftScheduleSummary extends StatelessWidget {
   final MilkShiftSchedule schedule;

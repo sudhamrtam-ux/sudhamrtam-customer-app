@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
 
+import '../models/milk_quantity.dart';
 import '../models/milk_subscription.dart';
 import 'milk_database_service.dart';
 
@@ -230,11 +231,10 @@ class MilkSubscriptionRepository {
       throw ArgumentError('Morning and Evening shifts must be unique.');
     }
     for (final schedule in schedules) {
-      if (schedule.quantityMl < 500 ||
-          schedule.quantityMl > 10000 ||
-          schedule.quantityMl % 500 != 0) {
+      if (!isAllowedMilkMl(schedule.quantityMl)) {
         throw ArgumentError(
-          'Shift quantity must be 500–10000 ml in 500 ml steps.',
+          'Shift quantity must be 0.5–10 L: whole litres plus 0.5 or '
+          '0.75 L.',
         );
       }
       if (schedule.endDate != null &&
