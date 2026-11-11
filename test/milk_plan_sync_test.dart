@@ -485,6 +485,47 @@ void main() {
       sync.dispose();
     });
 
+    test('an approval made meanwhile shows after a refresh', () async {
+      server.plans['s'] = MilkPlanApiClient.planFromJson({
+        ...MilkPlanApiClient.planToJson(plan('s', [morning(1000)])),
+        'approval': 'pending',
+      });
+      var now = DateTime(2026, 11, 11, 9);
+      final auth = FakeAuth()
+        ..user = const AuthUser(uid: 'c1', phoneNumber: '+919999900001');
+      final manager = MilkSubscriptionManager();
+      final sync = MilkPlanSyncService(
+        manager: manager,
+        api: server,
+        auth: auth,
+        clock: () => now,
+      )..attach();
+      await eventually(() => manager.subscriptions.isNotEmpty);
+      expect(manager.subscriptions.single.isWaitingForApproval, isTrue);
+
+      // The owner approves it.
+      server.plans['s'] = MilkPlanApiClient.planFromJson({
+        ...MilkPlanApiClient.planToJson(plan('s', [morning(1000)])),
+        'approval': 'approved',
+      });
+      final fetches = server.calls.where((c) => c == 'fetch').length;
+
+      // Within 15 seconds of the last sync: no new request.
+      now = now.add(const Duration(seconds: 5));
+      await sync.refresh();
+      expect(server.calls.where((c) => c == 'fetch').length, fetches);
+      expect(manager.subscriptions.single.isWaitingForApproval, isTrue);
+
+      now = now.add(const Duration(seconds: 15));
+      await sync.refresh();
+      expect(manager.subscriptions.single.isWaitingForApproval, isFalse);
+
+      // Pull to refresh always asks.
+      await sync.refresh(force: true);
+      expect(server.calls.where((c) => c == 'fetch').length, fetches + 2);
+      sync.dispose();
+    });
+
     test('the sync explains plans that were left out', () async {
       final repository = MilkSubscriptionRepository();
       await repository.saveSubscription(plan('p', [morning(500)]));

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
@@ -84,6 +86,11 @@ class _CustomerShellState extends State<CustomerShell> {
             if (index == 1) _shopCategory = null;
             _selectedIndex = index;
           });
+          // Home and Milk Plan show the plans: fetch any change
+          // Sudhamrtam made (e.g. an approval).
+          if (index == 0 || index == 2) {
+            unawaited(sudhamrtamMilkSync.refresh());
+          }
         },
         destinations: [
           const NavigationDestination(

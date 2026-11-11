@@ -24,235 +24,243 @@ class MilkPlanScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Milk Plan')),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const MilkBillsReminder(),
+        child: RefreshIndicator(
+          // Pull down: the latest from Sudhamrtam (e.g. an approval).
+          onRefresh: () => sudhamrtamMilkSync.refresh(force: true),
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              const MilkBillsReminder(),
 
-            // Main heading
-            Text(
-              'Fresh Milk, Early Morning to Evening',
-              style: Theme.of(context).textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
+              // Main heading
+              Text(
+                'Fresh Milk, Early Morning to Evening',
+                style: Theme.of(context).textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
 
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-            const Text(
-              'Choose a convenient milk delivery plan '
-              'for your family.',
-              style: TextStyle(fontSize: 15, color: Colors.black54),
-            ),
+              const Text(
+                'Choose a convenient milk delivery plan '
+                'for your family.',
+                style: TextStyle(fontSize: 15, color: Colors.black54),
+              ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // =================================================
-            // BUFFALO MILK
-            // =================================================
-            _MilkProductCard(
-              name: 'Buffalo Milk',
-              description: 'Rich, creamy farm-fresh buffalo milk.',
-              icon: Icons.water_drop,
-              onTap: () => openMilkPlanSetup(context, 'Buffalo Milk'),
-            ),
+              // =================================================
+              // BUFFALO MILK
+              // =================================================
+              _MilkProductCard(
+                name: 'Buffalo Milk',
+                description: 'Rich, creamy farm-fresh buffalo milk.',
+                icon: Icons.water_drop,
+                onTap: () => openMilkPlanSetup(context, 'Buffalo Milk'),
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // =================================================
-            // COW MILK
-            // =================================================
-            _MilkProductCard(
-              name: 'Cow Milk',
-              description: 'Fresh, wholesome cow milk.',
-              icon: Icons.water_drop_outlined,
-              onTap: () => openMilkPlanSetup(context, 'Cow Milk'),
-            ),
+              // =================================================
+              // COW MILK
+              // =================================================
+              _MilkProductCard(
+                name: 'Cow Milk',
+                description: 'Fresh, wholesome cow milk.',
+                icon: Icons.water_drop_outlined,
+                onTap: () => openMilkPlanSetup(context, 'Cow Milk'),
+              ),
 
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-            // =================================================
-            // SAVED SUBSCRIPTIONS
-            // =================================================
-            Text(
-              'My Milk Subscriptions',
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
+              // =================================================
+              // SAVED SUBSCRIPTIONS
+              // =================================================
+              Text(
+                'My Milk Subscriptions',
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
 
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-            const Text(
-              'View and manage your saved milk delivery plans.',
-              style: TextStyle(color: Colors.black54),
-            ),
+              const Text(
+                'View and manage your saved milk delivery plans.',
+                style: TextStyle(color: Colors.black54),
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            ListenableBuilder(
-              listenable: sudhamrtamMilkSync,
-              builder: (context, _) {
-                final message = sudhamrtamMilkSync.message;
-                if (message == null) return const SizedBox.shrink();
-                return Container(
-                  key: const Key('milkSyncMessage'),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF8E1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(message),
-                      TextButton(
-                        onPressed: sudhamrtamMilkSync.syncNow,
-                        child: const Text('Try again'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
-            ListenableBuilder(
-              listenable: sudhamrtamMilkSubscriptions,
-              builder: (context, child) {
-                final subscriptions = sudhamrtamMilkSubscriptions.subscriptions;
-
-                if (subscriptions.isEmpty) {
+              ListenableBuilder(
+                listenable: sudhamrtamMilkSync,
+                builder: (context, _) {
+                  final message = sudhamrtamMilkSync.message;
+                  if (message == null) return const SizedBox.shrink();
                   return Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
+                    key: const Key('milkSyncMessage'),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF5F8F0),
-                      borderRadius: BorderRadius.circular(14),
+                      color: const Color(0xFFFFF8E1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Column(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.event_note_outlined,
-                          size: 42,
-                          color: brandGreen,
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          'No Milk Subscriptions Yet',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Choose Buffalo Milk or Cow Milk '
-                          'above to create your first plan.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.black54),
+                        Text(message),
+                        TextButton(
+                          onPressed: sudhamrtamMilkSync.syncNow,
+                          child: const Text('Try again'),
                         ),
                       ],
                     ),
                   );
-                }
+                },
+              ),
 
-                return Column(
-                  children: [
-                    for (final group
-                        in sudhamrtamMilkSubscriptions.duplicatePlans)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: DuplicatePlansBanner(group: group),
+              ListenableBuilder(
+                listenable: sudhamrtamMilkSubscriptions,
+                builder: (context, child) {
+                  final subscriptions =
+                      sudhamrtamMilkSubscriptions.subscriptions;
+
+                  if (subscriptions.isEmpty) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F8F0),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                    // One card per milk, with every shift in it.
-                    for (final productId in const ['buffalo_milk', 'cow_milk'])
-                      if (sudhamrtamMilkSubscriptions
-                          .plansFor(productId)
-                          .isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: MilkProductCard(
-                            key: ValueKey('milk_$productId'),
-                            productId: productId,
-                            plans: sudhamrtamMilkSubscriptions.plansFor(
-                              productId,
+                      child: const Column(
+                        children: [
+                          Icon(
+                            Icons.event_note_outlined,
+                            size: 42,
+                            color: brandGreen,
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            'No Milk Subscriptions Yet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Choose Buffalo Milk or Cow Milk '
+                            'above to create your first plan.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.black54),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      for (final group
+                          in sudhamrtamMilkSubscriptions.duplicatePlans)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: DuplicatePlansBanner(group: group),
                         ),
-                    _CancelledPlans(
-                      plans: [
-                        for (final plan in subscriptions)
-                          if (plan.status == MilkSubscriptionStatus.cancelled)
-                            plan,
-                      ],
+                      // One card per milk, with every shift in it.
+                      for (final productId in const [
+                        'buffalo_milk',
+                        'cow_milk',
+                      ])
+                        if (sudhamrtamMilkSubscriptions
+                            .plansFor(productId)
+                            .isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: MilkProductCard(
+                              key: ValueKey('milk_$productId'),
+                              productId: productId,
+                              plans: sudhamrtamMilkSubscriptions.plansFor(
+                                productId,
+                              ),
+                            ),
+                          ),
+                      _CancelledPlans(
+                        plans: [
+                          for (final plan in subscriptions)
+                            if (plan.status == MilkSubscriptionStatus.cancelled)
+                              plan,
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+
+              const SizedBox(height: 28),
+
+              // =================================================
+              // DELIVERY OPTIONS
+              // =================================================
+              Text(
+                'Flexible Delivery Options',
+                style: Theme.of(context).textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+
+              const SizedBox(height: 16),
+
+              const _DeliveryOption(
+                icon: Icons.calendar_today_outlined,
+                title: 'Daily Delivery',
+                subtitle: 'Fresh milk delivered every day.',
+              ),
+
+              const _DeliveryOption(
+                icon: Icons.date_range_outlined,
+                title: 'Alternate Days',
+                subtitle: 'Milk delivered every other day.',
+              ),
+
+              const _DeliveryOption(
+                icon: Icons.event_available_outlined,
+                title: 'Selected Days',
+                subtitle: 'Choose your preferred weekdays.',
+              ),
+
+              const _DeliveryOption(
+                icon: Icons.calendar_month_outlined,
+                title: 'Random Days',
+                subtitle: 'Choose individual delivery dates.',
+              ),
+
+              const SizedBox(height: 24),
+
+              // =================================================
+              // BRAND VALUES
+              // =================================================
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F8F0),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.verified_outlined, color: brandGreen),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Pure • Natural • Delivered Fresh',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ],
-                );
-              },
-            ),
-
-            const SizedBox(height: 28),
-
-            // =================================================
-            // DELIVERY OPTIONS
-            // =================================================
-            Text(
-              'Flexible Delivery Options',
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-
-            const SizedBox(height: 16),
-
-            const _DeliveryOption(
-              icon: Icons.calendar_today_outlined,
-              title: 'Daily Delivery',
-              subtitle: 'Fresh milk delivered every day.',
-            ),
-
-            const _DeliveryOption(
-              icon: Icons.date_range_outlined,
-              title: 'Alternate Days',
-              subtitle: 'Milk delivered every other day.',
-            ),
-
-            const _DeliveryOption(
-              icon: Icons.event_available_outlined,
-              title: 'Selected Days',
-              subtitle: 'Choose your preferred weekdays.',
-            ),
-
-            const _DeliveryOption(
-              icon: Icons.calendar_month_outlined,
-              title: 'Random Days',
-              subtitle: 'Choose individual delivery dates.',
-            ),
-
-            const SizedBox(height: 24),
-
-            // =================================================
-            // BRAND VALUES
-            // =================================================
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F8F0),
-                borderRadius: BorderRadius.circular(14),
+                ),
               ),
-              child: const Row(
-                children: [
-                  Icon(Icons.verified_outlined, color: brandGreen),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Pure • Natural • Delivered Fresh',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
