@@ -18,12 +18,14 @@ import 'package:sqflite/sqflite.dart';
 /// Version 13: When a milk plan was cancelled.
 /// Version 14: A paused plan's return date (vacation).
 /// Version 15: A plan's approval and reject reason (from the server).
+/// Version 16: Society, block/tower, flat and independent house on
+/// addresses.
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 15;
+  static const int databaseVersion = 16;
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -143,6 +145,7 @@ class MilkDatabaseService {
     await _addPlanCancelledAtColumn(db);
     await _addPlanResumeOnColumn(db);
     await _addPlanApprovalColumns(db);
+    await _addAddressSocietyColumns(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -226,6 +229,33 @@ class MilkDatabaseService {
 
     if (oldVersion < 15) {
       await _addPlanApprovalColumns(db);
+    }
+
+    if (oldVersion < 16) {
+      await _addAddressSocietyColumns(db);
+    }
+  }
+
+  /// Version 16: society, block/tower and flat on addresses (owner
+  /// decisions 2026-11-11), so deliveries sort by them. All nullable;
+  /// is_house defaults to 0. Existing addresses keep their data.
+  Future<void> _addAddressSocietyColumns(Database db) async {
+    final columns = await db.rawQuery(
+      'PRAGMA table_info($customerAddressesTable)',
+    );
+    if (columns.isEmpty) return;
+    for (final (name, type) in const [
+      ('society_id', 'TEXT'),
+      ('society_name', 'TEXT'),
+      ('society_other', 'TEXT'),
+      ('block', 'TEXT'),
+      ('flat', 'TEXT'),
+      ('is_house', 'INTEGER NOT NULL DEFAULT 0'),
+    ]) {
+      if (columns.any((c) => c['name'] == name)) continue;
+      await db.execute(
+        'ALTER TABLE $customerAddressesTable ADD COLUMN $name $type',
+      );
     }
   }
 

@@ -38,7 +38,7 @@ The root-level `verify_*.dart` / `verify_*.py` scripts are one-off manual checks
 Global singletons live in `lib/app/sudhamrtam_app.dart`: `sudhamrtamCart` (`CartManager`) and `sudhamrtamMilkSubscriptions`. Both are `ChangeNotifier`s that screens listen to directly. There is no state-management package.
 
 ### Single SQLite database (`lib/database/milk_database_service.dart`)
-Despite the name, `MilkDatabaseService.instance` owns the **one** app database (`sudhamrtam_milk.db`) for all tables: subscriptions, cart, orders, profiles/addresses, pending submissions, checkout reconciliations. Schema is versioned (currently **v12**; the version history is in the class doc comment).
+Despite the name, `MilkDatabaseService.instance` owns the **one** app database (`sudhamrtam_milk.db`) for all tables: subscriptions, cart, orders, profiles/addresses, pending submissions, checkout reconciliations. Schema is versioned (currently **v16**; the version history is in the class doc comment).
 - New installs: `_createTables`. Upgrades: `_upgradeDatabase` with cumulative `if (oldVersion < N)` blocks that must never drop customer data.
 - A schema change means bumping `databaseVersion`, adding to both create and upgrade paths, and adding tests (see `sqlite_v8_order_recipient_test.dart` for a self-contained example; older v5–v7 tests depend on fixture DBs under `C:\Sudhamrtam\backups\`).
 - `CustomerOrder.toMap()` omits recipient keys when null, because durable pending payloads are compared byte-for-byte. Keep new optional order fields backward-compatible the same way.
@@ -68,6 +68,10 @@ Invariants to preserve: never generate a new order ID on retry; never clear the 
 
 ### Milk plan shifts
 `MilkDeliveryShift` is `earlyMorning`, `morning`, `evening` (delivery order). The phone stores the enum name; the server uses `early_morning` (`apiName` / `fromApi`). Early morning is last evening's milk kept cold overnight; its changes close at 9 PM the evening before (morning 6 AM, evening 6 PM; the server enforces them by fixing each list at its deadline). Shop orders stay on the morning run. v12 rebuilt `milk_shift_schedules` to allow the new shift (SQLite cannot alter a CHECK).
+
+### Milk plan approval and addresses
+- New milk plans wait for Sudhamrtam's approval (`MilkSubscription.approval`, v15): `isWaitingForApproval` shows "Waiting for approval" and no milk is delivered; rejected plans are cancelled with `rejectReason`. `MilkPlanSyncService.refresh` re-reads plans when the app resumes, Home or Milk Plan is opened (at most every 15 s) and on pull-down, so approvals show without a restart.
+- Addresses carry society (`societyId`/`societyName` from Sudhamrtam's list per area, or typed `societyOther`), `block`, `flat` and `isHouse` (v16). The form requires flat, and society + block unless an independent house; `AddressDetailsCard` on Home asks once (dismissal in `app_settings`) when a saved address lacks them. Deliveries are sorted by them on the server.
 
 ### Milk bills
 `lib/features/milk_bills/` shows monthly milk bills from the server (`MilkBillApiClient`, global `sudhamrtamMilkBills`; null without a server). They are not stored on the phone. `MilkBillsReminder` at the top of the Milk Plan tab shows unpaid bills and the due date; the Account tab links to the list. Online payment uses the same `PaymentLauncher` as orders, and only the server's check says a bill is paid. Staff record cash payments in the staff app (`../sudhamrtam_staff_app`).

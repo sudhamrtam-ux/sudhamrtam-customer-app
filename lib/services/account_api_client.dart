@@ -67,6 +67,11 @@ class AddressJson {
     'latitude': address.latitude,
     'longitude': address.longitude,
     'is_default': address.isDefault,
+    'society_id': address.societyId,
+    'society_other': address.societyOther,
+    'block': address.block,
+    'flat': address.flat,
+    'is_house': address.isHouse,
   };
 
   static CustomerAddress fromJson(
@@ -93,6 +98,12 @@ class AddressJson {
       isDefault: json['is_default'] as bool,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      societyId: json['society_id'] as String?,
+      societyName: json['society_name'] as String?,
+      societyOther: json['society_other'] as String?,
+      block: json['block'] as String?,
+      flat: json['flat'] as String?,
+      isHouse: json['is_house'] as bool? ?? false,
     );
   }
 }

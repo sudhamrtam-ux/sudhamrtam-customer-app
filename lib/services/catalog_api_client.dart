@@ -96,6 +96,28 @@ class CatalogApiClient {
     }
   }
 
+  /// An area's societies (Sudhamrtam's list), for the address form.
+  Future<List<DeliveryArea>> fetchSocieties(String areaId) async {
+    final json = await _getJson(
+      _baseUri.resolve('v1/areas/${Uri.encodeComponent(areaId)}/societies'),
+    );
+    final societies = json['societies'];
+    if (societies is! List) {
+      throw const CatalogApiException('Malformed societies response.');
+    }
+    try {
+      return [
+        for (final s in societies)
+          DeliveryArea(
+            id: (s as Map)['id'] as String,
+            name: s['name'] as String,
+          ),
+      ];
+    } on TypeError {
+      throw const CatalogApiException('Invalid society data.');
+    }
+  }
+
   Future<Map<String, Object?>> _getJson(Uri uri) async {
     final http.Response response;
 

@@ -28,6 +28,24 @@ class CustomerAddress {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// A society from Sudhamrtam's list for the area…
+  final String? societyId;
+
+  /// …its name (kept for showing it offline)…
+  final String? societyName;
+
+  /// …or one the customer typed because it was not listed.
+  final String? societyOther;
+
+  /// Block / tower / wing.
+  final String? block;
+
+  /// Flat number; the house number for an independent house.
+  final String? flat;
+
+  /// An independent house: no society or block.
+  final bool isHouse;
+
   const CustomerAddress({
     required this.id,
     required this.customerId,
@@ -46,10 +64,37 @@ class CustomerAddress {
     this.isDefault = false,
     required this.createdAt,
     required this.updatedAt,
+    this.societyId,
+    this.societyName,
+    this.societyOther,
+    this.block,
+    this.flat,
+    this.isHouse = false,
   });
 
   /// True when a complete coordinate pair is available.
   bool get hasMapLocation => latitude != null && longitude != null;
+
+  /// The society to show: the listed name, or the typed one.
+  String? get society => societyName ?? societyOther;
+
+  /// Society, block or flat is missing (an address saved before
+  /// they were asked for); deliveries sort by them.
+  bool get needsDetails =>
+      _blank(flat) ||
+      (!isHouse &&
+          (_blank(block) || (societyId == null && _blank(societyOther))));
+
+  static bool _blank(String? s) => s == null || s.trim().isEmpty;
+
+  /// "Block B", but "Tower 3" / "Wing C" as typed.
+  static String blockText(String block) =>
+      RegExp(
+        r'^(block|tower|wing|phase)\b',
+        caseSensitive: false,
+      ).hasMatch(block)
+      ? block
+      : 'Block $block';
 
   /// Creates a modified copy of the address.
   ///
@@ -73,6 +118,8 @@ class CustomerAddress {
     bool? isDefault,
     DateTime? updatedAt,
   }) {
+    // Society, block, flat and house are set in the address form,
+    // which builds a whole new address.
     return CustomerAddress(
       id: id,
       customerId: customerId,
@@ -93,12 +140,21 @@ class CustomerAddress {
       isDefault: isDefault ?? this.isDefault,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      societyId: societyId,
+      societyName: societyName,
+      societyOther: societyOther,
+      block: block,
+      flat: flat,
+      isHouse: isHouse,
     );
   }
 
   /// Returns the formatted address for display.
   String get formattedAddress {
     return [
+      if (!_blank(flat)) '${isHouse ? 'House' : 'Flat'} ${flat!.trim()}',
+      if (!isHouse && !_blank(block)) blockText(block!.trim()),
+      if (!isHouse && !_blank(society)) society!.trim(),
       addressLine1,
       if (addressLine2 != null && addressLine2!.trim().isNotEmpty)
         addressLine2!,
@@ -129,6 +185,12 @@ class CustomerAddress {
       'is_default': isDefault ? 1 : 0,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'society_id': societyId,
+      'society_name': societyName,
+      'society_other': societyOther,
+      'block': block,
+      'flat': flat,
+      'is_house': isHouse ? 1 : 0,
     };
   }
 
@@ -152,6 +214,12 @@ class CustomerAddress {
       isDefault: (map['is_default'] as int) == 1,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
+      societyId: map['society_id'] as String?,
+      societyName: map['society_name'] as String?,
+      societyOther: map['society_other'] as String?,
+      block: map['block'] as String?,
+      flat: map['flat'] as String?,
+      isHouse: (map['is_house'] as int? ?? 0) == 1,
     );
   }
 }

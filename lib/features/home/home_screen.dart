@@ -13,6 +13,7 @@ import '../checkout/order_destination.dart';
 import '../shop/product_image.dart';
 import '../../models/milk_subscription_manager.dart';
 import 'account_status.dart';
+import 'address_details_card.dart';
 import 'offer_ticker.dart';
 
 const _green = Color(0xFF82B440);
@@ -186,6 +187,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           const Text('Pure farm goodness delivered to your doorstep.'),
           const SizedBox(height: 16),
+          // Hidden unless an address lacks society, block or flat.
+          const AddressDetailsCard(),
           AccountStatusCard(
             plans: widget.milkPlans,
             onOpen: widget.onOpenMilkPlan,

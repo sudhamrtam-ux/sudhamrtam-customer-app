@@ -417,7 +417,19 @@ void main() {
               updated_at TEXT NOT NULL
             )
           ''');
-          final row = phoneAddress('old_1').toMap()..remove('area_id');
+          // A v9 address row: none of the later columns.
+          final row = phoneAddress('old_1').toMap()
+            ..removeWhere(
+              (key, _) => const {
+                'area_id',
+                'society_id',
+                'society_name',
+                'society_other',
+                'block',
+                'flat',
+                'is_house',
+              }.contains(key),
+            );
           await db.insert('customer_addresses', row);
         },
       ),

@@ -35,7 +35,11 @@ void main() {
 
     await type('Recipient Name', 'Asha');
     await type('Mobile Number', '9876543210');
-    await type('House / Flat / Street Address', 'Flat 1');
+    await type('Street / Road / Locality', 'Road 4');
+    // Without a society list (no loader in this test) the society is typed.
+    await type('Society / Apartment Name', 'Green Towers');
+    await type('Block / Tower', 'B');
+    await type('Flat Number', '101');
     await type('PIN Code', '500090');
   }
 

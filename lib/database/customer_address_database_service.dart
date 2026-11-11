@@ -167,6 +167,12 @@ class CustomerAddressDatabaseService {
           'longitude': address.longitude,
           'is_default': address.isDefault ? 1 : 0,
           'updated_at': address.updatedAt.toIso8601String(),
+          'society_id': address.societyId,
+          'society_name': address.societyName,
+          'society_other': address.societyOther,
+          'block': address.block,
+          'flat': address.flat,
+          'is_house': address.isHouse ? 1 : 0,
         },
         where: 'id = ? AND customer_id = ?',
         whereArgs: [address.id, address.customerId],
@@ -252,7 +258,9 @@ class CustomerAddressDatabaseService {
     for (final address in addresses) {
       _validateAddress(address);
       if (address.customerId != customerId) {
-        throw ArgumentError('Address ${address.id} belongs to another customer.');
+        throw ArgumentError(
+          'Address ${address.id} belongs to another customer.',
+        );
       }
     }
 
