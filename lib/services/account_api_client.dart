@@ -34,11 +34,16 @@ class ServerProfile {
   final String? fullName;
   final String? email;
 
+  /// Sudhamrtam's Reg No (e.g. SM-1002), given when the first milk
+  /// plan is approved; the same number is on every bill.
+  final String? regNo;
+
   const ServerProfile({
     required this.id,
     required this.phoneE164,
     this.fullName,
     this.email,
+    this.regNo,
   });
 
   factory ServerProfile.fromJson(Map<String, Object?> json) => ServerProfile(
@@ -46,6 +51,7 @@ class ServerProfile {
     phoneE164: json['phone_e164'] as String,
     fullName: json['full_name'] as String?,
     email: json['email'] as String?,
+    regNo: json['reg_no'] as String?,
   );
 }
 

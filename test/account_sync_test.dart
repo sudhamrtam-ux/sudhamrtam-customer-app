@@ -22,6 +22,7 @@ const local = AccountSyncService.localCustomerId;
 class FakeServer {
   String? fullName;
   String? email;
+  String? regNo;
   final Map<String, Map<String, Object?>> addresses = {};
 
   bool offline = false;
@@ -34,6 +35,7 @@ class FakeServer {
     'phone_e164': '+919999900001',
     'full_name': fullName,
     'email': email,
+    'reg_no': regNo,
   };
 
   void addAddress(String id, {bool isDefault = false, String label = 'Home'}) {
@@ -376,6 +378,29 @@ void main() {
     expect(await phoneAddressIds(), isEmpty);
     expect(await profiles.getProfileById(local), isNull);
     expect(server.addresses.keys, ['a1']);
+  });
+
+  test("the Reg No: none until approved, then the server's", () async {
+    expect(await sync.refreshRegNo(), isNull); // signed out
+    sync.attach();
+    auth.signIn();
+    await sync.syncNow();
+    expect(await sync.regNo(), isNull);
+
+    // Sudhamrtam approves the first plan after the last sync.
+    server.regNo = 'SM-1002';
+    expect(await sync.regNo(), isNull);
+    expect(await sync.refreshRegNo(), 'SM-1002', reason: 'fresh');
+    expect(await sync.regNo(), 'SM-1002', reason: 'saved');
+
+    // Offline: the saved one.
+    server.offline = true;
+    expect(await sync.refreshRegNo(), 'SM-1002', reason: 'offline');
+    server.offline = false;
+
+    await auth.signOut();
+    await sync.syncNow();
+    expect(await sync.regNo(), isNull);
   });
 
   test('an ended session signs the customer out', () async {

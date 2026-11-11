@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../app/sudhamrtam_app.dart';
+import '../../models/milk_subscription.dart';
+import '../../models/milk_subscription_manager.dart';
 import '../../services/milk_bill_api_client.dart';
+import '../milk_plan/vacation_days_screen.dart';
 import 'milk_bills_screen.dart';
 
 const _green = Color(0xFF4E8A1E);
@@ -11,6 +15,16 @@ const _pendingFill = Color(0xFFFFF4D6);
 const _pausedFill = Color(0xFFECEFF1);
 const _pausedText = Color(0xFF607D8B);
 const _pendingText = Color(0xFF8A6D00);
+const _vacationFill = Color(0xFFE3F2FD);
+const _vacationText = Color(0xFF1565C0);
+
+String _milkName(String productId) =>
+    productId == 'buffalo_milk' ? 'Buffalo Milk' : 'Cow Milk';
+
+/// "2026-11-15" for [d].
+String _dateKey(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-'
+    '${d.day.toString().padLeft(2, '0')}';
 
 /// Months of history the server keeps for customers.
 const _historyMonths = 12;
@@ -37,10 +51,17 @@ String missedReasonLabel(String? reason) => switch (reason) {
 /// The month's milk as a calendar: each date shows the litres
 /// delivered and their amount; tap a date for its deliveries.
 /// Below it, the month's totals, as on the paper bill.
+///
+/// Vacation days the customer chose (owner decision 2026-11-11) show
+/// from today on, from their milk plans, so the calendar can go
+/// forward to the months they are away.
 class MilkCalendar extends StatefulWidget {
-  const MilkCalendar({super.key, required this.api, this.today});
+  const MilkCalendar({super.key, required this.api, this.today, this.plans});
 
   final MilkBillApiClient api;
+
+  /// The customer's milk plans; defaults to the app's.
+  final MilkSubscriptionManager? plans;
 
   /// For tests; defaults to now.
   final DateTime Function()? today;
@@ -60,16 +81,58 @@ class _MilkCalendarState extends State<MilkCalendar> {
 
   String get _earliest => _addMonths(_thisMonth, -(_historyMonths - 1));
 
+  MilkSubscriptionManager get _plans =>
+      widget.plans ?? sudhamrtamMilkSubscriptions;
+
+  /// Upcoming vacation days: date → the milk not coming that day.
+  Map<String, List<String>> get _vacation {
+    final days = <String, List<String>>{};
+    for (final plan in _plans.subscriptions) {
+      if (plan.status != MilkSubscriptionStatus.active) continue;
+      for (final d in plan.vacationDaysFrom(_today)) {
+        (days[_dateKey(d)] ??= []).add(_milkName(plan.productId));
+      }
+    }
+    return days;
+  }
+
+  /// The last month to show: this one, or the last with vacation.
+  String get _lastMonth {
+    final keys = _vacation.keys.toList()..sort();
+    final last = keys.isEmpty ? _thisMonth : keys.last.substring(0, 7);
+    return last.compareTo(_thisMonth) > 0 ? last : _thisMonth;
+  }
+
   @override
   void initState() {
     super.initState();
     _thisMonth = _monthOf(_today);
     _month = _thisMonth;
+    _plans.addListener(_plansChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _plans.removeListener(_plansChanged);
+    super.dispose();
+  }
+
+  void _plansChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _load() async {
     final month = _month;
+    // A month ahead has no deliveries yet: only vacation days.
+    if (month.compareTo(_thisMonth) > 0) {
+      setState(() {
+        _loading = false;
+        _error = null;
+        _data = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -101,6 +164,12 @@ class _MilkCalendarState extends State<MilkCalendar> {
   @override
   Widget build(BuildContext context) {
     final data = _data;
+    final vacation = _vacation;
+    final isFuture = _month.compareTo(_thisMonth) > 0;
+    final vacationThisMonth = [
+      for (final key in vacation.keys)
+        if (key.startsWith(_month)) DateTime.parse(key),
+    ];
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -130,7 +199,7 @@ class _MilkCalendarState extends State<MilkCalendar> {
                 IconButton(
                   tooltip: 'Next month',
                   icon: const Icon(Icons.chevron_right),
-                  onPressed: _month.compareTo(_thisMonth) < 0
+                  onPressed: _month.compareTo(_lastMonth) < 0
                       ? () => _go(1)
                       : null,
                 ),
@@ -142,12 +211,33 @@ class _MilkCalendarState extends State<MilkCalendar> {
               month: _month,
               today: _today,
               data: data,
+              vacation: vacation,
               onTapDay: (date) => _showDay(context, date),
             ),
             const SizedBox(height: 8),
             const _Legend(),
             const SizedBox(height: 12),
-            if (_loading && data == null)
+            if (vacationThisMonth.isNotEmpty)
+              Container(
+                key: const Key('calendarVacation'),
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _vacationFill,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'Vacation: no milk on '
+                  '${vacationDaysText(vacationThisMonth)}.',
+                  style: const TextStyle(
+                    color: _vacationText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            if (isFuture)
+              const SizedBox.shrink()
+            else if (_loading && data == null)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(8),
@@ -171,7 +261,8 @@ class _MilkCalendarState extends State<MilkCalendar> {
 
   void _showDay(BuildContext context, String date) {
     final deliveries = _data?.on(date) ?? const <MilkDelivery>[];
-    if (deliveries.isEmpty) return;
+    final away = _vacation[date] ?? const <String>[];
+    if (deliveries.isEmpty && away.isEmpty) return;
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -187,6 +278,17 @@ class _MilkCalendarState extends State<MilkCalendar> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
+              if (away.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(
+                    'Vacation: no ${away.join(' or ')} this day.',
+                    style: const TextStyle(
+                      color: _vacationText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               for (final delivery in deliveries) _DeliveryDetail(delivery),
             ],
           ),
@@ -234,11 +336,13 @@ class _MonthGrid extends StatelessWidget {
     required this.today,
     required this.data,
     required this.onTapDay,
+    this.vacation = const {},
   });
 
   final String month;
   final DateTime today;
   final MilkDeliveryMonth? data;
+  final Map<String, List<String>> vacation;
   final void Function(String date) onTapDay;
 
   @override
@@ -271,6 +375,7 @@ class _MonthGrid extends StatelessWidget {
                       key: Key('day-$date'),
                       day: day,
                       deliveries: data?.on(date) ?? const [],
+                      onVacation: vacation.containsKey(date),
                       isToday: date == todayText,
                       onTap: () => onTapDay(date),
                     );
@@ -290,12 +395,16 @@ class _DayCell extends StatelessWidget {
     required this.deliveries,
     required this.isToday,
     required this.onTap,
+    this.onVacation = false,
   });
 
   static const double height = 64;
 
   final int day;
   final List<MilkDelivery> deliveries;
+
+  /// A vacation day the customer chose (today or later).
+  final bool onVacation;
   final bool isToday;
   final VoidCallback onTap;
 
@@ -307,7 +416,11 @@ class _DayCell extends StatelessWidget {
     final Color? fill;
     final List<String> lines;
     Color textColor = Colors.black87;
-    if (deliveries.isEmpty) {
+    if (onVacation && delivered.isEmpty && !missed) {
+      fill = _vacationFill;
+      lines = const ['Vacation'];
+      textColor = _vacationText;
+    } else if (deliveries.isEmpty) {
       fill = null;
       lines = const [];
     } else if (delivered.isNotEmpty) {
@@ -338,7 +451,7 @@ class _DayCell extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: deliveries.isEmpty ? null : onTap,
+          onTap: deliveries.isEmpty && !onVacation ? null : onTap,
           child: Container(
             height: height,
             padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
@@ -355,7 +468,9 @@ class _DayCell extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                    color: deliveries.isEmpty ? Colors.black45 : Colors.black87,
+                    color: deliveries.isEmpty && !onVacation
+                        ? Colors.black45
+                        : Colors.black87,
                   ),
                 ),
                 const Spacer(),
@@ -410,6 +525,7 @@ class _Legend extends StatelessWidget {
         item(_deliveredFill, 'Delivered'),
         item(_missedFill, 'Missed'),
         item(_pausedFill, 'Paused'),
+        item(_vacationFill, 'Vacation'),
         item(_pendingFill, 'Not marked yet'),
       ],
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import '../../models/milk_subscription_manager.dart';
 import '../../services/milk_bill_api_client.dart';
 import '../payment/payment_launcher.dart';
 import 'bill_pdf.dart';
@@ -181,10 +182,19 @@ class _MilkBillsReminderState extends State<MilkBillsReminder> {
 
 /// The customer's monthly milk bills.
 class MilkBillsScreen extends StatefulWidget {
-  const MilkBillsScreen({super.key, this.api, this.launcher, this.today});
+  const MilkBillsScreen({
+    super.key,
+    this.api,
+    this.launcher,
+    this.today,
+    this.plans,
+  });
 
   final MilkBillApiClient? api;
   final PaymentLauncher? launcher;
+
+  /// The customer's milk plans (vacation days); defaults to the app's.
+  final MilkSubscriptionManager? plans;
 
   /// For tests; defaults to now.
   final DateTime Function()? today;
@@ -263,7 +273,11 @@ class _MilkBillsScreenState extends State<MilkBillsScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    MilkCalendar(api: _api!, today: widget.today),
+                    MilkCalendar(
+                      api: _api!,
+                      today: widget.today,
+                      plans: widget.plans,
+                    ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
                       child: Text(

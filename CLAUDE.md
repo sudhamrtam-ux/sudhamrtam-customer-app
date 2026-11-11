@@ -71,6 +71,7 @@ Invariants to preserve: never generate a new order ID on retry; never clear the 
 
 ### Milk plan approval and addresses
 - Vacation (v18): "Pause → Going on vacation" opens `VacationDaysScreen` (tap any days, or add a date range); `MilkSubscription.vacationDates` holds them, the plan stays active and the server skips those days. The older paused-with-`resumeOn` vacation is still shown but no longer created.
+- Reg No: the server gives each customer `SM-1001`, … once with their first plan approval; the Account tab shows it (`AccountSyncService.refreshRegNo`, kept in `app_settings` key `account_reg_no`, cleared on sign-out). The same number is on every bill.
 - New milk plans wait for Sudhamrtam's approval (`MilkSubscription.approval`, v15): `isWaitingForApproval` shows "Waiting for approval" and no milk is delivered; rejected plans are cancelled with `rejectReason`. `MilkPlanSyncService.refresh` re-reads plans when the app resumes, Home or Milk Plan is opened (at most every 15 s) and on pull-down, so approvals show without a restart.
 - Addresses carry society (`societyId`/`societyName` from Sudhamrtam's list per area, or typed `societyOther`), `block`, `flat` and `isHouse` (v16). The form requires flat, and society + block unless an independent house; `AddressDetailsCard` on Home asks once (dismissal in `app_settings`) when a saved address lacks them. Deliveries are sorted by them on the server.
 

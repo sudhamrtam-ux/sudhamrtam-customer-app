@@ -226,6 +226,8 @@ Future<Uint8List> buildBillPdf(
   final gst = bill['gst_paise'] as int? ?? 0;
   final total = bill['total_paise'] as int;
   final paid = bill['status'] == 'paid';
+  // A "bill so far" for a month not billed yet (staff app).
+  final notFinal = print['not_final'] == true;
   final rates = {for (final l in lines) l['unit_price_paise'] as int};
 
   final phone = (customer['phone'] as String).replaceFirst('+91', '');
@@ -377,6 +379,14 @@ Future<Uint8List> buildBillPdf(
                     ),
                     if (settings['gstin'] != null)
                       pw.Text('GSTIN: ${settings['gstin']}'),
+                    if (notFinal)
+                      pw.Text(
+                        lines.isEmpty
+                            ? 'BILL SO FAR - NOT FINAL'
+                            : 'BILL SO FAR - NOT FINAL (milk up to '
+                                  '${billPdfLongDate(lines.last['delivery_date'] as String)})',
+                        style: bold.copyWith(color: _red, fontSize: 11),
+                      ),
                   ],
                 ),
               ),

@@ -8,6 +8,8 @@ import 'package:http/testing.dart';
 import 'package:sudhamrtam_customer_app/features/milk_bills/bill_pdf.dart';
 import 'package:sudhamrtam_customer_app/features/milk_bills/milk_bills_screen.dart';
 import 'package:sudhamrtam_customer_app/features/payment/payment_launcher.dart';
+import 'package:sudhamrtam_customer_app/models/milk_subscription.dart';
+import 'package:sudhamrtam_customer_app/models/milk_subscription_manager.dart';
 import 'package:sudhamrtam_customer_app/services/milk_bill_api_client.dart';
 import 'package:sudhamrtam_customer_app/services/order_api_client.dart';
 
@@ -483,6 +485,76 @@ void main() {
         server.requests.where((r) => r == 'GET /v1/milk-deliveries').length,
         12,
       );
+    });
+
+    testWidgets('vacation days show, this month and the months ahead', (
+      tester,
+    ) async {
+      november();
+      final plans = MilkSubscriptionManager();
+      await plans.loadSavedSubscriptions([
+        MilkSubscription(
+          id: 'p1',
+          productId: 'cow_milk',
+          shiftSchedules: [
+            MilkShiftSchedule(
+              shift: MilkDeliveryShift.morning,
+              quantityMl: 1000,
+              frequency: MilkDeliveryFrequency.daily,
+              startDate: DateTime(2026, 11, 1),
+            ),
+          ],
+          quantity: 1,
+          frequency: MilkDeliveryFrequency.daily,
+          startDate: DateTime(2026, 11, 1),
+          // A past day (the server's history shows it), two days
+          // ahead and one in December.
+          vacationDates: [
+            DateTime(2026, 11, 5),
+            DateTime(2026, 11, 14),
+            DateTime(2026, 11, 15),
+            DateTime(2026, 12, 2),
+          ],
+        ),
+      ]);
+      tester.view.physicalSize = const Size(400, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MilkBillsScreen(api: api, today: today, plans: plans),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(cell(tester, '2026-11-14'), '14 Vacation');
+      expect(cell(tester, '2026-11-15'), '15 Vacation');
+      expect(cell(tester, '2026-11-05'), '5 Paused');
+      expect(find.text('Vacation: no milk on 14–15 Nov.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('day-2026-11-14')));
+      await tester.pumpAndSettle();
+      expect(find.text('Vacation: no Cow Milk this day.'), findsOneWidget);
+      await tester.tapAt(const Offset(200, 50));
+      await tester.pumpAndSettle();
+
+      // December: only the vacation, nothing asked of the server.
+      final asked = server.requests.length;
+      await tester.tap(find.byTooltip('Next month'));
+      await tester.pumpAndSettle();
+      expect(find.text('December 2026'), findsOneWidget);
+      expect(cell(tester, '2026-12-02'), '2 Vacation');
+      expect(find.text('Vacation: no milk on 2 Dec.'), findsOneWidget);
+      expect(server.requests.length, asked);
+      // No further than the last vacation month.
+      expect(
+        tester
+            .widget<IconButton>(
+              find.widgetWithIcon(IconButton, Icons.chevron_right).first,
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('fits a phone', (tester) async {

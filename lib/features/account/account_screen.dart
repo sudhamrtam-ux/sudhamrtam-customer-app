@@ -285,7 +285,8 @@ class _SignInCard extends StatelessWidget {
           child: ListTile(
             leading: const Icon(Icons.verified_user, color: _brandGreen),
             title: Text('Signed in as ${user.phoneNumber ?? 'unknown number'}'),
-            subtitle: const Text('Phone number verified'),
+            // The Reg No on every bill (once a plan is approved).
+            subtitle: const _RegNoLine(),
             trailing: TextButton(
               onPressed: gateway.signOut,
               child: const Text('Sign out'),
@@ -295,4 +296,28 @@ class _SignInCard extends StatelessWidget {
       },
     );
   }
+}
+
+/// "Reg No: SM-1002 · Phone number verified": the number on every
+/// bill (owner decision 2026-11-11), once a plan is approved.
+class _RegNoLine extends StatefulWidget {
+  const _RegNoLine();
+
+  @override
+  State<_RegNoLine> createState() => _RegNoLineState();
+}
+
+class _RegNoLineState extends State<_RegNoLine> {
+  late final Future<String?> _regNo = sudhamrtamAccount.refreshRegNo();
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<String?>(
+    future: _regNo,
+    builder: (context, regNo) => Text(
+      regNo.data == null
+          ? 'Phone number verified'
+          : 'Reg No: ${regNo.data} · Phone number verified',
+      key: const Key('accountRegNo'),
+    ),
+  );
 }

@@ -35,6 +35,32 @@ class AccountSyncService extends ChangeNotifier {
   static const String localCustomerId = 'local_customer';
 
   static const String _linkedKey = 'account_linked_customer_id';
+  static const String _regNoKey = 'account_reg_no';
+
+  /// The customer's Reg No from the last sync (null without one).
+  Future<String?> regNo() async {
+    try {
+      return await _getSetting(_regNoKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Asks the server for the Reg No (it is given when a plan is
+  /// approved, maybe after the last sync); offline, the saved one.
+  /// Queued after other syncs, so an older one cannot overwrite it.
+  Future<String?> refreshRegNo() => _serial(() async {
+    final client = api;
+    if (!isSignedIn || client == null) return regNo();
+    try {
+      final profile = await client.getProfile();
+      await _setSetting(_regNoKey, profile.regNo);
+      return profile.regNo;
+    } catch (_) {
+      return regNo();
+    }
+  });
+
   static const String _unsyncedKey = 'account_unsynced_address_ids';
 
   final AccountApiClient? api;
@@ -180,20 +206,19 @@ class AccountSyncService extends ChangeNotifier {
       phoneNumber: verifiedPhone,
       email: profile.email,
     );
+    await _setSetting(_regNoKey, profile.regNo);
     await _addresses.replaceAllAddresses(localCustomerId, [
       ...serverAddresses,
       ...keep,
     ]);
-    await _setSetting(
-      _unsyncedKey,
-      jsonEncode([for (final a in keep) a.id]),
-    );
+    await _setSetting(_unsyncedKey, jsonEncode([for (final a in keep) a.id]));
   }
 
   Future<void> _onSignedOut() => _serial(() async {
     await _profiles.deleteProfile(localCustomerId);
     await _setSetting(_linkedKey, null);
     await _setSetting(_unsyncedKey, null);
+    await _setSetting(_regNoKey, null);
     lastSyncError = null;
     notifyListeners();
   });
