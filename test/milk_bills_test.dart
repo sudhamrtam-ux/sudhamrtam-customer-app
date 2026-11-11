@@ -68,7 +68,7 @@ Map<String, dynamic> billJson({
     ],
 };
 
-/// One delivery in the milk history: 0.5 L buffalo at ₹90 by default.
+/// One delivery in the milk history: 0.50 L buffalo at ₹90 by default.
 Map<String, dynamic> deliveryJson(
   String date, {
   String shift = 'morning',
@@ -260,8 +260,8 @@ void main() {
       expect(billRupees(139500), '₹1,395');
       expect(billRupees(12345650), '₹1,23,456.50');
       expect(billRupees(99900), '₹999');
-      expect(billLitres(1500), '1.5 L');
-      expect(billLitres(2000), '2 L');
+      expect(billLitres(1500), '1.50 L');
+      expect(billLitres(2000), '2.00 L');
     });
   });
 
@@ -394,9 +394,9 @@ void main() {
       await open(tester);
 
       expect(find.text('November 2026'), findsOneWidget);
-      expect(cell(tester, '2026-11-01'), '1 0.5 L ₹45');
+      expect(cell(tester, '2026-11-01'), '1 0.50 L ₹45');
       // Two deliveries on the 2nd: added up.
-      expect(cell(tester, '2026-11-02'), '2 1.5 L ₹135');
+      expect(cell(tester, '2026-11-02'), '2 1.50 L ₹135');
       expect(cell(tester, '2026-11-03'), '3 Missed');
       expect(cell(tester, '2026-11-10'), '10 Pending');
       expect(cell(tester, '2026-11-04'), '4');
@@ -408,7 +408,7 @@ void main() {
         find.text('3 delivered · 2 missed · 1 paused · 1 not marked yet'),
         findsOneWidget,
       );
-      expect(find.text('2 L'), findsOneWidget);
+      expect(find.text('2.00 L'), findsOneWidget);
       expect(find.text('₹90 per litre'), findsOneWidget);
       expect(find.text('Amount so far'), findsOneWidget);
       expect(find.text('₹180'), findsOneWidget);
@@ -433,8 +433,8 @@ void main() {
       // The 2nd: each delivery with its rate.
       await tester.tap(find.byKey(const Key('day-2026-11-02')));
       await tester.pumpAndSettle();
-      expect(find.text('Buffalo Milk 1 L × ₹90/L = ₹90'), findsOneWidget);
-      expect(find.text('Buffalo Milk 0.5 L × ₹90/L = ₹45'), findsOneWidget);
+      expect(find.text('Buffalo Milk 1.00 L × ₹90/L = ₹90'), findsOneWidget);
+      expect(find.text('Buffalo Milk 0.50 L × ₹90/L = ₹45'), findsOneWidget);
       expect(find.text('Evening'), findsOneWidget);
     });
 
@@ -461,7 +461,7 @@ void main() {
       await tester.tap(find.byTooltip('Previous month'));
       await tester.pumpAndSettle();
       expect(find.text('October 2026'), findsWidgets);
-      expect(cell(tester, '2026-10-31'), '31 0.5 L ₹45');
+      expect(cell(tester, '2026-10-31'), '31 0.50 L ₹45');
       expect(find.text('Amount'), findsOneWidget);
       expect(
         find.text('Your bill for October 2026 has been sent: ₹45.'),
@@ -561,7 +561,7 @@ void main() {
       november();
       await open(tester, size: const Size(320, 1400));
       expect(tester.takeException(), isNull);
-      expect(cell(tester, '2026-11-02'), '2 1.5 L ₹135');
+      expect(cell(tester, '2026-11-02'), '2 1.50 L ₹135');
     });
   });
 
@@ -580,7 +580,7 @@ void main() {
       expect(find.text('Paid in cash'), findsOneWidget);
       expect(find.text('Paid online'), findsOneWidget);
       expect(find.text('Overdue'), findsOneWidget);
-      expect(find.text('Buffalo Milk 1.5 L, Cow Milk 1 L'), findsNWidgets(4));
+      expect(find.text('Buffalo Milk 1.50 L, Cow Milk 1.00 L'), findsNWidgets(4));
     });
 
     testWidgets('explains an empty list', (tester) async {
@@ -688,9 +688,9 @@ void main() {
       // The amount due, the actual amount and the total.
       expect(find.text('₹230'), findsNWidgets(3));
       expect(find.text('Due by 8 Nov 2026'), findsOneWidget);
-      expect(find.text('Buffalo Milk: 1.5 L · ₹135'), findsOneWidget);
+      expect(find.text('Buffalo Milk: 1.50 L · ₹135'), findsOneWidget);
       expect(
-        find.textContaining('Buffalo Milk 1.5 L at ₹90 per litre'),
+        find.textContaining('Buffalo Milk 1.50 L at ₹90 per litre'),
         findsOneWidget,
       );
       expect(find.textContaining('5 Oct 2026 · Evening'), findsOneWidget);

@@ -30,8 +30,6 @@ int? previousMilkMl(int ml) {
   return null;
 }
 
-/// 1000 → "1 L", 1500 → "1.5 L", 750 → "0.75 L".
-String milkLitresText(int ml) {
-  if (ml % 1000 == 0) return '${ml ~/ 1000} L';
-  return '${(ml / 1000).toStringAsFixed(ml % 100 == 0 ? 1 : 2)} L';
-}
+/// Always two decimals (owner decision 2026-11-11): 1000 → "1.00 L",
+/// 1500 → "1.50 L", 750 → "0.75 L".
+String milkLitresText(int ml) => '${(ml / 1000).toStringAsFixed(2)} L';

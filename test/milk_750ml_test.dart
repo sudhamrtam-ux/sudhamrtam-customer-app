@@ -50,11 +50,11 @@ void main() {
       expect(previousMilkMl(500), isNull);
     });
 
-    test('litres show 0.75 L, not 0.8 L', () {
+    test('litres show 0.75 L, not 0.80 L', () {
       expect(milkLitresText(750), '0.75 L');
       expect(milkLitresText(1750), '1.75 L');
-      expect(milkLitresText(1500), '1.5 L');
-      expect(milkLitresText(2000), '2 L');
+      expect(milkLitresText(1500), '1.50 L');
+      expect(milkLitresText(2000), '2.00 L');
       expect(litresText(750), '0.75 L');
     });
 

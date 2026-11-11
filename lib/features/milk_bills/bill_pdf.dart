@@ -143,12 +143,8 @@ String _frequencyLabel(Map<String, dynamic> plan) {
   };
 }
 
-String _litresText(int ml) {
-  final value = ml / 1000;
-  return value == value.roundToDouble()
-      ? '${value.toStringAsFixed(0)} litre'
-      : '${value.toStringAsFixed(ml % 100 == 0 ? 1 : 2)} litre';
-}
+/// Two decimals, like the day table: "1.50 litre".
+String _litresText(int ml) => '${(ml / 1000).toStringAsFixed(2)} litre';
 
 /// What one date shows: litres delivered, or why there were none.
 class BillPdfDay {

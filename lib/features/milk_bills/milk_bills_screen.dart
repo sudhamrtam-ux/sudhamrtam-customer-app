@@ -55,7 +55,7 @@ String billRupees(int paise) {
   return rest == 0 ? '₹$whole' : '₹$whole.${rest.toString().padLeft(2, '0')}';
 }
 
-/// 1500 → "1.5 L".
+/// 1500 → "1.50 L".
 /// "Early morning", "Morning" or "Evening".
 String billShiftLabel(String shift) => switch (shift) {
   'early_morning' => 'Early morning',
@@ -63,12 +63,8 @@ String billShiftLabel(String shift) => switch (shift) {
   _ => 'Evening',
 };
 
-String billLitres(int ml) {
-  final value = ml / 1000;
-  return value == value.roundToDouble()
-      ? '${value.toStringAsFixed(0)} L'
-      : '${value.toStringAsFixed(ml % 100 == 0 ? 1 : 2)} L';
-}
+/// Always two decimals (owner decision 2026-11-11): "1.50 L".
+String billLitres(int ml) => '${(ml / 1000).toStringAsFixed(2)} L';
 
 (String, Color) _statusLabel(MilkBill bill) {
   if (bill.isPaid) {

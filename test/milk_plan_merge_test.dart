@@ -127,7 +127,7 @@ void main() {
       expect(changes.blockingPlan?.id, 'a');
     });
 
-    test('the total per delivery cannot go over 10 L', () {
+    test('the total per delivery cannot go over 10.00 L', () {
       final changes = planNewSubscription([
         plan('a', [morning(9500)]),
       ], plan('new', [morning(1000)]));
@@ -430,7 +430,7 @@ void main() {
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
 
-      // The app's shared manager: 1 L every morning.
+      // The app's shared manager: 1.00 L every morning.
       await tester.runAsync(
         () => sudhamrtamMilkSubscriptions.addSubscription(
           plan('existing', [
@@ -445,7 +445,7 @@ void main() {
         ),
       );
 
-      // The new plan's default: 1 L every morning.
+      // The new plan's default: 1.00 L every morning.
       await tester.tap(find.text('Save Milk Subscription'));
       await waitUntil(
         tester,
@@ -454,7 +454,7 @@ void main() {
 
       expect(find.byKey(const Key('addToPlanDialog')), findsOneWidget);
       expect(
-        find.textContaining('Morning: 1 L → 2 L every day'),
+        find.textContaining('Morning: 1.00 L → 2.00 L every day'),
         findsOneWidget,
       );
 
@@ -499,7 +499,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.textContaining('Morning: 1 L → 1.5 L every day'),
+        find.textContaining('Morning: 1.00 L → 1.50 L every day'),
         findsOneWidget,
       );
       expect(find.byKey(const Key('combinePlans')), findsOneWidget);
@@ -513,14 +513,14 @@ void main() {
           plan('a', [morning(1000)], productId: 'buffalo_milk'),
           plan('b', [evening(500)], productId: 'buffalo_milk'),
         ]),
-        'Total: 1.5 L every day',
+        'Total: 1.50 L every day',
       );
       expect(
         milkTotalText([
           plan('a', [morning(1000)]),
           plan('b', [evening(500)], status: MilkSubscriptionStatus.paused),
         ]),
-        'Total: 1 L every day (evening paused)',
+        'Total: 1.00 L every day (evening paused)',
       );
       expect(
         milkTotalText([
@@ -529,7 +529,7 @@ void main() {
             shift(e, 500, frequency: MilkDeliveryFrequency.alternateDays),
           ]),
         ]),
-        'Up to 1.5 L on days with both deliveries',
+        'Up to 1.50 L on days with both deliveries',
       );
       expect(
         milkTotalText([
@@ -567,7 +567,7 @@ void main() {
       expect(find.text('Early morning Delivery'), findsOneWidget);
       expect(find.text('Morning Delivery'), findsOneWidget);
       expect(find.text('Evening Delivery'), findsOneWidget);
-      expect(find.text('Total: 2 L every day'), findsOneWidget);
+      expect(find.text('Total: 2.00 L every day'), findsOneWidget);
       // Each plan keeps its own Pause button.
       expect(find.text('Pause'), findsNWidgets(3));
       // Early morning, then morning, then evening.
