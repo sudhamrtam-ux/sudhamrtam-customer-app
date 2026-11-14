@@ -14,6 +14,8 @@ import 'services/account_api_client.dart';
 import 'services/account_sync_service.dart';
 import 'services/api_phone_auth_gateway.dart';
 import 'services/catalog_api_client.dart';
+import 'services/firebase_push_platform.dart';
+import 'services/push_notifications.dart';
 import 'services/feedback_api_client.dart';
 import 'services/message_api_client.dart';
 import 'services/profile_photo_api_client.dart';
@@ -80,6 +82,23 @@ Future<void> main() async {
       unawaited(auth.checkSession());
     } catch (error) {
       debugPrint('Sign-in could not start: $error');
+    }
+
+    // Phone notifications (Firebase): optional; the app works
+    // without them.
+    final auth = sudhamrtamAuth;
+    if (auth is ApiPhoneAuthGateway) {
+      try {
+        final push = PushNotifications(
+          platform: await FirebasePushPlatform.start(),
+          api: PushApiClient(baseUrl: apiBaseUrl),
+          session: () => auth.sessionToken,
+        )..attach(auth.authStateChanges());
+        auth.beforeSignOut = push.unregister;
+        sudhamrtamPush = push;
+      } catch (error) {
+        debugPrint('Phone notifications could not start: $error');
+      }
     }
   }
 

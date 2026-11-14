@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
 import '../features/messages/message_inbox.dart';
+import '../features/messages/messages_screen.dart';
 import '../features/account/profile_photo.dart';
 import '../features/shell/customer_shell.dart';
 import '../models/cart_manager.dart';
@@ -15,6 +16,7 @@ import '../services/feedback_api_client.dart';
 import '../services/milk_bill_api_client.dart';
 import '../services/milk_plan_sync_service.dart';
 import '../services/phone_auth_service.dart';
+import '../services/push_notifications.dart';
 
 /// Phone login, or null when this build has no server
 /// (API_BASE_URL) or the saved login could not be read. The app
@@ -80,6 +82,14 @@ FeedbackApiClient? sudhamrtamFeedback;
 /// no server. Set by main().
 MessageInbox? sudhamrtamMessages;
 
+/// Phone notifications; null without a server or Firebase.
+PushNotifications? sudhamrtamPush;
+
+/// For opening pages and showing notes from outside a page (a tapped
+/// notification).
+final sudhamrtamNavigatorKey = GlobalKey<NavigatorState>();
+final sudhamrtamMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
 /// The signed-in customer's profile photo; null without a server.
 ProfilePhoto? sudhamrtamProfilePhoto;
 
@@ -92,8 +102,65 @@ MilkPlanSyncService sudhamrtamMilkSync = MilkPlanSyncService(
   manager: sudhamrtamMilkSubscriptions,
 );
 
-class SudhamrtamApp extends StatelessWidget {
+class SudhamrtamApp extends StatefulWidget {
   const SudhamrtamApp({super.key});
+
+  @override
+  State<SudhamrtamApp> createState() => _SudhamrtamAppState();
+}
+
+class _SudhamrtamAppState extends State<SudhamrtamApp> {
+  final List<StreamSubscription<Object?>> _subscriptions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final push = sudhamrtamPush;
+    if (push == null) return;
+    _subscriptions
+      ..add(push.taps.listen(_open))
+      ..add(push.arrivals.listen(_arrived));
+    // The notification that opened the app from closed.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final tap = await push.initialTap();
+      if (tap != null) _open(tap);
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final s in _subscriptions) {
+      s.cancel();
+    }
+    super.dispose();
+  }
+
+  /// A tapped notification: the message opens in Messages.
+  void _open(PushTap tap) {
+    final inbox = sudhamrtamMessages;
+    final navigator = sudhamrtamNavigatorKey.currentState;
+    if (tap.type != 'message' || inbox == null || navigator == null) return;
+    unawaited(inbox.refresh());
+    navigator.push(
+      MaterialPageRoute<void>(builder: (_) => MessagesScreen(inbox: inbox)),
+    );
+  }
+
+  /// Arrived while the app is open: the bell updates and a note shows.
+  void _arrived(PushArrival arrival) {
+    if (arrival.tap.type != 'message') return;
+    unawaited(sudhamrtamMessages?.refresh());
+    sudhamrtamMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text('New message: ${arrival.title ?? 'from Sudhamrtam'}'),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Open',
+          onPressed: () => _open(arrival.tap),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +168,8 @@ class SudhamrtamApp extends StatelessWidget {
       title: 'Sudhamrtam',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      navigatorKey: sudhamrtamNavigatorKey,
+      scaffoldMessengerKey: sudhamrtamMessengerKey,
       home: const CustomerShell(),
     );
   }

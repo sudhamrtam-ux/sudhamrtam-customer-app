@@ -183,9 +183,21 @@ class ApiPhoneAuthGateway implements PhoneAuthGateway {
     return user;
   }
 
+  /// Runs before signing out, while the session still works (e.g. to
+  /// stop this phone's notifications). Never blocks sign-out.
+  Future<void> Function(String sessionToken)? beforeSignOut;
+
   @override
   Future<void> signOut() async {
     final session = _session;
+    final before = beforeSignOut;
+    if (session != null && before != null) {
+      try {
+        await before(session.token).timeout(timeout);
+      } catch (error) {
+        debugPrint('Before sign-out skipped: $error');
+      }
+    }
     await _clearLocal();
 
     if (session == null) return;
