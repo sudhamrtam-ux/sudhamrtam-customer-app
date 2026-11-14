@@ -46,6 +46,9 @@ class CustomerAddress {
   /// An independent house: no society or block.
   final bool isHouse;
 
+  /// "Leave at the door": shown to the delivery partner (v19).
+  final String? deliveryNote;
+
   const CustomerAddress({
     required this.id,
     required this.customerId,
@@ -70,6 +73,7 @@ class CustomerAddress {
     this.block,
     this.flat,
     this.isHouse = false,
+    this.deliveryNote,
   });
 
   /// True when a complete coordinate pair is available.
@@ -146,6 +150,7 @@ class CustomerAddress {
       block: block,
       flat: flat,
       isHouse: isHouse,
+      deliveryNote: deliveryNote,
     );
   }
 
@@ -191,6 +196,7 @@ class CustomerAddress {
       'block': block,
       'flat': flat,
       'is_house': isHouse ? 1 : 0,
+      'delivery_note': deliveryNote,
     };
   }
 
@@ -220,6 +226,7 @@ class CustomerAddress {
       block: map['block'] as String?,
       flat: map['flat'] as String?,
       isHouse: (map['is_house'] as int? ?? 0) == 1,
+      deliveryNote: map['delivery_note'] as String?,
     );
   }
 }

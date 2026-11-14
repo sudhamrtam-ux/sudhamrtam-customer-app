@@ -173,6 +173,7 @@ class CustomerAddressDatabaseService {
           'block': address.block,
           'flat': address.flat,
           'is_house': address.isHouse ? 1 : 0,
+          'delivery_note': address.deliveryNote,
         },
         where: 'id = ? AND customer_id = ?',
         whereArgs: [address.id, address.customerId],

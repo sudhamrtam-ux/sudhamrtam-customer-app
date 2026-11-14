@@ -21,6 +21,36 @@ class DeliveryArea {
   const DeliveryArea({required this.id, required this.name});
 }
 
+/// One of Sudhamrtam's societies; with its own address (owner
+/// decision 2026-11-14), picking it fills in the customer's address.
+class SocietyChoice {
+  final String id;
+  final String name;
+  final String? addressLine1;
+  final String? city;
+  final String? state;
+  final String? postalCode;
+
+  const SocietyChoice({
+    required this.id,
+    required this.name,
+    this.addressLine1,
+    this.city,
+    this.state,
+    this.postalCode,
+  });
+
+  /// The society gives the street, city, state and PIN code.
+  bool get hasAddress =>
+      addressLine1 != null &&
+      city != null &&
+      state != null &&
+      postalCode != null;
+
+  /// "Road 4, Nizampet, Hyderabad, Telangana, 500090".
+  String get addressText => '$addressLine1, $city, $state, $postalCode';
+}
+
 class CatalogApiException implements Exception {
   final String message;
   const CatalogApiException(this.message);
@@ -97,7 +127,7 @@ class CatalogApiClient {
   }
 
   /// An area's societies (Sudhamrtam's list), for the address form.
-  Future<List<DeliveryArea>> fetchSocieties(String areaId) async {
+  Future<List<SocietyChoice>> fetchSocieties(String areaId) async {
     final json = await _getJson(
       _baseUri.resolve('v1/areas/${Uri.encodeComponent(areaId)}/societies'),
     );
@@ -108,9 +138,13 @@ class CatalogApiClient {
     try {
       return [
         for (final s in societies)
-          DeliveryArea(
+          SocietyChoice(
             id: (s as Map)['id'] as String,
             name: s['name'] as String,
+            addressLine1: s['address_line1'] as String?,
+            city: s['city'] as String?,
+            state: s['state'] as String?,
+            postalCode: s['postal_code'] as String?,
           ),
       ];
     } on TypeError {

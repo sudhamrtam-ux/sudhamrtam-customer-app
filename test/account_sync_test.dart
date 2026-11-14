@@ -453,6 +453,7 @@ void main() {
                 'block',
                 'flat',
                 'is_house',
+                'delivery_note',
               }.contains(key),
             );
           await db.insert('customer_addresses', row);

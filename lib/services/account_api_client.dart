@@ -78,6 +78,7 @@ class AddressJson {
     'block': address.block,
     'flat': address.flat,
     'is_house': address.isHouse,
+    'delivery_note': address.deliveryNote,
   };
 
   static CustomerAddress fromJson(
@@ -110,6 +111,7 @@ class AddressJson {
       block: json['block'] as String?,
       flat: json['flat'] as String?,
       isHouse: json['is_house'] as bool? ?? false,
+      deliveryNote: json['delivery_note'] as String?,
     );
   }
 }

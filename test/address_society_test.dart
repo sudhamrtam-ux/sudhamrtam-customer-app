@@ -49,6 +49,35 @@ CustomerAddress address({
 
 void main() {
   group('address model', () {
+    test('the delivery note survives the phone and the server', () {
+      final now = DateTime(2026, 11, 14);
+      final a = CustomerAddress(
+        id: 'a1',
+        customerId: AccountSyncService.localCustomerId,
+        label: 'Home',
+        recipientName: 'Asha',
+        phoneNumber: '9876543210',
+        addressLine1: 'Road 4',
+        landmark: '',
+        city: 'Hyderabad',
+        state: 'Telangana',
+        postalCode: '500090',
+        createdAt: now,
+        updatedAt: now,
+        deliveryNote: 'Ring twice',
+      );
+      expect(CustomerAddress.fromMap(a.toMap()).deliveryNote, 'Ring twice');
+      expect(a.copyWith(label: 'Office').deliveryNote, 'Ring twice');
+      final back = AddressJson.fromJson({
+        ...AddressJson.toJson(a),
+        'id': 'a1',
+        'phone_e164': '+919876543210',
+        'created_at': now.toIso8601String(),
+        'updated_at': now.toIso8601String(),
+      }, customerId: a.customerId);
+      expect(back.deliveryNote, 'Ring twice');
+    });
+
     test('flat, block and society come first in the address', () {
       expect(
         address(
@@ -144,7 +173,7 @@ void main() {
             ],
             loadSocieties: (area) async {
               asked.add(area);
-              return const [DeliveryArea(id: 's1', name: 'Green Towers')];
+              return const [SocietyChoice(id: 's1', name: 'Green Towers')];
             },
           ),
         ),
@@ -195,6 +224,132 @@ void main() {
       );
       expect(a.isHouse, isFalse);
     });
+
+    testWidgets('a society with its address fills it in; a note is optional', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 5000);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AddressFormScreen(
+            account: AccountSyncService.localOnly(),
+            loadAreas: () async => const [
+              DeliveryArea(id: 'nizampet', name: 'Nizampet'),
+            ],
+            loadSocieties: (_) async => const [
+              SocietyChoice(
+                id: 's1',
+                name: 'Green Towers',
+                addressLine1: 'Road 4, Nizampet',
+                city: 'Hyderabad',
+                state: 'Telangana',
+                postalCode: '500090',
+              ),
+              SocietyChoice(id: 's2', name: 'Lake View'),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      Future<void> type(String label, String text) =>
+          tester.enterText(find.widgetWithText(TextFormField, label), text);
+      await type('Recipient Name', 'Asha');
+      await type('Mobile Number', '9876543210');
+      await tester.tap(find.byKey(const Key('areaField')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Nizampet').last);
+      await tester.pumpAndSettle();
+
+      // A society without an address: the customer types it.
+      await tester.tap(find.textContaining('Society / Apartment').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lake View').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('societyAddress')), findsNothing);
+      expect(
+        find.widgetWithText(TextFormField, 'Street / Road / Locality'),
+        findsOneWidget,
+      );
+
+      // Green Towers gives the street, city and PIN code.
+      await tester.tap(find.text('Lake View').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Green Towers').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('societyAddress')), findsOneWidget);
+      expect(
+        find.text('Road 4, Nizampet, Hyderabad, Telangana, 500090'),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(TextFormField, 'Street / Road / Locality'),
+        findsNothing,
+      );
+      expect(find.widgetWithText(TextFormField, 'PIN Code'), findsNothing);
+
+      await type('Block / Tower', 'B');
+      await type('Flat Number', '1203');
+      await tester.enterText(
+        find.byKey(const Key('deliveryNoteField')),
+        ' Leave at the door ',
+      );
+      await tester.tap(find.text('Save Address'));
+      await tester.pump();
+
+      List<CustomerAddress>? saved;
+      for (var i = 0; i < 50 && (saved?.isEmpty ?? true); i++) {
+        saved = await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          return CustomerAddressDatabaseService.instance
+              .getAddressesByCustomerId(AccountSyncService.localCustomerId);
+        });
+        await tester.pump();
+      }
+      final a = saved!.single;
+      expect(
+        [a.addressLine1, a.city, a.state, a.postalCode, a.landmark],
+        ['Road 4, Nizampet', 'Hyderabad', 'Telangana', '500090', ''],
+      );
+      expect([a.societyId, a.block, a.flat], ['s1', 'B', '1203']);
+      expect(a.deliveryNote, 'Leave at the door');
+      // The server gets the note too.
+      expect(AddressJson.toJson(a)['delivery_note'], 'Leave at the door');
+    });
+
+    test(
+      'v18 to v19 keeps addresses and adds an empty delivery note',
+      () async {
+        // A v19 database made into a v18 one with an address in it.
+        await MilkDatabaseService.instance.database;
+        await MilkDatabaseService.instance.close();
+        final path = '${directory.path}${Platform.pathSeparator}soc.db';
+        final old = await databaseFactoryFfi.openDatabase(path);
+        await old.execute(
+          'ALTER TABLE customer_addresses DROP COLUMN delivery_note',
+        );
+        await old.insert('customer_profiles', {
+          'id': AccountSyncService.localCustomerId,
+          'full_name': 'Asha',
+          'created_at': '2026-11-11T00:00:00.000',
+          'updated_at': '2026-11-11T00:00:00.000',
+        });
+        final row = address(societyId: 's1', block: 'B', flat: '101').toMap()
+          ..remove('delivery_note');
+        await old.insert('customer_addresses', row);
+        await old.setVersion(18);
+        await old.close();
+
+        final db = await MilkDatabaseService.instance.database;
+        expect(await db.getVersion(), MilkDatabaseService.databaseVersion);
+        final kept = await CustomerAddressDatabaseService.instance
+            .getAddressesByCustomerId(AccountSyncService.localCustomerId);
+        expect([kept.single.id, kept.single.flat], ['a1', '101']);
+        expect(kept.single.deliveryNote, isNull);
+      },
+    );
 
     testWidgets('an independent house needs only the house number', (
       tester,

@@ -15,7 +15,7 @@ DeliveryAreaLoader? _defaultAreaLoader() =>
 
 /// Loads an area's societies (Sudhamrtam's list); null without a
 /// server, when the society is typed.
-typedef SocietyLoader = Future<List<DeliveryArea>> Function(String areaId);
+typedef SocietyLoader = Future<List<SocietyChoice>> Function(String areaId);
 
 SocietyLoader? _defaultSocietyLoader() =>
     CatalogApiClient.fromEnvironment()?.fetchSocieties;
@@ -60,12 +60,23 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   final _blockController = TextEditingController();
   final _flatController = TextEditingController();
   final _typedSocietyController = TextEditingController();
+  final _noteController = TextEditingController();
 
   /// Society, block and flat (owner decisions 2026-11-11): flat is
   /// always needed; society and block unless an independent house.
   bool _isHouse = false;
   String? _society;
-  List<DeliveryArea> _societies = const [];
+  List<SocietyChoice> _societies = const [];
+
+  /// The chosen society, when it gives the address (owner decision
+  /// 2026-11-14): then only flat, block and a note are typed.
+  SocietyChoice? get _societyWithAddress {
+    if (_isHouse || _society == null || _society == _notListed) return null;
+    for (final s in _societies) {
+      if (s.id == _society && s.hasAddress) return s;
+    }
+    return null;
+  }
 
   String _addressLabel = 'Home';
   bool _isDefault = false;
@@ -106,12 +117,13 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _blockController.text = address.block ?? '';
     _flatController.text = address.flat ?? '';
     _typedSocietyController.text = address.societyOther ?? '';
+    _noteController.text = address.deliveryNote ?? '';
     _society =
         address.societyId ?? (address.societyOther == null ? null : _notListed);
     // Shown until the list arrives.
     if (address.societyId != null && address.societyName != null) {
       _societies = [
-        DeliveryArea(id: address.societyId!, name: address.societyName!),
+        SocietyChoice(id: address.societyId!, name: address.societyName!),
       ];
     }
   }
@@ -250,6 +262,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _blockController.dispose();
     _flatController.dispose();
     _typedSocietyController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -431,6 +444,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     try {
       final now = DateTime.now();
       final existing = widget.existingAddress;
+      // A society with its own address gives the street, city and PIN.
+      final place = _societyWithAddress;
+      final note = _noteController.text.trim();
 
       final address = CustomerAddress(
         id: existing?.id ?? 'address_${now.microsecondsSinceEpoch}',
@@ -439,14 +455,16 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         label: _addressLabel,
         recipientName: _recipientController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
-        addressLine1: _addressLine1Controller.text.trim(),
-        addressLine2: _addressLine2Controller.text.trim().isEmpty
+        addressLine1:
+            place?.addressLine1 ?? _addressLine1Controller.text.trim(),
+        addressLine2:
+            place != null || _addressLine2Controller.text.trim().isEmpty
             ? null
             : _addressLine2Controller.text.trim(),
-        landmark: _landmarkController.text.trim(),
-        city: _cityController.text.trim(),
-        state: _stateController.text.trim(),
-        postalCode: _postalCodeController.text.trim(),
+        landmark: place != null ? '' : _landmarkController.text.trim(),
+        city: place?.city ?? _cityController.text.trim(),
+        state: place?.state ?? _stateController.text.trim(),
+        postalCode: place?.postalCode ?? _postalCodeController.text.trim(),
 
         // Preserve saved map coordinates during editing.
         latitude: existing?.latitude,
@@ -473,6 +491,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             : null,
         block: _isHouse ? null : _blockController.text.trim(),
         flat: _flatController.text.trim(),
+        deliveryNote: note.isEmpty ? null : note,
       );
 
       await widget.account.saveAddress(address);
@@ -576,36 +595,73 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
 
             _buildSocietyFields(),
 
-            _buildTextField(
-              controller: _addressLine1Controller,
-              label: 'Street / Road / Locality',
-              hint: 'Street, road or colony',
-              maxLines: 2,
-            ),
+            if (_societyWithAddress case final place?)
+              // The society gives the rest of the address.
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: InputDecorator(
+                  key: const Key('societyAddress'),
+                  decoration: const InputDecoration(
+                    labelText: 'Address',
+                    helperText: 'Filled in from your society.',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.location_city_outlined),
+                  ),
+                  child: Text(place.addressText),
+                ),
+              )
+            else ...[
+              _buildTextField(
+                controller: _addressLine1Controller,
+                label: 'Street / Road / Locality',
+                hint: 'Street, road or colony',
+                maxLines: 2,
+              ),
 
-            _buildTextField(
-              controller: _addressLine2Controller,
-              label: 'More Address (Optional)',
-              hint: 'Anything else that helps us find you',
-              requiredField: false,
-            ),
+              _buildTextField(
+                controller: _addressLine2Controller,
+                label: 'More Address (Optional)',
+                hint: 'Anything else that helps us find you',
+                requiredField: false,
+              ),
 
-            _buildTextField(
-              controller: _landmarkController,
-              label: 'Landmark (Optional)',
-              hint: 'Nearby landmark',
-              requiredField: false,
-            ),
+              _buildTextField(
+                controller: _landmarkController,
+                label: 'Landmark (Optional)',
+                hint: 'Nearby landmark',
+                requiredField: false,
+              ),
 
-            _buildTextField(controller: _cityController, label: 'City'),
+              _buildTextField(controller: _cityController, label: 'City'),
 
-            _buildTextField(controller: _stateController, label: 'State'),
+              _buildTextField(controller: _stateController, label: 'State'),
 
-            _buildTextField(
-              controller: _postalCodeController,
-              label: 'PIN Code',
-              hint: 'Enter 6-digit PIN code',
-              keyboardType: TextInputType.number,
+              _buildTextField(
+                controller: _postalCodeController,
+                label: 'PIN Code',
+                hint: 'Enter 6-digit PIN code',
+                keyboardType: TextInputType.number,
+              ),
+            ],
+
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: TextFormField(
+                key: const Key('deliveryNoteField'),
+                controller: _noteController,
+                enabled: !_isSaving,
+                maxLength: 200,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Delivery Note (Optional)',
+                  hintText: 'e.g. Leave at the door, ring twice',
+                  helperText: 'Our delivery partner sees this.',
+                  border: OutlineInputBorder(),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: _brandGreen, width: 2),
+                  ),
+                ),
+              ),
             ),
 
             SwitchListTile(

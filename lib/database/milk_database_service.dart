@@ -22,12 +22,13 @@ import 'package:sqflite/sqflite.dart';
 /// addresses.
 /// Version 17: 750 ml milk quantities (schedules table rebuilt).
 /// Version 18: Vacation days on milk plans.
+/// Version 19: A delivery note on addresses.
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 18;
+  static const int databaseVersion = 19;
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -149,6 +150,7 @@ class MilkDatabaseService {
     await _addPlanApprovalColumns(db);
     await _addAddressSocietyColumns(db);
     await _addPlanVacationDatesColumn(db);
+    await _addAddressDeliveryNoteColumn(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -245,6 +247,24 @@ class MilkDatabaseService {
     if (oldVersion < 18) {
       await _addPlanVacationDatesColumn(db);
     }
+
+    if (oldVersion < 19) {
+      await _addAddressDeliveryNoteColumn(db);
+    }
+  }
+
+  /// Version 19: an address's delivery note for the partner ("Leave
+  /// at the door"); nullable, existing addresses get none.
+  Future<void> _addAddressDeliveryNoteColumn(Database db) async {
+    final columns = await db.rawQuery(
+      'PRAGMA table_info($customerAddressesTable)',
+    );
+    if (columns.isEmpty || columns.any((c) => c['name'] == 'delivery_note')) {
+      return;
+    }
+    await db.execute(
+      'ALTER TABLE $customerAddressesTable ADD COLUMN delivery_note TEXT',
+    );
   }
 
   /// Version 18: a plan's vacation days (JSON list of YYYY-MM-DD);
