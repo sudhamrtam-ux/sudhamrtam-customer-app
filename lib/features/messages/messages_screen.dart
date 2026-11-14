@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import 'message_inbox.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 const _brandGreen = Color(0xFF82B440);
 const _paleGreen = Color(0xFFF5F8F0);
@@ -133,7 +134,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Widget build(BuildContext context) {
     final inbox = widget.inbox;
     return Scaffold(
-      appBar: AppBar(title: const Text('Messages')),
+      appBar: PageAppBar(title: const Text('Messages')),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: inbox,

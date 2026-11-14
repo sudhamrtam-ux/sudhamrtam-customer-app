@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import '../../services/feedback_api_client.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 const _brandGreen = Color(0xFF82B440);
 const _months = [
@@ -111,7 +112,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   Widget build(BuildContext context) {
     final api = _api;
     return Scaffold(
-      appBar: AppBar(title: const Text('Send Feedback')),
+      appBar: PageAppBar(title: const Text('Send Feedback')),
       body: SafeArea(
         child: api == null
             ? const _Notice('Feedback needs a connection to Sudhamrtam.')

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import 'product_image.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final String productId;
@@ -105,7 +106,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     const brandGreen = Color(0xFF82B440);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Product Details')),
+      appBar: PageAppBar(title: const Text('Product Details')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),

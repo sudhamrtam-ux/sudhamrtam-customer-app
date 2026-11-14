@@ -4,6 +4,7 @@ import '../../models/customer_order.dart';
 import '../../models/order_item.dart';
 import '../payment/order_payment_status.dart';
 import 'order_status_labels.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 class OrderDetailsScreen extends StatelessWidget {
   final CustomerOrder order;
@@ -130,7 +131,7 @@ class OrderDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Order Details')),
+      appBar: PageAppBar(title: const Text('Order Details')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

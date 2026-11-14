@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../services/phone_auth_service.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 const _green = Color(0xFF82B440);
 
@@ -133,7 +134,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     final enteringCode = _codeSent != null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
+      appBar: PageAppBar(title: const Text('Sign in')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(24),

@@ -18,6 +18,7 @@ import 'checkout_validator.dart';
 import 'durable_checkout_coordinator.dart';
 import 'order_destination.dart';
 import 'order_preparation_service.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 const _brandGreen = Color(0xFF82B440);
 
@@ -1145,7 +1146,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Checkout')),
+      appBar: PageAppBar(title: const Text('Checkout')),
       body: AnimatedBuilder(
         animation: sudhamrtamCart,
         builder: (context, child) {
@@ -1486,8 +1487,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 label: Text(placeOrderLabel),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
-                  backgroundColor: _brandGreen,
-                  foregroundColor: Colors.white,
                 ),
               ),
 

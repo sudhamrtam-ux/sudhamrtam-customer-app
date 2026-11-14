@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../database/milk_database_service.dart';
 import '../../database/milk_subscription_repository.dart';
 import '../../models/milk_subscription.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 /// Temporary manual test screen. Do not include in production navigation.
 class MilkSqliteTestScreen extends StatefulWidget {
@@ -128,7 +129,7 @@ class _MilkSqliteTestScreenState extends State<MilkSqliteTestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('SQLite Storage Test')),
+      appBar: PageAppBar(title: const Text('SQLite Storage Test')),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

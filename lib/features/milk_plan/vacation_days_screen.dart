@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 const _brandGreen = Color(0xFF82B440);
 
@@ -245,7 +246,7 @@ class _VacationDaysScreenState extends State<VacationDaysScreen> {
   Widget build(BuildContext context) {
     final sorted = _days.toList()..sort();
     return Scaffold(
-      appBar: AppBar(title: Text('Vacation · ${widget.milkName}')),
+      appBar: PageAppBar(title: Text('Vacation · ${widget.milkName}')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

@@ -6,6 +6,7 @@ import '../../services/milk_plan_api_client.dart';
 import '../../models/milk_plan_merge.dart';
 import '../../models/milk_quantity.dart';
 import 'milk_plan_merge_dialog.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 const _brandGreen = Color(0xFF82B440);
 
@@ -534,7 +535,7 @@ class _MilkSubscriptionSetupScreenState
         .where((draft) => draft.enabled)
         .fold<int>(0, (sum, draft) => sum + draft.quantityMl);
     return Scaffold(
-      appBar: AppBar(
+      appBar: PageAppBar(
         title: Text(
           _isEditing ? 'Edit Milk Subscription' : 'Set Up Milk Subscription',
         ),

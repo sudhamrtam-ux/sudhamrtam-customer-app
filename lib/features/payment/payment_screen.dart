@@ -6,6 +6,7 @@ import '../../services/order_api_client.dart';
 import '../checkout/order_destination.dart';
 import '../orders/order_details_screen.dart';
 import 'payment_launcher.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 const _green = Color(0xFF82B440);
 
@@ -258,7 +259,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final total = '₹${widget.order.subtotal.toStringAsFixed(2)}';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Payment')),
+      appBar: PageAppBar(title: const Text('Payment')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(24),

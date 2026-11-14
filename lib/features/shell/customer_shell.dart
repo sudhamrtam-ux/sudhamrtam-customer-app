@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import '../../core/widgets/page_app_bar.dart';
 import '../home/home_screen.dart';
 import '../messages/messages_screen.dart';
 import '../shop/product_image.dart';
@@ -25,6 +27,23 @@ class _CustomerShellState extends State<CustomerShell> {
   /// Shop filter; set when Home opens a category.
   String? _shopCategory;
 
+  @override
+  void initState() {
+    super.initState();
+    homeRequests.addListener(_showHome);
+  }
+
+  @override
+  void dispose() {
+    homeRequests.removeListener(_showHome);
+    super.dispose();
+  }
+
+  /// A page's Home button: the Home tab again.
+  void _showHome() {
+    if (mounted && _selectedIndex != 0) setState(() => _selectedIndex = 0);
+  }
+
   void _openShop(String? category) {
     setState(() {
       _shopCategory = category;
@@ -36,6 +55,15 @@ class _CustomerShellState extends State<CustomerShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        // Away from Home: an arrow back to it.
+        leading: _selectedIndex == 0
+            ? null
+            : IconButton(
+                key: const Key('backHome'),
+                tooltip: 'Back to Home',
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => setState(() => _selectedIndex = 0),
+              ),
         title: Row(
           children: [
             ClipOval(
@@ -60,17 +88,19 @@ class _CustomerShellState extends State<CustomerShell> {
         actions: [
           // Messages from Sudhamrtam; hidden without a server.
           const MessagesBell(),
-          IconButton(
-            tooltip: 'SQLite Test',
-            icon: const Icon(Icons.storage_outlined),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (context) => const MilkSqliteTestScreen(),
-                ),
-              );
-            },
-          ),
+          // A developer tool: only in debug builds.
+          if (kDebugMode)
+            IconButton(
+              tooltip: 'SQLite Test',
+              icon: const Icon(Icons.storage_outlined),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => const MilkSqliteTestScreen(),
+                  ),
+                );
+              },
+            ),
         ],
       ),
 

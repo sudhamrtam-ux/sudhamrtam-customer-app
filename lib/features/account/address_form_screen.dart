@@ -5,6 +5,7 @@ import '../../models/customer_address.dart';
 import '../../services/account_api_client.dart';
 import '../../services/account_sync_service.dart';
 import '../../services/catalog_api_client.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 /// Loads the delivery areas for the area choice; null when this
 /// build has no server.
@@ -529,12 +530,10 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: PageAppBar(
         title: Text(
           _isEditing ? 'Edit Delivery Address' : 'Add Delivery Address',
         ),
-        backgroundColor: _brandGreen,
-        foregroundColor: Colors.white,
       ),
       body: Form(
         key: _formKey,

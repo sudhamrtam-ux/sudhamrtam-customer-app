@@ -8,6 +8,7 @@ import '../../models/customer_address.dart';
 import '../../services/account_api_client.dart';
 import '../../services/account_sync_service.dart';
 import 'address_form_screen.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 class SavedAddressesScreen extends StatefulWidget {
   SavedAddressesScreen({super.key, AccountSyncService? account})
@@ -435,10 +436,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     final isBusy = _isDeleting || _isUpdatingDefault;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: PageAppBar(
         title: const Text('Saved Addresses'),
-        backgroundColor: _brandGreen,
-        foregroundColor: Colors.white,
       ),
 
       body: _isLoading

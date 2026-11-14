@@ -4,6 +4,7 @@ import '../../app/sudhamrtam_app.dart';
 import '../../database/customer_profile_database_service.dart';
 import '../../services/account_api_client.dart';
 import '../../services/account_sync_service.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 class CustomerProfileScreen extends StatefulWidget {
   CustomerProfileScreen({super.key, AccountSyncService? account})
@@ -255,7 +256,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('My Profile')),
+        appBar: PageAppBar(title: const Text('My Profile')),
         body: _buildBody(),
       ),
     );

@@ -6,6 +6,7 @@ import '../../services/order_api_client.dart';
 import '../checkout/order_destination.dart';
 import 'order_details_screen.dart';
 import 'order_status_labels.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   OrderHistoryScreen({super.key, OrderApiClient? api})
@@ -283,7 +284,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: PageAppBar(
         title: const Text('My Orders'),
         actions: [
           IconButton(

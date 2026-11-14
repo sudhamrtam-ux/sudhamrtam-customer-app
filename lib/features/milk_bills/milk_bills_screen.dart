@@ -6,6 +6,7 @@ import '../../services/milk_bill_api_client.dart';
 import '../payment/payment_launcher.dart';
 import 'bill_pdf.dart';
 import 'milk_calendar.dart';
+import '../../core/widgets/page_app_bar.dart';
 
 const _green = Color(0xFF4E8A1E);
 const _brandGreen = Color(0xFF82B440);
@@ -243,7 +244,7 @@ class _MilkBillsScreenState extends State<MilkBillsScreen> {
   Widget build(BuildContext context) {
     final bills = _bills;
     return Scaffold(
-      appBar: AppBar(title: const Text('Milk Bills')),
+      appBar: PageAppBar(title: const Text('Milk Bills')),
       body: SafeArea(
         child: bills == null
             ? Center(
@@ -570,7 +571,7 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: PageAppBar(
         title: Text('Bill for ${billMonthLabel(bill.month)}'),
         actions: [
           if (bill.status != 'cancelled')
