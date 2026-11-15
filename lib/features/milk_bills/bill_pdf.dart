@@ -253,6 +253,13 @@ Future<Uint8List> buildBillPdf(
   // half central (CGST), half state (SGST).
   final cgst = gst ~/ 2;
   final sgst = gst - cgst;
+  // HSN codes, printed with the GSTIN.
+  final hsnCodes = (print['hsn_codes'] as Map? ?? const {})
+      .cast<String, String>();
+  String hsnOf(Object? productId) {
+    final code = gstin == null ? null : hsnCodes[productId];
+    return code == null ? '' : ' · HSN $code';
+  }
 
   // Charges: each milk (litres at its rate), then phone-order items.
   final charges = <(String, String, String, String, int)>[];
@@ -266,14 +273,14 @@ Future<Uint8List> buildBillPdf(
     charges.add((
       '${milk['product_name']}',
       gstRate > 0
-          ? 'Monthly delivery · GST ${(gstRate / 100).toStringAsFixed(gstRate % 100 == 0 ? 0 : 2)}%'
-          : 'Monthly delivery',
+          ? 'Monthly delivery${hsnOf(milk['product_id'])} · GST ${(gstRate / 100).toStringAsFixed(gstRate % 100 == 0 ? 0 : 2)}%'
+          : 'Monthly delivery${hsnOf(milk['product_id'])}',
       '${billPdfLitres(milk['quantity_ml'] as int)} L',
       rates.length == 1 ? '${billPdfAmount(rates.first)} / L' : 'As per date',
       milk['amount_paise'] as int,
     ));
   }
-  final extras = <String, (String, String, int, int, int)>{};
+  final extras = <String, (String, String, int, int, int, String)>{};
   for (final i
       in (bill['items'] as List? ?? const []).cast<Map<String, dynamic>>()) {
     final key =
@@ -285,12 +292,13 @@ Future<Uint8List> buildBillPdf(
       i['unit_price_paise'] as int,
       (old?.$4 ?? 0) + (i['quantity'] as int),
       (old?.$5 ?? 0) + (i['amount_paise'] as int),
+      hsnOf(i['product_id']),
     );
   }
   for (final e in extras.values) {
     charges.add((
       e.$1,
-      'Extra order · ${e.$2} pack',
+      'Extra order · ${e.$2} pack${e.$6}',
       '${e.$4} x ${e.$2}',
       '${billPdfAmount(e.$3)} each',
       e.$5,
