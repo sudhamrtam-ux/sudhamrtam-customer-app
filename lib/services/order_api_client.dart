@@ -111,6 +111,10 @@ class OrderRules {
   final int deliveryFeePaise;
   final int cutoffHourIst;
 
+  /// The customer may choose a delivery date up to this many days
+  /// after today (0: only the earliest).
+  final int maxDaysAhead;
+
   /// e.g. ["cash_on_delivery", "online"].
   final List<String> paymentMethods;
 
@@ -119,6 +123,7 @@ class OrderRules {
     required this.deliveryFeePaise,
     required this.cutoffHourIst,
     this.paymentMethods = const ['cash_on_delivery'],
+    this.maxDaysAhead = 0,
   });
 
   double get minimumOrderRupees => minimumOrderPaise / 100;
@@ -131,6 +136,24 @@ class OrderRules {
     final ist = now.toUtc().add(const Duration(hours: 5, minutes: 30));
     final days = ist.hour < cutoffHourIst ? 1 : 2;
     return DateTime(ist.year, ist.month, ist.day + days);
+  }
+
+  /// The dates a customer may choose at [now]: the earliest, then
+  /// each day up to [maxDaysAhead] days after today (India time).
+  List<DateTime> deliveryDatesFor(DateTime now) {
+    final earliest = deliveryDateFor(now);
+    final ist = now.toUtc().add(const Duration(hours: 5, minutes: 30));
+    final last = DateTime(ist.year, ist.month, ist.day + maxDaysAhead);
+    // The earliest date is always offered.
+    final latest = last.isBefore(earliest) ? earliest : last;
+    return [
+      for (
+        var d = earliest;
+        !d.isAfter(latest);
+        d = DateTime(d.year, d.month, d.day + 1)
+      )
+        d,
+    ];
   }
 }
 
@@ -172,6 +195,8 @@ class OrderApiClient {
     'recipient_name': order.recipientName,
     'recipient_phone': order.recipientPhone,
     'notes': order.notes,
+    // Left out when not chosen, so earlier orders send the same body.
+    if (order.deliveryDate != null) 'delivery_date': order.deliveryDate,
     'items': [
       for (final item in order.items)
         if (!isComboProductId(item.productId))
@@ -248,6 +273,7 @@ class OrderApiClient {
         minimumOrderPaise: json['minimum_order_paise'] as int,
         deliveryFeePaise: json['delivery_fee_paise'] as int,
         cutoffHourIst: json['cutoff_hour_ist'] as int,
+        maxDaysAhead: json['max_days_ahead'] as int? ?? 0,
         paymentMethods: [
           for (final method in (json['payment_methods'] as List? ?? const []))
             method as String,

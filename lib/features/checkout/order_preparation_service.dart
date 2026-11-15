@@ -22,6 +22,7 @@ class OrderPreparationService {
     String? recipientPhone,
     String? addressId,
     String? deliveryInstructions,
+    String? deliveryDate,
   }) {
     final normalizedAddress = deliveryAddress?.trim();
     final normalizedRecipientName = recipientName?.trim();
@@ -80,6 +81,7 @@ class OrderPreparationService {
       recipientName: isDelivery ? normalizedRecipientName : null,
       recipientPhone: isDelivery ? normalizedRecipientPhone : null,
       addressId: isDelivery ? addressId : null,
+      deliveryDate: isDelivery ? deliveryDate : null,
       notes:
           fulfillmentMethod == FulfillmentMethod.delivery &&
               normalizedInstructions != null &&

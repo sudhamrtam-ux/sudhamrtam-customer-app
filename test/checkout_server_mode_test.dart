@@ -205,6 +205,53 @@ void main() {
     expect(order.paymentMethod, OrderPaymentMethod.cashOnDelivery);
   });
 
+  testWidgets('the customer chooses the delivery date (morning)', (
+    tester,
+  ) async {
+    await tester.runAsync(() => setUpAddress(areaId: 'nizampet'));
+    const weekly = OrderRules(
+      minimumOrderPaise: 20000,
+      deliveryFeePaise: 0,
+      cutoffHourIst: 21,
+      maxDaysAhead: 7,
+    );
+    await pump(tester, serverRules: weekly);
+
+    expect(find.text('Delivery Date'), findsOneWidget);
+    final dates = weekly.deliveryDatesFor(DateTime.now());
+    final chips = find.byWidgetPredicate(
+      (w) =>
+          w is ChoiceChip &&
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('delivery-date-'),
+    );
+    expect(chips, findsNWidgets(dates.length));
+    expect(find.textContaining('Earliest'), findsOneWidget);
+
+    final pick = dates[2];
+    await tester.tap(
+      find.byKey(Key('delivery-date-${pick.month}-${pick.day}')),
+    );
+    await tester.pump();
+
+    await tester.tap(button('Place Order'));
+    await tester.pump();
+    final iso =
+        '${pick.year}-${pick.month.toString().padLeft(2, '0')}-'
+        '${pick.day.toString().padLeft(2, '0')}';
+    expect(coordinator.received.single.deliveryDate, iso);
+  });
+
+  testWidgets('without a choice the earliest date is used', (tester) async {
+    await tester.runAsync(() => setUpAddress(areaId: 'nizampet'));
+    await pump(tester);
+    // An older server: no date to choose.
+    expect(find.text('Delivery Date'), findsNothing);
+    await tester.tap(button('Place Order'));
+    await tester.pump();
+    expect(coordinator.received.single.deliveryDate, isNull);
+  });
+
   testWidgets('online payment is offered when the server takes it', (
     tester,
   ) async {

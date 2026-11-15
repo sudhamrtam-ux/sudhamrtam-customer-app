@@ -23,12 +23,13 @@ import 'package:sqflite/sqflite.dart';
 /// Version 17: 750 ml milk quantities (schedules table rebuilt).
 /// Version 18: Vacation days on milk plans.
 /// Version 19: A delivery note on addresses.
+/// Version 20: The delivery date a customer chose for an order.
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 19;
+  static const int databaseVersion = 20;
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -151,6 +152,7 @@ class MilkDatabaseService {
     await _addAddressSocietyColumns(db);
     await _addPlanVacationDatesColumn(db);
     await _addAddressDeliveryNoteColumn(db);
+    await _addOrderDeliveryDateColumn(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -251,6 +253,25 @@ class MilkDatabaseService {
     if (oldVersion < 19) {
       await _addAddressDeliveryNoteColumn(db);
     }
+
+    if (oldVersion < 20) {
+      await _addOrderDeliveryDateColumn(db);
+    }
+  }
+
+  /// Version 20: the delivery date the customer chose (YYYY-MM-DD).
+  /// Nullable: older orders have none, and CustomerOrder.toMap()
+  /// omits it when null.
+  Future<void> _addOrderDeliveryDateColumn(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info($ordersTable)');
+    if (columns.isEmpty || columns.any((c) => c['name'] == 'delivery_date')) {
+      return;
+    }
+
+    await db.execute('''
+      ALTER TABLE $ordersTable
+      ADD COLUMN delivery_date TEXT
+    ''');
   }
 
   /// Version 19: an address's delivery note for the partner ("Leave

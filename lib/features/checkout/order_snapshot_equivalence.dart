@@ -46,6 +46,10 @@ class OrderSnapshotEquivalence {
       return false;
     }
 
+    if (prepared.deliveryDate != saved.deliveryDate) {
+      return false;
+    }
+
     if (!_validItems(prepared.items) || !_validItems(saved.items)) {
       return false;
     }

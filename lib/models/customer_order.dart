@@ -48,6 +48,10 @@ class CustomerOrder {
   // Optional customer instructions.
   final String? notes;
 
+  // The delivery date the customer chose, YYYY-MM-DD (schema v20).
+  // Null: the earliest date (and for orders placed before v20).
+  final String? deliveryDate;
+
   CustomerOrder({
     required this.id,
     required this.createdAt,
@@ -60,6 +64,7 @@ class CustomerOrder {
     this.recipientPhone,
     this.addressId,
     this.notes,
+    this.deliveryDate,
   }) : items = List<OrderItem>.unmodifiable(items) {
     if (id.trim().isEmpty) {
       throw ArgumentError('Order ID cannot be empty.');
@@ -103,6 +108,7 @@ class CustomerOrder {
       recipientPhone: recipientPhone,
       addressId: addressId,
       notes: notes,
+      deliveryDate: deliveryDate,
     );
   }
 
@@ -126,6 +132,8 @@ class CustomerOrder {
       if (addressId != null) 'address_id': addressId,
       'notes': notes,
       'subtotal': subtotal,
+      // Same rule for the chosen delivery date (v20).
+      if (deliveryDate != null) 'delivery_date': deliveryDate,
     };
   }
 
@@ -150,6 +158,7 @@ class CustomerOrder {
       recipientPhone: map['recipient_phone'] as String?,
       addressId: map['address_id'] as String?,
       notes: map['notes'] as String?,
+      deliveryDate: map['delivery_date'] as String?,
     );
   }
 }

@@ -103,6 +103,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   OrderRules? _rules;
 
+  /// The delivery date the customer chose (owner decision
+  /// 2026-11-15); null: the earliest.
+  DateTime? _chosenDate;
+
   bool get _serverMode => widget.sendsToServer;
 
   bool get _ordersEnabled => _serverMode || widget.enableTestOrders;
@@ -315,25 +319,94 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  String _deliveryDateText(OrderRules rules) {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final date = rules.deliveryDateFor(DateTime.now());
-    return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} '
-        '(morning)';
+  static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  String _dateLabel(DateTime date) =>
+      '${_weekdays[date.weekday - 1]}, ${date.day} ${_months[date.month - 1]}';
+
+  /// The dates the customer may choose now (the earliest first).
+  List<DateTime> _deliveryDates(OrderRules rules) =>
+      rules.deliveryDatesFor(DateTime.now());
+
+  /// The chosen date if it can still be chosen, else the earliest.
+  DateTime _shownDate(OrderRules rules) {
+    final dates = _deliveryDates(rules);
+    final chosen = _chosenDate;
+    return chosen != null && dates.contains(chosen) ? chosen : dates.first;
+  }
+
+  /// YYYY-MM-DD for the order; null for the earliest date, so the
+  /// server picks it (as before dates could be chosen).
+  String? _chosenDateIso() {
+    final rules = _rules;
+    if (rules == null || _chosenDate == null) return null;
+    final dates = _deliveryDates(rules);
+    final date = _shownDate(rules);
+    if (date == dates.first) return null;
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+  }
+
+  String _deliveryDateText(OrderRules rules) =>
+      '${_dateLabel(_shownDate(rules))} (morning)';
+
+  /// Delivery date choice: the earliest, or up to a week ahead,
+  /// on the morning run with the milk.
+  Widget _buildDeliveryDate(OrderRules rules) {
+    final dates = _deliveryDates(rules);
+    final shown = _shownDate(rules);
+    final locked = sudhamrtamCart.isCheckoutRecoveryLocked;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Delivery Date'),
+        const Text(
+          'Delivered in the morning, with the milk.',
+          style: TextStyle(color: Colors.black54),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var i = 0; i < dates.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    key: Key('delivery-date-${dates[i].month}-${dates[i].day}'),
+                    label: Text(
+                      i == 0
+                          ? '${_dateLabel(dates[i])}\nEarliest'
+                          : _dateLabel(dates[i]),
+                      textAlign: TextAlign.center,
+                    ),
+                    selected: dates[i] == shown,
+                    selectedColor: const Color(0xFFE5F0D7),
+                    onSelected: locked
+                        ? null
+                        : (_) => setState(() => _chosenDate = dates[i]),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -452,6 +525,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           deliveryInstructions: isDelivery
               ? _deliveryInstructionsController.text
               : null,
+          deliveryDate: isDelivery ? _chosenDateIso() : null,
         ),
       );
 
@@ -1434,6 +1508,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const SizedBox(height: 20),
                 _sectionTitle('Select Delivery Address'),
                 _buildAddressSelection(),
+
+                if (_serverMode &&
+                    _rules != null &&
+                    _rules!.maxDaysAhead > 0) ...[
+                  const SizedBox(height: 24),
+                  _buildDeliveryDate(_rules!),
+                ],
 
                 const SizedBox(height: 24),
                 _buildDeliveryInstructions(),
