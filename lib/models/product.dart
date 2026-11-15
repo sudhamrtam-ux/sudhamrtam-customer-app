@@ -14,6 +14,10 @@ class Product {
   /// in the cart but block checkout.
   final bool isAvailable;
 
+  /// At most this many in the cart (a combo offer's limit per
+  /// order); null: the cart's own limit.
+  final int? maxQuantity;
+
   const Product({
     required this.id,
     required this.name,
@@ -23,6 +27,7 @@ class Product {
     required this.unit,
     required this.icon,
     this.isAvailable = true,
+    this.maxQuantity,
   });
 
   /// Placeholder for a saved cart item whose product is
@@ -52,6 +57,7 @@ class Product {
       unit: unit,
       icon: icon,
       isAvailable: isAvailable ?? this.isAvailable,
+      maxQuantity: maxQuantity,
     );
   }
 }

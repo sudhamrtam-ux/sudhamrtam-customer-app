@@ -9,6 +9,7 @@ import '../features/account/profile_photo.dart';
 import '../features/shell/customer_shell.dart';
 import '../models/cart_manager.dart';
 import '../models/catalog_repository.dart';
+import '../models/combo_offer.dart';
 import '../models/milk_subscription_manager.dart';
 import '../services/account_sync_service.dart';
 import '../services/catalog_api_client.dart';
@@ -32,8 +33,18 @@ final CatalogRepository sudhamrtamCatalog = CatalogRepository(
   api: CatalogApiClient.fromEnvironment(),
 );
 
+/// Today's combo offers (empty without a server).
+final ComboRepository sudhamrtamCombos = ComboRepository(
+  load: apiBaseUrl.isEmpty
+      ? null
+      : ComboApiClient(baseUrl: apiBaseUrl).fetchCombos,
+);
+
+/// Products from the catalog; combo lines from the combos.
 final CartManager sudhamrtamCart = CartManager(
-  productLookup: sudhamrtamCatalog.productById,
+  productLookup: (id) => isComboProductId(id)
+      ? sudhamrtamCombos.productById(id)
+      : sudhamrtamCatalog.productById(id),
 );
 
 bool _catalogLinkedToCart = false;
@@ -52,6 +63,7 @@ Future<void> initializeCatalogAndCart() async {
   if (!_catalogLinkedToCart) {
     _catalogLinkedToCart = true;
     sudhamrtamCatalog.addListener(sudhamrtamCart.refreshProducts);
+    sudhamrtamCombos.addListener(sudhamrtamCart.refreshProducts);
   }
 
   // Milk plans saved on this phone. A failure here must not stop
@@ -68,6 +80,7 @@ Future<void> initializeCatalogAndCart() async {
   }
 
   unawaited(sudhamrtamCatalog.refresh());
+  unawaited(sudhamrtamCombos.refresh());
 }
 
 /// Monthly milk bills, or null when this build has no server.

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../models/cart_manager.dart';
 import '../checkout/checkout_screen.dart';
+import '../../models/combo_offer.dart';
 
 const _brandGreen = Color(0xFF82B440);
 
@@ -145,7 +146,24 @@ class CartScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text('Pack size: ${item.product.unit}'),
+                            // A combo offer lists what is in it.
+                            if (isComboProductId(item.product.id)) ...[
+                              const Text(
+                                'Combo offer',
+                                style: TextStyle(
+                                  color: Color(0xFFD14A6E),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(
+                                item.product.isAvailable
+                                    ? item.product.description
+                                    : 'This combo offer has ended or '
+                                          'changed. Please remove it.',
+                                style: const TextStyle(color: Colors.black54),
+                              ),
+                            ] else
+                              Text('Pack size: ${item.product.unit}'),
                             const SizedBox(height: 8),
 
                             // Quantity controls.
@@ -181,7 +199,9 @@ class CartScreen extends StatelessWidget {
                                   tooltip: 'Increase quantity',
                                   onPressed:
                                       item.quantity <
-                                          CartManager.maxQuantityPerProduct
+                                          CartManager.maxQuantityOf(
+                                            item.product,
+                                          )
                                       ? () {
                                           sudhamrtamCart.increaseQuantity(
                                             item.product.id,

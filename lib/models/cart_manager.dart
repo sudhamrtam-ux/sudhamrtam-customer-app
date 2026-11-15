@@ -38,6 +38,10 @@ class CartManager extends ChangeNotifier {
 
   static const int maxQuantityPerProduct = 100;
 
+  /// The most of [product] the cart may hold.
+  static int maxQuantityOf(Product product) =>
+      product.maxQuantity ?? maxQuantityPerProduct;
+
   bool _isInitialized = false;
   bool _isLoading = false;
 
@@ -322,7 +326,7 @@ class CartManager extends ChangeNotifier {
 
     final currentQuantity = quantityFor(product.id);
 
-    if (currentQuantity + quantity > maxQuantityPerProduct) {
+    if (currentQuantity + quantity > maxQuantityOf(product)) {
       return false;
     }
 
@@ -346,7 +350,7 @@ class CartManager extends ChangeNotifier {
 
     if (existing == null ||
         !existing.product.isAvailable ||
-        existing.quantity >= maxQuantityPerProduct) {
+        existing.quantity >= maxQuantityOf(existing.product)) {
       return false;
     }
 
@@ -392,6 +396,10 @@ class CartManager extends ChangeNotifier {
 
     // Unavailable products can only be reduced or removed.
     if (!existing.product.isAvailable && quantity > existing.quantity) {
+      return false;
+    }
+    if (quantity > existing.quantity &&
+        quantity > maxQuantityOf(existing.product)) {
       return false;
     }
 

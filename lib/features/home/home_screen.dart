@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../models/cart_manager.dart';
 import '../../models/catalog_repository.dart';
+import '../../models/combo_offer.dart';
 import '../../models/product.dart';
 import '../../services/catalog_api_client.dart' show apiBaseUrl;
 import '../../services/offer_api_client.dart';
@@ -14,6 +15,7 @@ import '../shop/product_image.dart';
 import '../../models/milk_subscription_manager.dart';
 import 'account_status.dart';
 import 'address_details_card.dart';
+import 'combo_cards.dart';
 import 'offer_ticker.dart';
 
 const _green = Color(0xFF82B440);
@@ -41,6 +43,7 @@ class HomeScreen extends StatefulWidget {
     this.onOpenCart,
     this.catalog,
     this.cart,
+    this.combos,
     this.milkPlans,
     OrderRulesLoader? loadRules,
     OffersLoader? loadOffers,
@@ -57,6 +60,9 @@ class HomeScreen extends StatefulWidget {
   /// Overrides for tests; default to the app's catalog and cart.
   final CatalogRepository? catalog;
   final CartManager? cart;
+
+  /// Override for tests; defaults to the app's combo offers.
+  final ComboRepository? combos;
 
   /// Override for tests; defaults to the app's milk plans.
   final MilkSubscriptionManager? milkPlans;
@@ -79,12 +85,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   CatalogRepository get _catalog => widget.catalog ?? sudhamrtamCatalog;
   CartManager get _cart => widget.cart ?? sudhamrtamCart;
+  ComboRepository get _combos => widget.combos ?? sudhamrtamCombos;
 
   @override
   void initState() {
     super.initState();
     _loadRules();
     _loadOffers();
+    unawaited(_combos.refresh());
     // Keeps the "time left to order" current.
     _ticker = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted && _rules != null) setState(() {});
@@ -145,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_catalog, _cart]),
+      animation: Listenable.merge([_catalog, _cart, _combos]),
       builder: (context, _) {
         final products = _catalog.products;
         final essentials = products
@@ -173,12 +181,26 @@ class _HomeScreenState extends State<HomeScreen> {
     return RefreshIndicator(
       color: _green,
       onRefresh: () async {
-        await Future.wait([_catalog.refresh(), _loadRules(), _loadOffers()]);
+        await Future.wait([
+          _catalog.refresh(),
+          _loadRules(),
+          _loadOffers(),
+          _combos.refresh(),
+        ]);
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
+          // Combo offers (owner decision 2026-11-15), under the offer line.
+          if (_combos.combos.isNotEmpty) ...[
+            ComboCards(
+              combos: _combos.combos,
+              cart: _cart,
+              onOpenCart: widget.onOpenCart,
+            ),
+            const SizedBox(height: 12),
+          ],
           Text(
             'Welcome to Sudhamrtam',
             style: Theme.of(context).textTheme.headlineSmall
