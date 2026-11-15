@@ -13,6 +13,20 @@ void goHome(BuildContext context) {
   Navigator.of(context).popUntil((route) => route.isFirst);
 }
 
+/// The tab a page asked the tab frame to show (1 Shop, 3 Cart); the
+/// frame shows it and sets this back to null.
+final tabRequests = ValueNotifier<int?>(null);
+
+/// Tab numbers for [openTab].
+const shopTab = 1;
+const cartTab = 3;
+
+/// Closes every page opened on top and shows tab [tab].
+void openTab(BuildContext context, int tab) {
+  Navigator.of(context).popUntil((route) => route.isFirst);
+  tabRequests.value = tab;
+}
+
 class PageAppBar extends StatelessWidget implements PreferredSizeWidget {
   const PageAppBar({super.key, required this.title, this.actions = const []});
 

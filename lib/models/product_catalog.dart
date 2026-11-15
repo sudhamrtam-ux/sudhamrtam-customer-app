@@ -92,6 +92,27 @@ class ProductCatalog {
     // ============================
     // NATURAL GOODNESS
     // ============================
+    // Three sizes (owner decision 2026-11-15), each its own product.
+    Product(
+      id: 'honey_250g',
+      name: 'Honey (Multi Flower)',
+      category: 'Natural Goodness',
+      description: rawHoneyDescription,
+      price: 150.0,
+      unit: '250 g',
+      icon: Icons.spa_outlined,
+    ),
+
+    Product(
+      id: 'honey_500g',
+      name: 'Honey (Multi Flower)',
+      category: 'Natural Goodness',
+      description: rawHoneyDescription,
+      price: 290.0,
+      unit: '500 g',
+      icon: Icons.spa_outlined,
+    ),
+
     Product(
       id: 'raw_honey',
       name: 'Honey (Multi Flower)',

@@ -1261,6 +1261,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 'Please review your products and preferences.',
                 style: TextStyle(color: Colors.black54),
               ),
+              const SizedBox(height: 12),
+              // Shortcuts (owner request 2026-11-15): change the cart,
+              // or add more products first.
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    key: const Key('checkoutEditCart'),
+                    onPressed: () => openTab(context, cartTab),
+                    icon: const Icon(Icons.shopping_cart_outlined),
+                    label: const Text('Edit cart'),
+                  ),
+                  OutlinedButton.icon(
+                    key: const Key('checkoutContinueShopping'),
+                    onPressed: () => openTab(context, shopTab),
+                    icon: const Icon(Icons.storefront_outlined),
+                    label: const Text('Continue shopping'),
+                  ),
+                ],
+              ),
               const SizedBox(height: 24),
 
               _sectionTitle('Order Summary'),

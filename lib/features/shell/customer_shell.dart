@@ -31,17 +31,30 @@ class _CustomerShellState extends State<CustomerShell> {
   void initState() {
     super.initState();
     homeRequests.addListener(_showHome);
+    tabRequests.addListener(_showTab);
   }
 
   @override
   void dispose() {
     homeRequests.removeListener(_showHome);
+    tabRequests.removeListener(_showTab);
     super.dispose();
   }
 
   /// A page's Home button: the Home tab again.
   void _showHome() {
     if (mounted && _selectedIndex != 0) setState(() => _selectedIndex = 0);
+  }
+
+  /// A page asked for a tab (Cart or Shop).
+  void _showTab() {
+    final tab = tabRequests.value;
+    if (tab == null || !mounted) return;
+    tabRequests.value = null;
+    setState(() {
+      if (tab == 1) _shopCategory = null;
+      _selectedIndex = tab;
+    });
   }
 
   void _openShop(String? category) {

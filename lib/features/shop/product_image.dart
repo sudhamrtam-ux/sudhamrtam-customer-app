@@ -13,6 +13,8 @@ const Map<String, String> productImageAssets = {
   'buffalo_ghee': 'assets/images/products/buffalo_ghee.jpg',
   'cow_ghee': 'assets/images/products/cow_ghee.jpg',
   'raw_honey': 'assets/images/products/raw_honey.jpg',
+  'honey_250g': 'assets/images/products/raw_honey.jpg',
+  'honey_500g': 'assets/images/products/raw_honey.jpg',
   'paneer': 'assets/images/products/paneer.jpg',
   'coconut_oil': 'assets/images/products/coconut_oil.jpg',
   'groundnut_oil': 'assets/images/products/groundnut_oil.jpg',

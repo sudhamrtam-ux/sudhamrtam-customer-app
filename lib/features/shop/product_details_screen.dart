@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import '../../models/product.dart';
+import 'product_description.dart';
 import 'product_image.dart';
 import '../../core/widgets/page_app_bar.dart';
 
@@ -97,13 +99,46 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 4),
+          action: addedQuantity > 0
+              ? SnackBarAction(
+                  label: 'VIEW CART',
+                  onPressed: () => openTab(context, cartTab),
+                )
+              : null,
+        ),
       );
+  }
+
+  /// Opens the same product in another size (e.g. honey 250 g).
+  void _openSize(Product size) {
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder<void>(
+        pageBuilder: (_, _, _) => ProductDetailsScreen(
+          productId: size.id,
+          productName: size.name,
+          category: size.category,
+          productIcon: size.icon,
+          description: size.description,
+          unit: size.unit,
+          price: size.price,
+        ),
+        transitionDuration: Duration.zero,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     const brandGreen = Color(0xFF82B440);
+    // The same product in other sizes, smallest price first.
+    final sizes =
+        sudhamrtamCatalog.products
+            .where((p) => p.name == widget.productName && p.isAvailable)
+            .toList()
+          ..sort((a, b) => a.price.compareTo(b.price));
 
     return Scaffold(
       appBar: PageAppBar(title: const Text('Product Details')),
@@ -126,7 +161,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   icon: widget.productIcon,
                   iconSize: 100,
                   borderRadius: 20,
-                    ),
+                ),
               ),
 
               const SizedBox(height: 24),
@@ -152,11 +187,31 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
               const SizedBox(height: 8),
 
-              // Packaging unit
-              Text(
-                'Pack size: ${widget.unit}',
-                style: const TextStyle(fontSize: 15, color: Colors.black54),
-              ),
+              // Packaging unit, or a choice of sizes.
+              if (sizes.length > 1)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final size in sizes)
+                      ChoiceChip(
+                        key: Key('size-${size.id}'),
+                        label: Text(
+                          '${size.unit} · ₹${size.price.toStringAsFixed(0)}',
+                        ),
+                        selected: size.id == widget.productId,
+                        selectedColor: const Color(0xFFE5F0D7),
+                        onSelected: size.id == widget.productId
+                            ? null
+                            : (_) => _openSize(size),
+                      ),
+                  ],
+                )
+              else
+                Text(
+                  'Pack size: ${widget.unit}',
+                  style: const TextStyle(fontSize: 15, color: Colors.black54),
+                ),
 
               const SizedBox(height: 12),
 
@@ -172,24 +227,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
-
-              // Product description heading
-              Text(
-                'About This Product',
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Product description
-              Text(
-                widget.description,
-                style: const TextStyle(fontSize: 15, height: 1.6),
-              ),
-
-              const SizedBox(height: 32),
+              const SizedBox(height: 20),
 
               // Quantity selector heading
               Text(
@@ -259,7 +297,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 20),
+
+              // Next to the quantity (owner request 2026-11-15): short,
+              // with Read more.
+              ProductDescription(description: widget.description),
+
+              const SizedBox(height: 20),
 
               // Brand values
               Container(

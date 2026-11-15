@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
-const _green = Color(0xFF82B440);
+/// Warm offer colours (owner request 2026-11-15: easier to notice).
+const _offerDeep = Color(0xFFD84315);
+const _offerBright = Color(0xFFFF8F00);
 const _separator = '   •   ';
 
-/// A thin green line that scrolls the owner's offers across the top
-/// of the Home tab, one after another, without end. Text that fits
-/// stays still, and so does everything when the phone asks for
-/// fewer animations.
+/// A warm orange ribbon that scrolls the owner's offers across the top
+/// of the Home tab, one after another, without end, with an OFFERS tag
+/// and a gentle glow that pulses so it is noticed. Text that fits
+/// stays still, and so does everything when the phone asks for fewer
+/// animations.
 class OfferTicker extends StatefulWidget {
   const OfferTicker({
     super.key,
@@ -22,12 +25,31 @@ class OfferTicker extends StatefulWidget {
 }
 
 class _OfferTickerState extends State<OfferTicker>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(vsync: this);
+
+  /// The mild pulse of the ribbon's glow (a few times, then steady).
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pulse.stop();
+      _pulse.value = 0;
+    } else if (!_pulse.isAnimating && _pulse.value == 0) {
+      // A few mild flashes when the ribbon appears, then it glows.
+      _pulse.repeat(reverse: true, count: 5);
+    }
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _pulse.dispose();
     super.dispose();
   }
 
@@ -51,22 +73,65 @@ class _OfferTickerState extends State<OfferTicker>
     final text = widget.messages.join(_separator);
     const style = TextStyle(
       color: Colors.white,
-      fontWeight: FontWeight.w600,
+      fontWeight: FontWeight.w700,
       fontSize: 14,
     );
 
     return Semantics(
       label: 'Offers: ${widget.messages.join('. ')}',
       excludeSemantics: true,
-      child: Container(
-        key: const Key('offer-ticker'),
-        height: 36,
-        color: _green,
-        padding: const EdgeInsets.only(left: 12),
+      child: AnimatedBuilder(
+        animation: _pulse,
+        builder: (context, child) {
+          final t = Curves.easeInOut.transform(_pulse.value);
+          return Container(
+            key: const Key('offer-ticker'),
+            height: 42,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  _offerDeep,
+                  Color.lerp(_offerBright, const Color(0xFFFFB300), t)!,
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _offerBright.withValues(alpha: 0.25 + 0.35 * t),
+                  blurRadius: 6 + 8 * t,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.only(left: 10),
+            child: child,
+          );
+        },
         child: Row(
           children: [
-            const Icon(Icons.campaign_outlined, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.local_offer, color: _offerDeep, size: 14),
+                  SizedBox(width: 4),
+                  Text(
+                    'OFFERS',
+                    style: TextStyle(
+                      color: _offerDeep,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11.5,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
