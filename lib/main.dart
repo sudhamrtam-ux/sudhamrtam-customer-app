@@ -23,6 +23,7 @@ import 'services/milk_bill_api_client.dart';
 import 'services/milk_plan_api_client.dart';
 import 'services/milk_plan_sync_service.dart';
 import 'services/order_api_client.dart';
+import 'services/support_api_client.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +59,10 @@ Future<void> main() async {
         token: () => auth.sessionToken,
       );
       sudhamrtamFeedback = FeedbackApiClient(
+        baseUrl: apiBaseUrl,
+        token: () => auth.sessionToken,
+      );
+      sudhamrtamSupport = SupportApiClient(
         baseUrl: apiBaseUrl,
         token: () => auth.sessionToken,
       );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../services/phone_auth_service.dart';
 import '../feedback/feedback_screen.dart';
+import '../support/help_support_screen.dart';
 import '../milk_bills/milk_bills_screen.dart';
 import '../orders/order_history_screen.dart';
 import 'customer_profile_screen.dart';
@@ -53,13 +54,9 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  /// Displays a message for features not yet implemented.
-  void _showComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature will be available soon.'),
-        behavior: SnackBarBehavior.floating,
-      ),
+  void _openHelpSupport(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (context) => const HelpSupportScreen()),
     );
   }
 
@@ -200,12 +197,12 @@ class AccountScreen extends StatelessWidget {
           onTap: () => _openFeedback(context),
         ),
 
-        // Help & Support — placeholder.
+        // Help & Support: call, email or raise a query.
         _buildAccountTile(
           icon: Icons.help_outline,
           title: 'Help & Support',
-          subtitle: 'Get assistance with your Sudhamrtam account',
-          onTap: () => _showComingSoon(context, 'Help & Support'),
+          subtitle: 'Call us, email us or raise a query',
+          onTap: () => _openHelpSupport(context),
         ),
 
         const SizedBox(height: 24),

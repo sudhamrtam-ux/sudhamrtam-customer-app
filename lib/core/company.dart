@@ -4,3 +4,11 @@
 const sudhamrtamCompanyName = 'Sudhamrtam Pvt. Ltd.';
 const sudhamrtamGstin = '36NBFPS3736A2ZG';
 const sudhamrtamFssai = '23625029000830';
+
+/// Help & Support contact details (owner, 2026-11-15).
+const sudhamrtamSupportPhone = '+91 86882 21433';
+const sudhamrtamSupportPhoneDial = '+918688221433';
+const sudhamrtamSupportEmails = [
+  'Contact@sudhamrtam.in',
+  'sudhamrtam@gmail.com',
+];
