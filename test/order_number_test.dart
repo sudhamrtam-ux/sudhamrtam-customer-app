@@ -47,14 +47,15 @@ void main() {
   setUpAll(sqfliteFfiInit);
 
   test('the title shows the short number when known', () {
-    expect(orderTitle('abc', 'ORD-1001'), 'Order ORD-1001');
+    expect(orderTitle('abc', 'SUD0000001'), 'Order SUD0000001');
     expect(orderTitle('abc', null), 'Order #abc');
   });
 
   test('placing an order returns its short number', () async {
     expect(
-      await _api({'id': _order.id, 'order_ref': 'ORD-1001'}).placeOrder(_order),
-      'ORD-1001',
+      await _api({'id': _order.id, 'order_ref': 'SUD0000001'})
+          .placeOrder(_order),
+      'SUD0000001',
     );
     // An older server: no number, still placed.
     expect(await _api({'id': _order.id}).placeOrder(_order), isNull);
@@ -62,9 +63,9 @@ void main() {
       OrderPaymentStatus.fromOrderJson({
         'payment_method': 'cash_on_delivery',
         'status': 'pending',
-        'order_ref': 'ORD-1002',
+        'order_ref': 'SUD0000002',
       }).orderRef,
-      'ORD-1002',
+      'SUD0000002',
     );
   });
 
@@ -91,19 +92,19 @@ void main() {
     test('a placed order keeps its number on the phone', () async {
       OrderDestination.server = _api({
         'id': _order.id,
-        'order_ref': 'ORD-1001',
+        'order_ref': 'SUD0000001',
       });
       await OrderDestination.save(_order);
       expect(
         await OrderDatabaseService.instance.getOrderById(_order.id),
         isNotNull,
       );
-      expect(await OrderRefService.instance.refFor(_order.id), 'ORD-1001');
+      expect(await OrderRefService.instance.refFor(_order.id), 'SUD0000001');
 
-      await OrderRefService.instance.saveAll({'other_order': 'ORD-1002'});
+      await OrderRefService.instance.saveAll({'other_order': 'SUD0000002'});
       expect(await OrderRefService.instance.all(), {
-        _order.id: 'ORD-1001',
-        'other_order': 'ORD-1002',
+        _order.id: 'SUD0000001',
+        'other_order': 'SUD0000002',
       });
     });
 
@@ -122,8 +123,8 @@ void main() {
         isNotNull,
       );
       expect(await OrderRefService.instance.refFor(_order.id), isNull);
-      await OrderRefService.instance.save(_order.id, 'ORD-1003');
-      expect(await OrderRefService.instance.refFor(_order.id), 'ORD-1003');
+      await OrderRefService.instance.save(_order.id, 'SUD0000003');
+      expect(await OrderRefService.instance.refFor(_order.id), 'SUD0000003');
     });
   });
 }

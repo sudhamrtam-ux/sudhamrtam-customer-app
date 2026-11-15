@@ -24,7 +24,7 @@ import 'package:sqflite/sqflite.dart';
 /// Version 18: Vacation days on milk plans.
 /// Version 19: A delivery note on addresses.
 /// Version 20: The delivery date a customer chose for an order.
-/// Version 21: Short order numbers from the server (ORD-1001).
+/// Version 21: Short order numbers from the server (SUD0000001).
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
@@ -266,7 +266,7 @@ class MilkDatabaseService {
     }
   }
 
-  /// Version 21: the server's short number per order ("ORD-1001"),
+  /// Version 21: the server's short number per order ("SUD0000001"),
   /// kept apart from the order rows so the saved order still matches
   /// its checkout snapshot exactly.
   Future<void> _createOrderRefsTable(Database db) async {

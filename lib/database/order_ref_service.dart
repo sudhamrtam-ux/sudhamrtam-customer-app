@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 
 import 'milk_database_service.dart';
 
-/// The server's short order numbers ("ORD-1001"), by order ID. Shown
+/// The server's short order numbers ("SUD0000001"), by order ID. Shown
 /// instead of the long order ID, so an order is easy to share and
 /// discuss. Orders not on the server (test orders) have none.
 class OrderRefService {

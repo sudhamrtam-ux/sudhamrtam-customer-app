@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../database/order_ref_service.dart';
 import '../checkout/order_destination.dart';
 
-/// "Order ORD-1001" when the server gave the order a short number,
+/// "Order SUD0000001" when the server gave the order a short number,
 /// else the long order ID (test orders, or not known yet).
 String orderTitle(String orderId, String? orderRef) =>
     orderRef == null ? 'Order #$orderId' : 'Order $orderRef';

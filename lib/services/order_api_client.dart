@@ -82,7 +82,7 @@ class OrderPaymentStatus {
   /// Online orders are cancelled if not paid by this time.
   final DateTime? paymentDueAt;
 
-  /// The short order number, e.g. "ORD-1001" (null from older servers).
+  /// The short order number, e.g. "SUD0000001" (null from older servers).
   final String? orderRef;
 
   const OrderPaymentStatus({
@@ -226,7 +226,7 @@ class OrderApiClient {
   };
 
   /// Places [order] (or confirms it was already placed); returns the
-  /// server's short order number ("ORD-1001"), if it gave one.
+  /// server's short order number ("SUD0000001"), if it gave one.
   ///
   /// Throws [OrderRejectedException] if the server refuses it, and
   /// [OrderApiException] if it could not be confirmed.
