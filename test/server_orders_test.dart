@@ -120,6 +120,54 @@ void main() {
       });
     });
 
+    test('combo lines go to the server as combos', () {
+      final order = CustomerOrder(
+        id: orderId,
+        createdAt: DateTime.utc(2026, 11, 7, 9, 55),
+        items: const [
+          OrderItem(
+            productId: 'curd',
+            productName: 'Curd',
+            unit: '1 kg',
+            quantity: 1,
+            unitPrice: 120,
+          ),
+          OrderItem(
+            productId: 'combo__diwali_combo_1',
+            productName: 'Diwali Delight',
+            unit: 'Combo, save ₹21.00 each',
+            quantity: 2,
+            unitPrice: 189,
+          ),
+        ],
+        fulfillmentMethod: FulfillmentMethod.delivery,
+        paymentMethod: OrderPaymentMethod.cashOnDelivery,
+        deliveryAddress: 'Flat 1, Hyderabad, Telangana, 500090',
+        recipientName: 'Asha',
+        recipientPhone: '9876543210',
+        addressId: 'home_1',
+      );
+      final body = OrderApiClient.requestBody(order);
+      expect(body['items'], [
+        {'product_id': 'curd', 'quantity': 1, 'unit_price_paise': 12000},
+      ]);
+      expect(body['combos'], [
+        {'combo_id': 'diwali_combo_1', 'quantity': 2, 'price_paise': 18900},
+      ]);
+      expect(
+        const OrderRejectedException('COMBO_CHANGED', 'x').isComboChange,
+        isTrue,
+      );
+      expect(
+        const OrderRejectedException('COMBO_LIMIT', 'x').isComboChange,
+        isTrue,
+      );
+      expect(
+        const OrderRejectedException('PRICE_CHANGED', 'x').isComboChange,
+        isFalse,
+      );
+    });
+
     test('converts rupees to whole paise without rounding errors', () {
       expect(OrderApiClient.toPaise(0.29), 29);
       expect(OrderApiClient.toPaise(880), 88000);
@@ -160,13 +208,16 @@ void main() {
       );
     });
 
-    test('an order without a saved address is refused before sending', () async {
-      await expectLater(
-        api.placeOrder(serverOrder(addressId: null)),
-        throwsA(isA<OrderRejectedException>()),
-      );
-      expect(server.calls, isEmpty);
-    });
+    test(
+      'an order without a saved address is refused before sending',
+      () async {
+        await expectLater(
+          api.placeOrder(serverOrder(addressId: null)),
+          throwsA(isA<OrderRejectedException>()),
+        );
+        expect(server.calls, isEmpty);
+      },
+    );
 
     test('delivery date follows the 9 PM India-time cut-off', () {
       const rules = OrderRules(
@@ -217,44 +268,50 @@ void main() {
     Future<CustomerOrder?> phoneOrder() =>
         OrderDatabaseService.instance.getOrderById(orderId);
 
-    test('the order is saved on the phone only after the server took it', () async {
-      server.offline = true;
-      final submission = OrderSubmissionService();
+    test(
+      'the order is saved on the phone only after the server took it',
+      () async {
+        server.offline = true;
+        final submission = OrderSubmissionService();
 
-      await expectLater(
-        submission.submit(serverOrder()),
-        throwsA(isA<OrderApiException>()),
-      );
-      expect(await phoneOrder(), isNull);
+        await expectLater(
+          submission.submit(serverOrder()),
+          throwsA(isA<OrderApiException>()),
+        );
+        expect(await phoneOrder(), isNull);
 
-      server.offline = false;
-      await submission.retryPendingOrder();
+        server.offline = false;
+        await submission.retryPendingOrder();
 
-      expect(server.orders.keys, [orderId]);
-      final saved = await phoneOrder();
-      expect(OrderSnapshotEquivalence.matches(serverOrder(), saved!), isTrue);
-      expect(saved.addressId, 'home_1');
-    });
+        expect(server.orders.keys, [orderId]);
+        final saved = await phoneOrder();
+        expect(OrderSnapshotEquivalence.matches(serverOrder(), saved!), isTrue);
+        expect(saved.addressId, 'home_1');
+      },
+    );
 
-    test('a lost reply is retried with the same order, never a second', () async {
-      server.dropResponse = true;
-      final submission = OrderSubmissionService();
+    test(
+      'a lost reply is retried with the same order, never a second',
+      () async {
+        server.dropResponse = true;
+        final submission = OrderSubmissionService();
 
-      await expectLater(
-        submission.submit(serverOrder()),
-        throwsA(isA<OrderApiException>()),
-      );
-      expect(server.orders, hasLength(1)); // the server has it
+        await expectLater(
+          submission.submit(serverOrder()),
+          throwsA(isA<OrderApiException>()),
+        );
+        expect(server.orders, hasLength(1)); // the server has it
 
-      await submission.retryPendingOrder();
+        await submission.retryPendingOrder();
 
-      expect(server.orders, hasLength(1));
-      expect(
-        server.calls.where((c) => c.startsWith('PUT')),
-        hasLength(2), // the same PUT, sent twice
-      );
-      expect(await phoneOrder(), isNotNull);
-    });
+        expect(server.orders, hasLength(1));
+        expect(
+          server.calls.where((c) => c.startsWith('PUT')),
+          hasLength(2), // the same PUT, sent twice
+        );
+        expect(await phoneOrder(), isNotNull);
+      },
+    );
 
     group('cancelling an unfinished order', () {
       final executor = CheckoutRecoveryExecutor.instance;

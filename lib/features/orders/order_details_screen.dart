@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../models/combo_offer.dart';
 import '../../models/customer_order.dart';
 import '../../models/order_item.dart';
 import '../payment/order_payment_status.dart';
@@ -99,6 +100,14 @@ class OrderDetailsScreen extends StatelessWidget {
                   item.productName,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
+                if (isComboProductId(item.productId))
+                  const Text(
+                    'Combo offer',
+                    style: TextStyle(
+                      color: Color(0xFFD14A6E),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
 
                 const SizedBox(height: 4),
 

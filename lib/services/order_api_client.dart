@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../models/combo_offer.dart';
 import '../models/customer_order.dart';
 
 /// The order could not be sent or confirmed (no connection, a
@@ -27,6 +28,9 @@ class OrderRejectedException implements Exception {
   const OrderRejectedException(this.code, this.message);
 
   bool get isPriceChange => code == 'PRICE_CHANGED';
+
+  /// A combo offer ended, changed price or is over its limit.
+  bool get isComboChange => code == 'COMBO_CHANGED' || code == 'COMBO_LIMIT';
 
   @override
   String toString() => message;
@@ -170,12 +174,25 @@ class OrderApiClient {
     'notes': order.notes,
     'items': [
       for (final item in order.items)
-        {
-          'product_id': item.productId,
-          'quantity': item.quantity,
-          'unit_price_paise': toPaise(item.unitPrice),
-        },
+        if (!isComboProductId(item.productId))
+          {
+            'product_id': item.productId,
+            'quantity': item.quantity,
+            'unit_price_paise': toPaise(item.unitPrice),
+          },
     ],
+    // Combo offers: the server checks each one and its price again.
+    // Left out without combos, so earlier orders send the same body.
+    if (order.items.any((i) => isComboProductId(i.productId)))
+      'combos': [
+        for (final item in order.items)
+          if (isComboProductId(item.productId))
+            {
+              'combo_id': comboIdOf(item.productId),
+              'quantity': item.quantity,
+              'price_paise': toPaise(item.unitPrice),
+            },
+      ],
   };
 
   /// Places [order] (or confirms it was already placed).

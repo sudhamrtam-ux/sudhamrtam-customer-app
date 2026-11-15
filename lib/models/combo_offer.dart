@@ -16,6 +16,8 @@ import 'product.dart';
 /// the combo and its price again.
 const comboProductPrefix = 'combo__';
 
+String _rupees(int paise) => '₹${(paise / 100).toStringAsFixed(2)}';
+
 bool isComboProductId(String productId) =>
     productId.startsWith(comboProductPrefix);
 
@@ -124,7 +126,8 @@ class ComboOffer {
     category: 'Combo offer',
     description: itemsText,
     price: pricePaise / 100,
-    unit: 'Combo',
+    // Kept with the order, so order history shows the saving.
+    unit: 'Combo, save ${_rupees(savingsPaise)} each',
     icon: Icons.redeem,
     maxQuantity: maxPerOrder,
   );

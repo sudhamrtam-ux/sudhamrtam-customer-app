@@ -5,6 +5,7 @@ import '../../app/sudhamrtam_app.dart';
 import '../../database/customer_address_database_service.dart';
 import '../../database/pending_order_submission_service.dart';
 import '../../models/customer_address.dart';
+import '../../models/combo_offer.dart';
 import '../../models/customer_order.dart';
 import '../../services/order_api_client.dart';
 import '../../services/phone_auth_service.dart';
@@ -278,6 +279,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       // New prices reach the cart through the catalog.
       if (rejection.isPriceChange) await sudhamrtamCatalog.refresh();
+
+      // A combo that ended comes out of the cart; one whose price
+      // changed stays, at its new price.
+      if (rejection.isComboChange) {
+        await sudhamrtamCombos.refresh();
+        sudhamrtamCart.refreshProducts();
+        for (final item in sudhamrtamCart.items.toList()) {
+          if (isComboProductId(item.product.id) && !item.product.isAvailable) {
+            sudhamrtamCart.removeProduct(item.product.id);
+          }
+        }
+      }
 
       if (!mounted) return;
       setState(() {
@@ -590,7 +603,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               key: const Key('cancelRejectedOrder'),
               onPressed: _isSubmitting ? null : _cancelRejectedOrder,
               icon: const Icon(Icons.undo),
-              label: const Text('Cancel Order and Review Cart'),
+              label: Text(
+                _rejection!.isComboChange
+                    ? 'Remove Combo and Review Cart'
+                    : 'Cancel Order and Review Cart',
+              ),
             ),
           ] else if (isProtected) ...[
             const SizedBox(height: 8),
