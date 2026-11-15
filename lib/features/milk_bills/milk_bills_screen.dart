@@ -408,9 +408,12 @@ class _BillCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                bill.milk
-                    .map((m) => '${m.productName} ${billLitres(m.quantityMl)}')
-                    .join(', '),
+                [
+                  for (final m in bill.milk)
+                    '${m.productName} ${billLitres(m.quantityMl)}',
+                  if (bill.items.isNotEmpty)
+                    '${bill.items.length} extra item(s)',
+                ].join(', '),
               ),
               const SizedBox(height: 4),
               _StatusPill(bill),
@@ -470,6 +473,7 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
         overdue: fresh.overdue,
         milk: fresh.milk,
         lines: fresh.lines.isEmpty ? _bill.lines : fresh.lines,
+        items: fresh.items.isEmpty ? _bill.items : fresh.items,
       );
     });
   }
@@ -629,6 +633,12 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
                 '${m.productName}: ${billLitres(m.quantityMl)} · '
                 '${billRupees(m.amountPaise)}',
               ),
+            if (bill.items.isNotEmpty)
+              Text(
+                'Extra items: '
+                '${billRupees(bill.items.fold(0, (s, i) => s + i.amountPaise))}',
+                key: const Key('billExtraItems'),
+              ),
             const SizedBox(height: 12),
             _BillAmounts(bill: bill),
             const SizedBox(height: 16),
@@ -710,6 +720,36 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
                   ],
                 ),
               ),
+            if (bill.items.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Extra items you ordered',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Divider(),
+              for (final item in bill.items)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${billDateLabel(item.deliveryDate)} · '
+                          '${billShiftLabel(item.shift)}\n'
+                          '${item.quantity} × ${item.productName} '
+                          '(${item.unitLabel}) at '
+                          '${billRupees(item.unitPricePaise)}',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(billRupees(item.amountPaise)),
+                    ],
+                  ),
+                ),
+            ],
           ],
         ),
       ),

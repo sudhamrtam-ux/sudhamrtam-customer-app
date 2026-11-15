@@ -580,7 +580,10 @@ void main() {
       expect(find.text('Paid in cash'), findsOneWidget);
       expect(find.text('Paid online'), findsOneWidget);
       expect(find.text('Overdue'), findsOneWidget);
-      expect(find.text('Buffalo Milk 1.50 L, Cow Milk 1.00 L'), findsNWidgets(4));
+      expect(
+        find.text('Buffalo Milk 1.50 L, Cow Milk 1.00 L'),
+        findsNWidgets(4),
+      );
     });
 
     testWidgets('explains an empty list', (tester) async {
@@ -783,4 +786,41 @@ void main() {
       expect(find.text('Paid in cash'), findsOneWidget);
     });
   });
+
+  test(
+    'extra items from phone orders: read from the bill and printed',
+    () async {
+      final json = {
+        ...billJson(),
+        'items': [
+          {
+            'order_id': 'o1',
+            'delivery_date': '2026-10-06',
+            'shift': 'evening',
+            'product_id': 'curd',
+            'product_name': 'Curd',
+            'unit_label': '500 g',
+            'quantity': 2,
+            'unit_price_paise': 6000,
+            'amount_paise': 12000,
+            'gst_rate_bp': 0,
+          },
+        ],
+      };
+      final bill = MilkBill.fromJson(json);
+      expect(bill.items.single.productName, 'Curd');
+      expect(bill.items.single.amountPaise, 12000);
+      // A bill without items (older servers) reads as none.
+      expect(MilkBill.fromJson(billJson()).items, isEmpty);
+
+      final pdf = await buildBillPdf({
+        'bill': json,
+        'customer': {'name': 'Asha', 'phone': '+919876543210', 'address': null},
+        'plans': <Object>[],
+        'deliveries': <Object>[],
+        'settings': <String, Object?>{},
+      });
+      expect(pdf.length, greaterThan(5000));
+    },
+  );
 }

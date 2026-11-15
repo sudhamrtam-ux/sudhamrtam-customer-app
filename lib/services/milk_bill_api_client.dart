@@ -70,6 +70,38 @@ class MilkBillLine {
   );
 }
 
+/// An extra item Sudhamrtam delivered on a phone order (curd, honey,
+/// oils, extra milk), charged on the month's milk bill.
+class MilkBillItem {
+  final String deliveryDate;
+  final String shift;
+  final String productName;
+  final String unitLabel;
+  final int quantity;
+  final int unitPricePaise;
+  final int amountPaise;
+
+  const MilkBillItem({
+    required this.deliveryDate,
+    required this.shift,
+    required this.productName,
+    required this.unitLabel,
+    required this.quantity,
+    required this.unitPricePaise,
+    required this.amountPaise,
+  });
+
+  factory MilkBillItem.fromJson(Map<String, dynamic> json) => MilkBillItem(
+    deliveryDate: json['delivery_date'] as String,
+    shift: json['shift'] as String,
+    productName: json['product_name'] as String,
+    unitLabel: json['unit_label'] as String,
+    quantity: json['quantity'] as int,
+    unitPricePaise: json['unit_price_paise'] as int,
+    amountPaise: json['amount_paise'] as int,
+  );
+}
+
 /// A monthly bill for the milk delivered. Only the server decides
 /// whether it is paid.
 class MilkBill {
@@ -99,6 +131,9 @@ class MilkBill {
   final List<MilkBillMilk> milk;
   final List<MilkBillLine> lines;
 
+  /// Extra items delivered on phone orders.
+  final List<MilkBillItem> items;
+
   const MilkBill({
     required this.id,
     required this.month,
@@ -113,6 +148,7 @@ class MilkBill {
     required this.overdue,
     required this.milk,
     required this.lines,
+    this.items = const [],
   }) : subtotalPaise = subtotalPaise ?? totalPaise;
 
   bool get isPaid => status == 'paid';
@@ -137,6 +173,10 @@ class MilkBill {
     lines: [
       for (final l in json['lines'] as List? ?? const [])
         MilkBillLine.fromJson(l as Map<String, dynamic>),
+    ],
+    items: [
+      for (final i in json['items'] as List? ?? const [])
+        MilkBillItem.fromJson(i as Map<String, dynamic>),
     ],
   );
 }

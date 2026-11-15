@@ -225,6 +225,20 @@ Future<Uint8List> buildBillPdf(
   // A "bill so far" for a month not billed yet (staff app).
   final notFinal = print['not_final'] == true;
   final rates = {for (final l in lines) l['unit_price_paise'] as int};
+  final milkList = (bill['milk'] as List? ?? const [])
+      .cast<Map<String, dynamic>>();
+  final milkPaise = milkList.fold<int>(
+    0,
+    (s, m) => s + (m['amount_paise'] as int),
+  );
+  // Phone-order items, one row per product.
+  final extras = <String, (int, int)>{};
+  for (final i
+      in (bill['items'] as List? ?? const []).cast<Map<String, dynamic>>()) {
+    final key = '${i['product_name']} ${i['unit_label']}';
+    final (q, a) = extras[key] ?? (0, 0);
+    extras[key] = (q + (i['quantity'] as int), a + (i['amount_paise'] as int));
+  }
 
   final phone = (customer['phone'] as String).replaceFirst('+91', '');
   final startDates = [for (final p in plans) p['start_date'] as String]..sort();
@@ -466,16 +480,20 @@ Future<Uint8List> buildBillPdf(
           if (rates.length == 1)
             amountRow(
               'Rate @ Rs.${billPdfAmount(rates.first).replaceAll('.00', '')}/- per litre',
-              billPdfAmount(subtotal),
+              billPdfAmount(milkPaise),
             )
           else ...[
-            for (final milk
-                in (bill['milk'] as List).cast<Map<String, dynamic>>())
+            for (final milk in milkList)
               amountRow(
                 '${milk['product_name']} ${billPdfLitres(milk['quantity_ml'] as int)} L',
                 billPdfAmount(milk['amount_paise'] as int),
               ),
           ],
+          for (final e in extras.entries)
+            amountRow(
+              'Extra: ${e.key} x ${e.value.$1}',
+              billPdfAmount(e.value.$2),
+            ),
           amountRow('Actual amount', billPdfAmount(subtotal)),
           amountRow(
             percent == null
