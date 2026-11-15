@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import '../../services/account_deletion_client.dart';
+import '../../services/api_phone_auth_gateway.dart';
+import '../../services/catalog_api_client.dart' show apiBaseUrl;
 import '../../services/phone_auth_service.dart';
+import 'delete_account_screen.dart';
 import '../feedback/feedback_screen.dart';
 import '../support/help_support_screen.dart';
 import '../milk_bills/milk_bills_screen.dart';
@@ -58,6 +63,40 @@ class AccountScreen extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (context) => const HelpSupportScreen()),
     );
+  }
+
+  /// Privacy policy or terms, in the browser.
+  Future<void> _openPage(BuildContext context, String url) async {
+    final opened = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    ).catchError((_) => false);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Open $url in your browser.')));
+    }
+  }
+
+  Future<void> _openDeleteAccount(
+    BuildContext context,
+    ApiPhoneAuthGateway gateway,
+  ) async {
+    final deleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => DeleteAccountScreen(
+          client: AccountDeletionClient(
+            baseUrl: apiBaseUrl,
+            token: () => gateway.sessionToken,
+          ),
+          signOut: gateway.signOut,
+        ),
+      ),
+    );
+    if (deleted == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your account was deleted.')),
+      );
+    }
   }
 
   /// Builds a reusable Account menu tile.
@@ -204,6 +243,53 @@ class AccountScreen extends StatelessWidget {
           subtitle: 'Call us, email us or raise a query',
           onTap: () => _openHelpSupport(context),
         ),
+
+        const SizedBox(height: 20),
+
+        Text(
+          'ABOUT',
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: Colors.black54,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.1,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        _buildAccountTile(
+          icon: Icons.privacy_tip_outlined,
+          title: 'Privacy Policy',
+          subtitle: 'What we collect and how we use it',
+          onTap: () => _openPage(context, sudhamrtamPrivacyUrl),
+        ),
+
+        _buildAccountTile(
+          icon: Icons.description_outlined,
+          title: 'Terms of Use',
+          subtitle: 'Orders, milk plans, bills and payments',
+          onTap: () => _openPage(context, sudhamrtamTermsUrl),
+        ),
+
+        // Delete my account: signed in, with the server only.
+        if ((auth ?? sudhamrtamAuth) case final ApiPhoneAuthGateway gateway)
+          StreamBuilder<AuthUser?>(
+            stream: gateway.authStateChanges(),
+            initialData: gateway.currentUser,
+            builder: (context, snapshot) => snapshot.data == null
+                ? const SizedBox.shrink()
+                : Center(
+                    child: TextButton.icon(
+                      key: const Key('openDeleteAccount'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFC62828),
+                      ),
+                      onPressed: () => _openDeleteAccount(context, gateway),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Delete my account'),
+                    ),
+                  ),
+          ),
 
         const SizedBox(height: 24),
 

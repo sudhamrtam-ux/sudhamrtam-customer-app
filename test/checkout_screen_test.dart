@@ -131,7 +131,7 @@ void main() {
     await pumpCheckout(tester, enableTestOrders: false);
     await choosePickup(tester);
 
-    expect(isEnabled(tester, 'Place Order — Coming Soon'), isFalse);
+    expect(isEnabled(tester, 'Ordering unavailable in this version'), isFalse);
     expect(find.text('Place Test Order'), findsNothing);
     expect(find.text('Debug: Simulate Failure'), findsNothing);
   });

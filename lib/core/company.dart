@@ -12,3 +12,7 @@ const sudhamrtamSupportEmails = [
   'Contact@sudhamrtam.in',
   'sudhamrtam@gmail.com',
 ];
+
+/// Public privacy policy and terms (served by the Sudhamrtam server).
+const sudhamrtamPrivacyUrl = 'https://api.sudhamrtam.in/privacy';
+const sudhamrtamTermsUrl = 'https://api.sudhamrtam.in/terms';

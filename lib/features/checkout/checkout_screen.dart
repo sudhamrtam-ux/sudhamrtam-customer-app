@@ -1365,7 +1365,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           _paysOnline)));
 
           final placeOrderLabel = !_ordersEnabled
-              ? 'Place Order — Coming Soon'
+              ? 'Ordering unavailable in this version'
               : _serverMode
               ? (_isSubmitting
                     ? 'Placing Order...'
