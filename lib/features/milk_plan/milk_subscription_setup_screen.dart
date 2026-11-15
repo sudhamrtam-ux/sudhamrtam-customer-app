@@ -154,6 +154,20 @@ class _MilkSubscriptionSetupScreenState
     setState(() => draft.randomDates.add(DateUtils.dateOnly(picked)));
   }
 
+  /// The customer chooses when milk starts (owner request 2026-11-15).
+  Future<void> _pickStart(_ShiftDraft draft) async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: draft.startDate.isBefore(today) ? today : draft.startDate,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 90)),
+      helpText: 'Milk starts on',
+    );
+    if (!mounted || picked == null) return;
+    setState(() => draft.startDate = DateUtils.dateOnly(picked));
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
@@ -497,6 +511,12 @@ class _MilkSubscriptionSetupScreenState
                   }),
                 ),
               ],
+              if (draft.frequency != MilkDeliveryFrequency.randomDays)
+                _StartDateRow(
+                  key: Key('$title-start'),
+                  start: draft.startDate,
+                  onChange: () => _pickStart(draft),
+                ),
               if (draft.frequency == MilkDeliveryFrequency.randomDays) ...[
                 const SizedBox(height: 18),
                 OutlinedButton.icon(
@@ -634,6 +654,51 @@ class _MilkSubscriptionSetupScreenState
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "Starts on Mon, 16 Nov 2026 [Change]". A plan already running
+/// shows when it started; that cannot be changed here.
+class _StartDateRow extends StatelessWidget {
+  const _StartDateRow({super.key, required this.start, required this.onChange});
+
+  final DateTime start;
+  final VoidCallback onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final started = start.isBefore(today);
+    final label = MaterialLocalizations.of(context).formatFullDate(start);
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Row(
+        children: [
+          const Icon(Icons.event_outlined),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  started ? 'Started on' : 'Starts on',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(label),
+                if (!started)
+                  const Text(
+                    'Choose a later day to start milk later. '
+                    'Lists already fixed are not changed.',
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+              ],
+            ),
+          ),
+          if (!started)
+            TextButton(onPressed: onChange, child: const Text('Change')),
+        ],
       ),
     );
   }
