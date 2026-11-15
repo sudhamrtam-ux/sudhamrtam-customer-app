@@ -53,6 +53,7 @@ void main() {
     expect(find.text('500 g · ₹290'), findsOneWidget);
     expect(find.text('1 kg · ₹550'), findsOneWidget);
     expect(find.text('Price: ₹550.00'), findsOneWidget);
+    expect(find.text('FSSAI Lic. No. 23625029000830'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('size-honey_250g')));
     await tester.pumpAndSettle();

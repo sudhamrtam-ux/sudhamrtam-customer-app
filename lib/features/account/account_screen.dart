@@ -9,6 +9,7 @@ import 'customer_profile_screen.dart';
 import 'phone_login_screen.dart';
 import 'profile_photo.dart';
 import 'saved_addresses_screen.dart';
+import '../../core/company.dart';
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key, this.auth});
@@ -214,6 +215,17 @@ class AccountScreen extends StatelessWidget {
           child: Text(
             'Sudhamrtam • Pure by Nature',
             style: TextStyle(color: Colors.black45, fontSize: 12),
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Center(
+          child: Text(
+            '$sudhamrtamCompanyName\n'
+            'GSTIN: $sudhamrtamGstin\n'
+            'FSSAI Lic. No: $sudhamrtamFssai',
+            key: Key('accountLicences'),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.black45, fontSize: 11, height: 1.5),
           ),
         ),
 

@@ -248,6 +248,11 @@ Future<Uint8List> buildBillPdf(
   // A "bill so far" for a month not billed yet (staff app).
   final notFinal = print['not_final'] == true;
   final gstin = settings['gstin'] as String?;
+  final fssai = settings['fssai'] as String?;
+  // GST on a bill from a Telangana GSTIN to customers in Telangana:
+  // half central (CGST), half state (SGST).
+  final cgst = gst ~/ 2;
+  final sgst = gst - cgst;
 
   // Charges: each milk (litres at its rate), then phone-order items.
   final charges = <(String, String, String, String, int)>[];
@@ -635,13 +640,23 @@ Future<Uint8List> buildBillPdf(
                         ),
                       ),
                       pw.Text(
-                        _companyContact +
-                            (gstin != null ? '  |  GSTIN: $gstin' : ''),
+                        _companyContact,
                         style: const pw.TextStyle(
                           color: PdfColors.white,
                           fontSize: 7.5,
                         ),
                       ),
+                      if (gstin != null || fssai != null)
+                        pw.Text(
+                          [
+                            if (gstin != null) 'GSTIN: $gstin',
+                            if (fssai != null) 'FSSAI Lic. No: $fssai',
+                          ].join('  |  '),
+                          style: const pw.TextStyle(
+                            color: PdfColors.white,
+                            fontSize: 7.5,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -649,7 +664,13 @@ Future<Uint8List> buildBillPdf(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
                     pw.Text(
-                      gstin != null ? 'TAX INVOICE' : 'MILK BILL',
+                      // With GST charged: a tax invoice; a GST-registered
+                      // seller's bill without GST is a bill of supply.
+                      gstin == null
+                          ? 'MILK BILL'
+                          : gst > 0
+                          ? 'TAX INVOICE'
+                          : 'BILL OF SUPPLY',
                       style: pw.TextStyle(
                         color: PdfColors.white,
                         fontSize: 15,
@@ -858,7 +879,11 @@ Future<Uint8List> buildBillPdf(
                                     : 'Discount (${(percent / 100).toStringAsFixed(percent % 100 == 0 ? 0 : 2)}%)',
                                 '- ${billPdfAmount(discount)}',
                               ),
-                            if (gst > 0) sumRow('GST', billPdfAmount(gst)),
+                            if (gst > 0 && gstin != null) ...[
+                              sumRow('CGST', billPdfAmount(cgst)),
+                              sumRow('SGST', billPdfAmount(sgst)),
+                            ] else if (gst > 0)
+                              sumRow('GST', billPdfAmount(gst)),
                             pw.SizedBox(height: 3),
                             sumRow(
                               paid ? 'Amount paid (Rs.)' : 'Amount due (Rs.)',

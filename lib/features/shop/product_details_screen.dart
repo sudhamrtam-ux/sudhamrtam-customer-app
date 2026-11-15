@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import '../../core/company.dart';
 import '../../models/product.dart';
 import 'product_description.dart';
 import 'product_image.dart';
@@ -318,9 +319,23 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     Icon(Icons.verified_outlined, color: brandGreen),
                     SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        'Pure • Natural • Traditional',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pure • Natural • Traditional',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'FSSAI Lic. No. $sudhamrtamFssai',
+                            key: Key('productFssai'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
