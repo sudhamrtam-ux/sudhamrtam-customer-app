@@ -15,6 +15,10 @@ class CatalogProductData {
   final int pricePaise;
   final bool isAvailable;
 
+  /// The owner's photo on the server (`/v1/products/{id}/photo?v=…`),
+  /// or null: the app's built-in photo.
+  final String? photoUrl;
+
   const CatalogProductData({
     required this.id,
     required this.name,
@@ -23,6 +27,7 @@ class CatalogProductData {
     required this.unitLabel,
     required this.pricePaise,
     required this.isAvailable,
+    this.photoUrl,
   });
 
   factory CatalogProductData.fromJson(Map<String, Object?> json) {
@@ -40,6 +45,7 @@ class CatalogProductData {
       unitLabel: json['unit_label'] as String,
       pricePaise: pricePaise,
       isAvailable: (json['is_available'] as bool?) ?? true,
+      photoUrl: json['photo_url'] as String?,
     );
   }
 
@@ -51,6 +57,7 @@ class CatalogProductData {
     'unit_label': unitLabel,
     'price_paise': pricePaise,
     'is_available': isAvailable,
+    'photo_url': ?photoUrl,
   };
 
   Product toProduct() {

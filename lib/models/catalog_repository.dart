@@ -6,6 +6,7 @@ import '../database/catalog_cache_service.dart';
 import '../services/catalog_api_client.dart';
 import 'product.dart';
 import 'product_catalog.dart';
+import 'product_photos.dart';
 
 /// Where the current product list came from.
 enum CatalogSource {
@@ -162,9 +163,14 @@ class CatalogRepository extends ChangeNotifier {
     };
     _products = List.unmodifiable(products);
     _source = source;
+    setProductPhotoUrls({
+      for (final item in items)
+        if (item.photoUrl != null) item.id: item.photoUrl!,
+    });
   }
 
   void _useBuiltIn() {
+    setProductPhotoUrls(const {});
     _source = CatalogSource.builtIn;
     _products = _builtIn;
     _knownProducts = {for (final product in _builtIn) product.id: product};

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Product photos bundled with the app, by product ID.
+import '../../models/product_photos.dart';
+
+/// Product photos bundled with the app, by product ID. The owner's
+/// photos from the server (productPhotoUrls) come first.
 ///
 /// The photos come from the Sudhamrtam website
 /// (sudhamrtam.in/admin/uploads/products/), resized for the app;
@@ -47,21 +50,35 @@ class ProductImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final asset = productImageAssets[productId];
+    final url = productPhotoUrls[productId];
     final fallback = Center(
       child: Icon(icon, size: iconSize, color: iconColor),
     );
 
-    if (asset == null) return fallback;
+    if (asset == null && url == null) return fallback;
+
+    final builtIn = asset == null
+        ? fallback
+        : Image.asset(
+            asset,
+            errorBuilder: (context, error, stackTrace) => fallback,
+          );
 
     // Without a fixed size the image keeps its shape inside the
     // space, and the rounded corners follow the photo itself.
     return Center(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
-        child: Image.asset(
-          asset,
-          errorBuilder: (context, error, stackTrace) => fallback,
-        ),
+        child: url == null
+            ? builtIn
+            // The owner's photo; the built-in one while it loads or
+            // when it cannot be loaded (offline).
+            : Image.network(
+                url,
+                frameBuilder: (context, child, frame, wasSynchronous) =>
+                    frame == null && !wasSynchronous ? builtIn : child,
+                errorBuilder: (context, error, stackTrace) => builtIn,
+              ),
       ),
     );
   }
