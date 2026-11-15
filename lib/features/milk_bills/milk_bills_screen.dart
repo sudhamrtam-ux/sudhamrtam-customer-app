@@ -474,6 +474,7 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
         milk: fresh.milk,
         lines: fresh.lines.isEmpty ? _bill.lines : fresh.lines,
         items: fresh.items.isEmpty ? _bill.items : fresh.items,
+        periodEnd: fresh.periodEnd,
       );
     });
   }
@@ -627,6 +628,14 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
                 ],
               ],
             ),
+            if (bill.periodEnd != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Final bill up to ${billDateLabel(bill.periodEnd!)}',
+                key: const Key('billPeriodEnd'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
             const SizedBox(height: 12),
             for (final m in bill.milk)
               Text(

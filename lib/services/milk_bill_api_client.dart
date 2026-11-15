@@ -134,6 +134,10 @@ class MilkBill {
   /// Extra items delivered on phone orders.
   final List<MilkBillItem> items;
 
+  /// A bill made before the month ended (moving out): the last day
+  /// billed.
+  final String? periodEnd;
+
   const MilkBill({
     required this.id,
     required this.month,
@@ -149,6 +153,7 @@ class MilkBill {
     required this.milk,
     required this.lines,
     this.items = const [],
+    this.periodEnd,
   }) : subtotalPaise = subtotalPaise ?? totalPaise;
 
   bool get isPaid => status == 'paid';
@@ -178,6 +183,7 @@ class MilkBill {
       for (final i in json['items'] as List? ?? const [])
         MilkBillItem.fromJson(i as Map<String, dynamic>),
     ],
+    periodEnd: json['period_end'] as String?,
   );
 }
 

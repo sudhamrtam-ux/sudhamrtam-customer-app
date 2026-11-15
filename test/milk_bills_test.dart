@@ -823,4 +823,10 @@ void main() {
       expect(pdf.length, greaterThan(5000));
     },
   );
+
+  test('a bill made early says up to which day', () {
+    final bill = MilkBill.fromJson({...billJson(), 'period_end': '2026-10-15'});
+    expect(bill.periodEnd, '2026-10-15');
+    expect(MilkBill.fromJson(billJson()).periodEnd, isNull);
+  });
 }
