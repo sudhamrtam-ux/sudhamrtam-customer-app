@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../features/messages/message_inbox.dart';
 import '../features/messages/messages_screen.dart';
+import '../features/milk_bills/milk_bills_screen.dart';
 import '../features/account/profile_photo.dart';
 import '../features/shell/customer_shell.dart';
 import '../models/cart_manager.dart';
@@ -162,6 +163,13 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
   void _open(PushTap tap) {
     final inbox = sudhamrtamMessages;
     final navigator = sudhamrtamNavigatorKey.currentState;
+    // A bill is ready or due: open the milk bills.
+    if (tap.type == 'bill' && navigator != null) {
+      navigator.push(
+        MaterialPageRoute<void>(builder: (_) => const MilkBillsScreen()),
+      );
+      return;
+    }
     if (tap.type != 'message' || inbox == null || navigator == null) return;
     unawaited(inbox.refresh());
     navigator.push(
@@ -171,8 +179,9 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
 
   /// Arrived while the app is open: the bell updates and a note shows.
   void _arrived(PushArrival arrival) {
-    // "Milk delivered" (or why not): a note while the app is open.
-    if (arrival.tap.type == 'delivery') {
+    // "Milk delivered" (or why not), or a bill: a note while the app
+    // is open; a bill can be opened from it.
+    if (arrival.tap.type == 'delivery' || arrival.tap.type == 'bill') {
       sudhamrtamMessengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text(
@@ -180,6 +189,12 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
           ),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 6),
+          action: arrival.tap.type == 'bill'
+              ? SnackBarAction(
+                  label: 'Open',
+                  onPressed: () => _open(arrival.tap),
+                )
+              : null,
         ),
       );
       return;
