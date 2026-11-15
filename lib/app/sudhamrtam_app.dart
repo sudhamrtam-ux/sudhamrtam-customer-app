@@ -14,6 +14,7 @@ import '../models/milk_subscription_manager.dart';
 import '../services/account_sync_service.dart';
 import '../services/catalog_api_client.dart';
 import '../services/feedback_api_client.dart';
+import '../services/milk_tomorrow_client.dart';
 import '../services/support_api_client.dart';
 import '../services/milk_bill_api_client.dart';
 import '../services/milk_plan_sync_service.dart';
@@ -91,6 +92,10 @@ MilkBillApiClient? sudhamrtamMilkBills;
 /// Customer feedback, or null when this build has no server.
 /// Set by main().
 FeedbackApiClient? sudhamrtamFeedback;
+
+/// Tomorrow's milk (skip, one-day quantity), or null when this build
+/// has no server. Set by main().
+MilkTomorrowClient? sudhamrtamMilkTomorrow;
 
 /// Help & Support queries, or null when this build has no server.
 /// Set by main().

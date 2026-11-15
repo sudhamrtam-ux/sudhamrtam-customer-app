@@ -17,6 +17,7 @@ import 'account_status.dart';
 import 'address_details_card.dart';
 import 'combo_cards.dart';
 import 'offer_ticker.dart';
+import 'tomorrow_milk_card.dart';
 
 const _green = Color(0xFF82B440);
 const _paleGreen = Color(0xFFF5F8F0);
@@ -82,6 +83,9 @@ class _HomeScreenState extends State<HomeScreen> {
   OrderRules? _rules;
   List<String> _offers = const [];
   Timer? _ticker;
+
+  /// Bumped on pull-to-refresh: reloads tomorrow's milk.
+  int _tomorrowTick = 0;
 
   CatalogRepository get _catalog => widget.catalog ?? sudhamrtamCatalog;
   CartManager get _cart => widget.cart ?? sudhamrtamCart;
@@ -181,6 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return RefreshIndicator(
       color: _green,
       onRefresh: () async {
+        setState(() => _tomorrowTick++);
         await Future.wait([
           _catalog.refresh(),
           _loadRules(),
@@ -215,6 +220,12 @@ class _HomeScreenState extends State<HomeScreen> {
             plans: widget.milkPlans,
             onOpen: widget.onOpenMilkPlan,
             today: widget.clock,
+          ),
+          // Skip tomorrow / extra milk tomorrow (owner decision 2026-11-15).
+          TomorrowMilkCard(
+            key: ValueKey('tomorrow-$_tomorrowTick'),
+            client: sudhamrtamMilkTomorrow,
+            onChanged: () => sudhamrtamMilkSync.refresh(force: true),
           ),
           const SizedBox(height: 20),
           _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
