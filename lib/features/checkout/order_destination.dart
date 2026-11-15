@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
+
 import '../../database/order_database_service.dart';
+import '../../database/order_ref_service.dart';
 import '../../models/customer_order.dart';
 import '../../services/order_api_client.dart';
 
@@ -23,8 +26,16 @@ class OrderDestination {
   /// Saves [order] wherever orders go (see the class comment).
   static Future<void> save(CustomerOrder order) async {
     final api = server;
-    if (api != null) await api.placeOrder(order);
+    final ref = api == null ? null : await api.placeOrder(order);
     await OrderDatabaseService.instance.saveOrder(order);
+    if (ref != null) {
+      // A convenience: never fails the order (it shows later).
+      try {
+        await OrderRefService.instance.save(order.id, ref);
+      } catch (error) {
+        debugPrint('Order number not saved: $error');
+      }
+    }
   }
 
   /// Whether an unfinished order may be discarded: true only when

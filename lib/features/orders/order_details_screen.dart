@@ -4,6 +4,7 @@ import '../../models/combo_offer.dart';
 import '../../models/customer_order.dart';
 import '../../models/order_item.dart';
 import '../payment/order_payment_status.dart';
+import 'order_number.dart';
 import 'order_status_labels.dart';
 import '../../core/widgets/page_app_bar.dart';
 
@@ -156,8 +157,8 @@ class OrderDetailsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Order #${order.id}',
+                  OrderNumberText(
+                    orderId: order.id,
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,

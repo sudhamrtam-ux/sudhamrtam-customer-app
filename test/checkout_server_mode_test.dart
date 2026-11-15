@@ -209,30 +209,35 @@ void main() {
     tester,
   ) async {
     await tester.runAsync(() => setUpAddress(areaId: 'nizampet'));
-    const weekly = OrderRules(
+    const monthly = OrderRules(
       minimumOrderPaise: 20000,
       deliveryFeePaise: 0,
       cutoffHourIst: 21,
-      maxDaysAhead: 7,
+      maxDaysAhead: 30,
     );
-    await pump(tester, serverRules: weekly);
+    await pump(tester, serverRules: monthly);
 
     expect(find.text('Delivery Date'), findsOneWidget);
-    final dates = weekly.deliveryDatesFor(DateTime.now());
-    final chips = find.byWidgetPredicate(
-      (w) =>
-          w is ChoiceChip &&
-          w.key is ValueKey<String> &&
-          (w.key! as ValueKey<String>).value.startsWith('delivery-date-'),
-    );
-    expect(chips, findsNWidgets(dates.length));
-    expect(find.textContaining('Earliest'), findsOneWidget);
+    final dates = monthly.deliveryDatesFor(DateTime.now());
+    expect(find.text('Earliest delivery'), findsOneWidget);
 
-    final pick = dates[2];
-    await tester.tap(
-      find.byKey(Key('delivery-date-${pick.month}-${pick.day}')),
+    // A calendar pops up; typed here, as the month shown depends on
+    // today.
+    final pick = dates[20];
+    await tester.ensureVisible(find.byKey(const Key('delivery-date-pick')));
+    await tester.tap(find.byKey(const Key('delivery-date-pick')));
+    await tester.pumpAndSettle();
+    expect(find.text('Delivery date (morning)'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+    String two(int n) => n.toString().padLeft(2, '0');
+    await tester.enterText(
+      find.byType(TextField).last,
+      '${two(pick.month)}/${two(pick.day)}/${pick.year}',
     );
-    await tester.pump();
+    await tester.tap(find.text('Choose'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your chosen date'), findsOneWidget);
 
     await tester.tap(button('Place Order'));
     await tester.pump();

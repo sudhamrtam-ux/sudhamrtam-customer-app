@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../database/order_database_service.dart';
+import '../../database/order_ref_service.dart';
 import '../../models/customer_order.dart';
 import '../../services/order_api_client.dart';
 import '../checkout/order_destination.dart';
 import 'order_details_screen.dart';
+import 'order_number.dart';
 import 'order_status_labels.dart';
 import '../../core/widgets/page_app_bar.dart';
 
@@ -45,6 +47,16 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     try {
       final payments = await api.fetchPaymentStatuses();
       if (mounted) setState(() => _payments = payments);
+      // Keep the short order numbers for offline use and the details.
+      final refs = {
+        for (final e in payments.entries)
+          if (e.value.orderRef != null) e.key: e.value.orderRef!,
+      };
+      try {
+        await OrderRefService.instance.saveAll(refs);
+      } catch (_) {
+        // They show again next time.
+      }
     } catch (_) {
       // Offline: the cards show the payment method instead.
     }
@@ -152,11 +164,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ORDER ID
-              Text(
-                'Order #${order.id}',
+              // ORDER NUMBER
+              OrderNumberText(
+                key: ValueKey('${order.id}-${server?.orderRef}'),
+                orderId: order.id,
+                orderRef: server?.orderRef,
                 maxLines: 2,
-                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,

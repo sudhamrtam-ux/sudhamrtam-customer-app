@@ -24,12 +24,14 @@ import 'package:sqflite/sqflite.dart';
 /// Version 18: Vacation days on milk plans.
 /// Version 19: A delivery note on addresses.
 /// Version 20: The delivery date a customer chose for an order.
+/// Version 21: Short order numbers from the server (ORD-1001).
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 20;
+  static const int databaseVersion = 21;
+  static const String orderRefsTable = 'order_refs';
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
   static const String subscriptionsTable = 'milk_subscriptions';
@@ -153,6 +155,7 @@ class MilkDatabaseService {
     await _addPlanVacationDatesColumn(db);
     await _addAddressDeliveryNoteColumn(db);
     await _addOrderDeliveryDateColumn(db);
+    await _createOrderRefsTable(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -257,6 +260,22 @@ class MilkDatabaseService {
     if (oldVersion < 20) {
       await _addOrderDeliveryDateColumn(db);
     }
+
+    if (oldVersion < 21) {
+      await _createOrderRefsTable(db);
+    }
+  }
+
+  /// Version 21: the server's short number per order ("ORD-1001"),
+  /// kept apart from the order rows so the saved order still matches
+  /// its checkout snapshot exactly.
+  Future<void> _createOrderRefsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $orderRefsTable (
+        order_id TEXT PRIMARY KEY,
+        order_ref TEXT NOT NULL
+      )
+    ''');
   }
 
   /// Version 20: the delivery date the customer chose (YYYY-MM-DD).

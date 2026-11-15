@@ -365,11 +365,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _deliveryDateText(OrderRules rules) =>
       '${_dateLabel(_shownDate(rules))} (morning)';
 
-  /// Delivery date choice: the earliest, or up to a week ahead,
-  /// on the morning run with the milk.
+  /// Delivery date choice: the earliest, or any later day the server
+  /// allows (a calendar), on the morning run with the milk.
   Widget _buildDeliveryDate(OrderRules rules) {
     final dates = _deliveryDates(rules);
     final shown = _shownDate(rules);
+    final isEarliest = shown == dates.first;
     final locked = sudhamrtamCart.isCheckoutRecoveryLocked;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,32 +381,72 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           style: TextStyle(color: Colors.black54),
         ),
         const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (var i = 0; i < dates.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    key: Key('delivery-date-${dates[i].month}-${dates[i].day}'),
-                    label: Text(
-                      i == 0
-                          ? '${_dateLabel(dates[i])}\nEarliest'
-                          : _dateLabel(dates[i]),
-                      textAlign: TextAlign.center,
+        Material(
+          color: const Color(0xFFF5F8F0),
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            key: const Key('delivery-date-pick'),
+            borderRadius: BorderRadius.circular(12),
+            onTap: locked || dates.length < 2
+                ? null
+                : () => _pickDeliveryDate(dates, shown),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_month_outlined, color: _brandGreen),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _dateLabel(shown),
+                          key: const Key('delivery-date-shown'),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          isEarliest ? 'Earliest delivery' : 'Your chosen date',
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
                     ),
-                    selected: dates[i] == shown,
-                    selectedColor: const Color(0xFFE5F0D7),
-                    onSelected: locked
-                        ? null
-                        : (_) => setState(() => _chosenDate = dates[i]),
                   ),
-                ),
-            ],
+                  if (dates.length > 1)
+                    const Text(
+                      'Change',
+                      style: TextStyle(
+                        color: _brandGreen,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _pickDeliveryDate(List<DateTime> dates, DateTime shown) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: shown,
+      firstDate: dates.first,
+      lastDate: dates.last,
+      helpText: 'Delivery date (morning)',
+      confirmText: 'Choose',
+    );
+    if (picked == null || !mounted) return;
+    setState(
+      () => _chosenDate = DateTime(picked.year, picked.month, picked.day),
     );
   }
 

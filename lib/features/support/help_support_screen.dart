@@ -80,7 +80,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       _sendError = null;
     });
     try {
-      await api.send(_draftId, topic: _topic!, message: _message.text.trim());
+      final sent = await api.send(
+        _draftId,
+        topic: _topic!,
+        message: _message.text.trim(),
+      );
       if (!mounted) return;
       setState(() {
         _draftId = newSupportQueryId();
@@ -88,8 +92,13 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         _message.clear();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Your query was sent. We will get back to you soon.'),
+        SnackBar(
+          content: Text(
+            sent.ref == null
+                ? 'Your query was sent. We will get back to you soon.'
+                : 'Your query ${sent.ref} was sent. We will get back to '
+                      'you soon; quote ${sent.ref} if you call us.',
+          ),
         ),
       );
       await _load();
@@ -347,6 +356,19 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                         _StatusPill(answered: q.handledAt != null),
                       ],
                     ),
+                    if (q.ref != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: SelectableText(
+                          'Query no. ${q.ref}',
+                          key: Key('supportRef-${q.id}'),
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 6),
                     Text(q.message),
                     if (q.reply != null) ...[

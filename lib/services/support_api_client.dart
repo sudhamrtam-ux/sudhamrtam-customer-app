@@ -34,6 +34,10 @@ const supportTopics = <String, String>{
 /// A query the customer raised, as the server keeps it.
 class SupportQuery {
   final String id;
+
+  /// e.g. "Q-1001": quoted when talking to Sudhamrtam about it. Null
+  /// only from a server older than query numbers.
+  final String? ref;
   final String topic;
   final String message;
   final DateTime createdAt;
@@ -46,6 +50,7 @@ class SupportQuery {
 
   const SupportQuery({
     required this.id,
+    this.ref,
     required this.topic,
     required this.message,
     required this.createdAt,
@@ -55,6 +60,7 @@ class SupportQuery {
 
   factory SupportQuery.fromJson(Map<String, dynamic> json) => SupportQuery(
     id: json['id'] as String,
+    ref: json['ref'] as String?,
     topic: json['topic'] as String,
     message: json['message'] as String,
     createdAt: DateTime.parse(json['created_at'] as String),

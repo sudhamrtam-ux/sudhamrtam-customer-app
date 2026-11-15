@@ -82,11 +82,15 @@ class OrderPaymentStatus {
   /// Online orders are cancelled if not paid by this time.
   final DateTime? paymentDueAt;
 
+  /// The short order number, e.g. "ORD-1001" (null from older servers).
+  final String? orderRef;
+
   const OrderPaymentStatus({
     required this.paymentMethod,
     required this.paymentStatus,
     required this.orderStatus,
     this.paymentDueAt,
+    this.orderRef,
   });
 
   bool get isPaid => paymentStatus == 'paid_online';
@@ -100,6 +104,7 @@ class OrderPaymentStatus {
       paymentMethod: order['payment_method'] as String,
       paymentStatus: order['payment_status'] as String? ?? 'due_on_delivery',
       orderStatus: order['status'] as String,
+      orderRef: order['order_ref'] as String?,
       paymentDueAt: due == null ? null : DateTime.parse(due),
     );
   }
@@ -220,11 +225,12 @@ class OrderApiClient {
       ],
   };
 
-  /// Places [order] (or confirms it was already placed).
+  /// Places [order] (or confirms it was already placed); returns the
+  /// server's short order number ("ORD-1001"), if it gave one.
   ///
   /// Throws [OrderRejectedException] if the server refuses it, and
   /// [OrderApiException] if it could not be confirmed.
-  Future<void> placeOrder(CustomerOrder order) async {
+  Future<String?> placeOrder(CustomerOrder order) async {
     if (order.addressId == null) {
       throw const OrderRejectedException(
         'ADDRESS_NOT_FOUND',
@@ -238,7 +244,16 @@ class OrderApiClient {
       body: requestBody(order),
     );
 
-    if (response.statusCode == 200 || response.statusCode == 201) return;
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      try {
+        final json = jsonDecode(utf8.decode(response.bodyBytes));
+        final placed = json is Map ? json['order'] : null;
+        final ref = placed is Map ? placed['order_ref'] : null;
+        return ref is String ? ref : null;
+      } catch (_) {
+        return null; // Placed; the number shows later.
+      }
+    }
     throw _failure(response);
   }
 

@@ -38,7 +38,7 @@ The root-level `verify_*.dart` / `verify_*.py` scripts are one-off manual checks
 Global singletons live in `lib/app/sudhamrtam_app.dart`: `sudhamrtamCart` (`CartManager`) and `sudhamrtamMilkSubscriptions`. Both are `ChangeNotifier`s that screens listen to directly. There is no state-management package.
 
 ### Single SQLite database (`lib/database/milk_database_service.dart`)
-Despite the name, `MilkDatabaseService.instance` owns the **one** app database (`sudhamrtam_milk.db`) for all tables: subscriptions, cart, orders, profiles/addresses, pending submissions, checkout reconciliations. Schema is versioned (currently **v19**; the version history is in the class doc comment).
+Despite the name, `MilkDatabaseService.instance` owns the **one** app database (`sudhamrtam_milk.db`) for all tables: subscriptions, cart, orders, profiles/addresses, pending submissions, checkout reconciliations. Schema is versioned (currently **v21**; the version history is in the class doc comment).
 - New installs: `_createTables`. Upgrades: `_upgradeDatabase` with cumulative `if (oldVersion < N)` blocks that must never drop customer data.
 - A schema change means bumping `databaseVersion`, adding to both create and upgrade paths, and adding tests (see `sqlite_v8_order_recipient_test.dart` for a self-contained example; older v5–v7 tests depend on fixture DBs under `C:\Sudhamrtam\backups\`).
 - `CustomerOrder.toMap()` omits recipient keys when null, because durable pending payloads are compared byte-for-byte. Keep new optional order fields backward-compatible the same way.

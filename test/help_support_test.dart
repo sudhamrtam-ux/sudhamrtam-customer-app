@@ -25,6 +25,7 @@ void main() {
       final id = request.url.pathSegments.last;
       final query = {
         'id': id,
+        'ref': 'Q-1002',
         'topic': body['topic'],
         'message': body['message'],
         'created_at': '2026-11-15T05:00:00.000Z',
@@ -43,6 +44,7 @@ void main() {
     saved = [
       {
         'id': 'old_query_1',
+        'ref': 'Q-1001',
         'topic': 'bill',
         'message': 'Bill question',
         'created_at': '2026-11-10T05:00:00.000Z',
@@ -95,6 +97,7 @@ void main() {
     expect(find.text('Bill question'), findsOneWidget);
     expect(find.text('Sudhamrtam: Fixed, please check.'), findsOneWidget);
     expect(find.text('Answered'), findsOneWidget);
+    expect(find.text('Query no. Q-1001'), findsOneWidget);
 
     // Topic and message are needed.
     final send = find.byKey(const Key('supportSend'));
@@ -111,8 +114,12 @@ void main() {
     expect(calls.where((c) => c.startsWith('PUT')), hasLength(1));
     expect(find.text('Milk came late today'), findsOneWidget);
     expect(find.text('Open'), findsOneWidget);
+    expect(find.text('Query no. Q-1002'), findsOneWidget);
     expect(
-      find.text('Your query was sent. We will get back to you soon.'),
+      find.text(
+        'Your query Q-1002 was sent. We will get back to you soon; '
+        'quote Q-1002 if you call us.',
+      ),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
