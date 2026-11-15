@@ -171,6 +171,19 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
 
   /// Arrived while the app is open: the bell updates and a note shows.
   void _arrived(PushArrival arrival) {
+    // "Milk delivered" (or why not): a note while the app is open.
+    if (arrival.tap.type == 'delivery') {
+      sudhamrtamMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text(
+            [arrival.title, arrival.body].whereType<String>().join('\n'),
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+      return;
+    }
     if (arrival.tap.type != 'message') return;
     unawaited(sudhamrtamMessages?.refresh());
     sudhamrtamMessengerKey.currentState?.showSnackBar(
