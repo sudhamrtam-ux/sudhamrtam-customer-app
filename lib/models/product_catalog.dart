@@ -50,7 +50,7 @@ class ProductCatalog {
       id: 'curd',
       name: 'Curd',
       category: 'Fresh Dairy',
-      description: 'Fresh curd from Sudhamrtam.',
+      description: curdDescription,
       price: 120.0,
       unit: '1 kg',
       icon: Icons.breakfast_dining_outlined,

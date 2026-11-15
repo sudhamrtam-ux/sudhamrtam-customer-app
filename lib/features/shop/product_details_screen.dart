@@ -5,6 +5,7 @@ import '../../core/company.dart';
 import '../../models/product.dart';
 import 'product_description.dart';
 import 'product_image.dart';
+import 'quantity_bill.dart';
 import '../../core/widgets/page_app_bar.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
@@ -239,63 +240,54 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
               const SizedBox(height: 12),
 
-              // Quantity controls
-              Row(
-                children: [
-                  IconButton.filledTonal(
-                    onPressed: _quantity > 1
-                        ? () {
-                            setState(() {
-                              _quantity--;
-                            });
-                          }
-                        : null,
-                    icon: const Icon(Icons.remove),
-                  ),
-
-                  const SizedBox(width: 20),
-
-                  Text(
-                    '$_quantity',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(width: 20),
-
-                  IconButton.filled(
-                    onPressed: _quantity < 10
-                        ? () {
-                            setState(() {
-                              _quantity++;
-                            });
-                          }
-                        : null,
-                    icon: const Icon(Icons.add),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // Add to Cart button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _addToCart,
-                  icon: const Icon(Icons.shopping_cart_outlined),
-                  label: const Text('Add to Cart'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: brandGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+              // Quantity with the bill next to it (owner request
+              // 2026-11-15): price × quantity before adding to the cart.
+              ListenableBuilder(
+                listenable: sudhamrtamCart,
+                builder: (context, _) {
+                  final price =
+                      sudhamrtamCatalog.productById(widget.productId)?.price ??
+                      widget.price;
+                  final inCart = sudhamrtamCart.items
+                      .where((item) => item.product.id == widget.productId)
+                      .fold(0, (sum, item) => sum + item.quantity);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      QuantityBill(
+                        quantity: _quantity,
+                        unitPrice: price,
+                        unit: widget.unit,
+                        inCart: inCart,
+                        maxQuantity: 10,
+                        onChanged: (q) => setState(() => _quantity = q),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        key: const Key('add-to-cart'),
+                        onPressed: _addToCart,
+                        icon: const Icon(Icons.shopping_cart_outlined),
+                        label: Text(
+                          price > 0
+                              ? 'Add to Cart · ${billRupees(price * _quantity)}'
+                              : 'Add to Cart',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: brandGreen,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
 
               const SizedBox(height: 20),

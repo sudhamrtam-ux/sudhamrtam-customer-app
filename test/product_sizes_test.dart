@@ -65,4 +65,70 @@ void main() {
       isTrue,
     );
   });
+
+  testWidgets(
+    'the bill next to the quantity: price × quantity, and the cart after',
+    (tester) async {
+      tester.view.physicalSize = const Size(1080, 4000);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      await tester.runAsync(sudhamrtamCatalog.initialize);
+      await tester.runAsync(sudhamrtamCart.initialize);
+      final honey = sudhamrtamCatalog.productById('honey_250g')!;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProductDetailsScreen(
+            productId: honey.id,
+            productName: honey.name,
+            category: honey.category,
+            productIcon: honey.icon,
+            description: honey.description,
+            unit: honey.unit,
+            price: honey.price,
+          ),
+        ),
+      );
+      String text(String key) => (tester.widget<Text>(
+        find
+            .descendant(of: find.byKey(Key(key)), matching: find.byType(Text))
+            .first,
+      )).data!;
+
+      expect(text('quantity-bill-line'), '₹150.00 × 1 pack (250 g)');
+      expect(find.text('Add to Cart · ₹150.00'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('qty-plus')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('qty-plus')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const Key('qty-value'))).data, '3');
+      expect(text('quantity-bill-line'), '₹150.00 × 3 packs (250 g)');
+      expect(find.text('₹450.00'), findsWidgets);
+      expect(find.text('Add to Cart · ₹450.00'), findsOneWidget);
+      expect(find.byKey(const Key('cart-after')), findsNothing);
+
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(const Key('add-to-cart')));
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('Already in your cart: 3'), findsOneWidget);
+      expect(text('cart-after'), 'Your cart will have 6');
+      expect(find.text('₹900.00'), findsOneWidget);
+
+      // At most 10: the cart after stops at 10, with a note.
+      for (var i = 0; i < 6; i++) {
+        await tester.tap(find.byKey(const Key('qty-plus')));
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(text('cart-after'), 'Your cart will have 10');
+      expect(
+        find.text('At most 10 of one product can be in the cart.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
