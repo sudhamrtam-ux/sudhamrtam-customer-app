@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import '../account/address_location_gate.dart';
 import '../../models/milk_subscription.dart';
 import '../../services/milk_plan_api_client.dart';
 import '../../models/milk_plan_merge.dart';
@@ -69,10 +70,14 @@ class MilkSubscriptionSetupScreen extends StatefulWidget {
   final String productName;
   final MilkSubscription? existingSubscription;
 
+  /// Before a new plan: the milk's address must be on the map.
+  final MilkAddressCheck checkAddress;
+
   const MilkSubscriptionSetupScreen({
     super.key,
     required this.productName,
     this.existingSubscription,
+    this.checkAddress = checkMilkAddressLocation,
   });
 
   @override
@@ -214,6 +219,16 @@ class _MilkSubscriptionSetupScreenState
     }
     for (final MapEntry(key: shift, value: draft) in _drafts.entries) {
       if (!_validateDraft(draft, shiftText(shift))) return;
+    }
+
+    // A new plan needs the home marked on the map (owner decision
+    // 2026-11-16); a running plan can still be changed.
+    if (widget.existingSubscription == null) {
+      setState(() => _isSaving = true);
+      final ok = await widget.checkAddress(context);
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      if (!ok) return;
     }
 
     // A disabled Save button also prevents duplicate requests.

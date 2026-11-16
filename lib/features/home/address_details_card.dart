@@ -38,10 +38,15 @@ Future<void> _dismiss() async {
 /// On Home, once (owner decision 2026-11-11): asks a customer whose
 /// saved address has no society, block or flat to add them, so the
 /// delivery partner finds them faster. "Not now" hides it for good.
+///
+/// An address not marked on the map (owner decision 2026-11-16) is
+/// asked first, and that card stays until it is marked: new orders and
+/// milk plans need it.
 class AddressDetailsCard extends StatefulWidget {
   const AddressDetailsCard({
     super.key,
     this.account,
+    this.asksForLocation,
     this.loadAddresses = _savedAddresses,
     this.isDismissed = _isDismissed,
     this.dismiss = _dismiss,
@@ -50,6 +55,10 @@ class AddressDetailsCard extends StatefulWidget {
 
   /// Reloads when addresses change; defaults to the app's account.
   final AccountSyncService? account;
+
+  /// Asks for the map spot; defaults to builds with a server (the
+  /// only ones that deliver).
+  final bool? asksForLocation;
   final Future<List<CustomerAddress>> Function() loadAddresses;
   final Future<bool> Function() isDismissed;
   final Future<void> Function() dismiss;
@@ -63,6 +72,9 @@ class AddressDetailsCard extends StatefulWidget {
 
 class _AddressDetailsCardState extends State<AddressDetailsCard> {
   CustomerAddress? _needing;
+
+  /// True when [_needing] lacks its spot on the map.
+  bool _needsLocation = false;
   late final AccountSyncService _account = widget.account ?? sudhamrtamAccount;
 
   @override
@@ -80,21 +92,46 @@ class _AddressDetailsCardState extends State<AddressDetailsCard> {
 
   Future<void> _check() async {
     try {
-      if (await widget.isDismissed()) {
-        if (mounted) setState(() => _needing = null);
-        return;
-      }
       final addresses = await widget.loadAddresses();
       // The default address first: that is where milk goes.
       final ordered = [
         ...addresses.where((a) => a.isDefault),
         ...addresses.where((a) => !a.isDefault),
       ];
+      if (widget.asksForLocation ?? sudhamrtamAuth != null) {
+        final unmarked = [
+          for (final a in ordered)
+            if (!a.hasMapLocation) a,
+        ].firstOrNull;
+        if (unmarked != null) {
+          if (mounted) {
+            setState(() {
+              _needing = unmarked;
+              _needsLocation = true;
+            });
+          }
+          return;
+        }
+      }
+      if (await widget.isDismissed()) {
+        if (mounted) {
+          setState(() {
+            _needing = null;
+            _needsLocation = false;
+          });
+        }
+        return;
+      }
       final needing = [
         for (final a in ordered)
           if (a.needsDetails) a,
       ].firstOrNull;
-      if (mounted) setState(() => _needing = needing);
+      if (mounted) {
+        setState(() {
+          _needing = needing;
+          _needsLocation = false;
+        });
+      }
     } catch (_) {
       // Only a reminder: never get in the way of Home.
     }
@@ -132,23 +169,35 @@ class _AddressDetailsCardState extends State<AddressDetailsCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.apartment, color: Color(0xFFEF6C00)),
-                SizedBox(width: 8),
+                Icon(
+                  _needsLocation ? Icons.pin_drop_outlined : Icons.apartment,
+                  color: const Color(0xFFEF6C00),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Help us find your door faster',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    _needsLocation
+                        ? 'Mark your home on the map'
+                        : 'Help us find your door faster',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 6),
             Text(
-              'Please add your society, block/tower and flat number to your '
-              '${address.label} address. Our delivery partners deliver one '
-              'building at a time.',
+              _needsLocation
+                  ? 'Your ${address.label} address is not marked on the map '
+                        'yet. Mark it so our delivery partner can reach you. '
+                        'New orders and milk plans need it.'
+                  : 'Please add your society, block/tower and flat number '
+                        'to your ${address.label} address. Our delivery '
+                        'partners deliver one building at a time.',
             ),
             const SizedBox(height: 8),
             Row(
@@ -157,17 +206,19 @@ class _AddressDetailsCardState extends State<AddressDetailsCard> {
                   key: const Key('addressDetailsAdd'),
                   style: FilledButton.styleFrom(backgroundColor: brandGreen),
                   onPressed: () => _open(address),
-                  child: const Text('Add now'),
+                  child: Text(_needsLocation ? 'Add location' : 'Add now'),
                 ),
                 const SizedBox(width: 8),
-                TextButton(
-                  key: const Key('addressDetailsLater'),
-                  onPressed: () async {
-                    await widget.dismiss();
-                    if (mounted) setState(() => _needing = null);
-                  },
-                  child: const Text('Not now'),
-                ),
+                // The map spot is required, so it cannot be put off.
+                if (!_needsLocation)
+                  TextButton(
+                    key: const Key('addressDetailsLater'),
+                    onPressed: () async {
+                      await widget.dismiss();
+                      if (mounted) setState(() => _needing = null);
+                    },
+                    child: const Text('Not now'),
+                  ),
               ],
             ),
           ],

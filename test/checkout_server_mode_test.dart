@@ -104,7 +104,10 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  Future<void> setUpAddress({required String? areaId}) async {
+  Future<void> setUpAddress({
+    required String? areaId,
+    bool onMap = true,
+  }) async {
     await CustomerProfileDatabaseService.instance.saveSyncedProfile(
       customerId: AccountSyncService.localCustomerId,
       fullName: 'Asha',
@@ -125,6 +128,8 @@ void main() {
           city: 'Hyderabad',
           state: 'Telangana',
           postalCode: '500090',
+          latitude: onMap ? 17.5 : null,
+          longitude: onMap ? 78.4 : null,
           isDefault: true,
           createdAt: now,
           updatedAt: now,
@@ -310,6 +315,22 @@ void main() {
     await pump(tester);
 
     expect(find.text('Edit address'), findsOneWidget);
+    expect(isEnabled(tester, 'Place Order'), isFalse);
+  });
+
+  testWidgets('the address must be marked on the map', (tester) async {
+    // Owner decision 2026-11-16: the partner navigates to the spot.
+    await tester.runAsync(() => setUpAddress(areaId: 'nizampet', onMap: false));
+    await pump(tester);
+
+    expect(
+      find.text(
+        'Mark this address on the map so our delivery partner '
+        'can reach you.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Add location'), findsOneWidget);
     expect(isEnabled(tester, 'Place Order'), isFalse);
   });
 

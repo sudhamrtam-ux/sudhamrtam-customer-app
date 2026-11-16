@@ -196,6 +196,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           action: 'Edit address',
           onAction: () => _editAddress(address),
         ),
+      // Every address needs its spot on the map (owner decision
+      // 2026-11-16), so the delivery partner can navigate there.
+      if (address != null && !address.hasMapLocation)
+        (
+          message:
+              'Mark this address on the map so our delivery partner '
+              'can reach you.',
+          action: 'Add location',
+          onAction: () => _editAddress(address),
+        ),
       if (rules != null && subtotal < rules.minimumOrderRupees)
         (
           message:
