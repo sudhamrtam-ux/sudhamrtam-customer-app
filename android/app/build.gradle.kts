@@ -17,6 +17,11 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+// Google Maps key for the address map pin (owner decision 2026-11-16):
+// android/maps-key.txt, never in git. Without it the map stays blank.
+val mapsKeyFile = rootProject.file("maps-key.txt")
+val mapsApiKey = if (mapsKeyFile.exists()) mapsKeyFile.readText().trim() else ""
+
 android {
     namespace = "com.sudhamrtam.customer"
     compileSdk = flutter.compileSdkVersion
@@ -40,6 +45,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["mapsApiKey"] = mapsApiKey
     }
 
     signingConfigs {

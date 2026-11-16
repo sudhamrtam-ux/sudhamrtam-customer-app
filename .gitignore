@@ -21,6 +21,7 @@ app.*.map.json
 /android/captures/
 /android/local.properties
 /android/key.properties
+/android/maps-key.txt
 /android/app/debug/
 /android/app/profile/
 /android/app/release/

@@ -13,6 +13,8 @@ import 'package:sudhamrtam_customer_app/services/account_api_client.dart';
 import 'package:sudhamrtam_customer_app/services/account_sync_service.dart';
 import 'package:sudhamrtam_customer_app/services/catalog_api_client.dart';
 
+import 'fake_map.dart';
+
 CustomerAddress address({
   String? societyId,
   String? societyName,
@@ -168,6 +170,8 @@ void main() {
         MaterialApp(
           home: AddressFormScreen(
             account: AccountSyncService.localOnly(),
+            findLocation: fakeFindLocation,
+            mapBuilder: fakeMap,
             loadAreas: () async => const [
               DeliveryArea(id: 'nizampet', name: 'Nizampet'),
             ],
@@ -205,6 +209,7 @@ void main() {
       await tester.pumpAndSettle();
       await type('Block / Tower', 'B');
       await type('Flat Number', '1203');
+      await useCurrentLocation(tester);
       await tester.tap(find.text('Save Address'));
       await tester.pump();
 
@@ -235,6 +240,8 @@ void main() {
         MaterialApp(
           home: AddressFormScreen(
             account: AccountSyncService.localOnly(),
+            findLocation: fakeFindLocation,
+            mapBuilder: fakeMap,
             loadAreas: () async => const [
               DeliveryArea(id: 'nizampet', name: 'Nizampet'),
             ],
@@ -296,6 +303,7 @@ void main() {
         find.byKey(const Key('deliveryNoteField')),
         ' Leave at the door ',
       );
+      await useCurrentLocation(tester);
       await tester.tap(find.text('Save Address'));
       await tester.pump();
 
@@ -361,6 +369,8 @@ void main() {
         MaterialApp(
           home: AddressFormScreen(
             account: AccountSyncService.localOnly(),
+            findLocation: fakeFindLocation,
+            mapBuilder: fakeMap,
             loadAreas: () async => const [
               DeliveryArea(id: 'nizampet', name: 'Nizampet'),
             ],

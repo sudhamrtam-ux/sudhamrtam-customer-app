@@ -6,6 +6,7 @@ import '../../services/account_api_client.dart';
 import '../../services/account_sync_service.dart';
 import '../../services/catalog_api_client.dart';
 import '../../core/widgets/page_app_bar.dart';
+import 'map_location_field.dart';
 
 /// Loads the delivery areas for the area choice; null when this
 /// build has no server.
@@ -31,14 +32,22 @@ class AddressFormScreen extends StatefulWidget {
     AccountSyncService? account,
     DeliveryAreaLoader? loadAreas,
     SocietyLoader? loadSocieties,
+    CurrentLocationFinder? findLocation,
+    MapPinBuilder? mapBuilder,
   }) : account = account ?? sudhamrtamAccount,
        loadAreas = loadAreas ?? _defaultAreaLoader(),
-       loadSocieties = loadSocieties ?? _defaultSocietyLoader();
+       loadSocieties = loadSocieties ?? _defaultSocietyLoader(),
+       findLocation = findLocation ?? findCurrentLocation,
+       mapBuilder = mapBuilder ?? googleMapPin;
 
   final CustomerAddress? existingAddress;
   final AccountSyncService account;
   final DeliveryAreaLoader? loadAreas;
   final SocietyLoader? loadSocieties;
+
+  /// The phone's GPS and the map; tests replace them.
+  final CurrentLocationFinder findLocation;
+  final MapPinBuilder mapBuilder;
 
   @override
   State<AddressFormScreen> createState() => _AddressFormScreenState();
@@ -79,6 +88,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     return null;
   }
 
+  /// The spot on the map (owner decision 2026-11-16: required).
+  MapPoint? _pin;
+
   String _addressLabel = 'Home';
   bool _isDefault = false;
   bool _isSaving = false;
@@ -100,6 +112,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     if (address == null) return;
 
     _areaId = address.areaId;
+    if (address.latitude != null && address.longitude != null) {
+      _pin = MapPoint(address.latitude!, address.longitude!);
+    }
 
     _addressLabel = ['Home', 'Office', 'Other'].contains(address.label)
         ? address.label
@@ -467,9 +482,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         state: place?.state ?? _stateController.text.trim(),
         postalCode: place?.postalCode ?? _postalCodeController.text.trim(),
 
-        // Preserve saved map coordinates during editing.
-        latitude: existing?.latitude,
-        longitude: existing?.longitude,
+        // The spot the partner navigates to.
+        latitude: _pin?.latitude,
+        longitude: _pin?.longitude,
 
         isDefault: _isDefault,
 
@@ -642,6 +657,17 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 keyboardType: TextInputType.number,
               ),
             ],
+
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: MapLocationField(
+                initialValue: _pin,
+                enabled: !_isSaving,
+                findLocation: widget.findLocation,
+                mapBuilder: widget.mapBuilder,
+                onChanged: (pin) => setState(() => _pin = pin),
+              ),
+            ),
 
             Padding(
               padding: const EdgeInsets.only(bottom: 16),

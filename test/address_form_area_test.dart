@@ -10,6 +10,8 @@ import 'package:sudhamrtam_customer_app/features/account/address_form_screen.dar
 import 'package:sudhamrtam_customer_app/services/account_sync_service.dart';
 import 'package:sudhamrtam_customer_app/services/catalog_api_client.dart';
 
+import 'fake_map.dart';
+
 void main() {
   late Directory directory;
 
@@ -60,6 +62,8 @@ void main() {
       MaterialApp(
         home: AddressFormScreen(
           account: account,
+          findLocation: fakeFindLocation,
+          mapBuilder: fakeMap,
           loadAreas: () async => const [
             DeliveryArea(id: 'nizampet', name: 'Nizampet'),
             DeliveryArea(id: 'flora', name: 'Praneeth Pranav Flora'),
@@ -90,6 +94,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nizampet').last);
     await tester.pumpAndSettle();
+    await useCurrentLocation(tester);
 
     await tapSave(tester);
     await tester.pump();
