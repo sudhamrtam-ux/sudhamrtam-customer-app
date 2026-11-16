@@ -168,45 +168,54 @@ class AccountStatusCard extends StatelessWidget {
       listenable: manager,
       builder: (context, _) {
         final status = accountStatusFor(manager.subscriptions, today());
-        return Card(
-          key: const Key('accountStatus'),
-          margin: EdgeInsets.zero,
-          color: status.color.withValues(alpha: 0.08),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: status.color.withValues(alpha: 0.5)),
-          ),
-          child: ListTile(
-            onTap: onOpen,
-            leading: Icon(status.icon, color: status.color, size: 32),
-            title: Row(
-              children: [
-                const Text('Milk plan: '),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: status.color,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    status.label,
-                    key: const Key('accountStatusLabel'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+        // A small button with text (owner, 2026-11-17); the details
+        // are in the Milk Plan tab it opens.
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: Tooltip(
+            message: status.detail,
+            child: Material(
+              key: const Key('accountStatus'),
+              color: status.color.withValues(alpha: 0.10),
+              shape: StadiumBorder(
+                side: BorderSide(color: status.color.withValues(alpha: 0.45)),
+              ),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: onOpen,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(status.icon, color: status.color, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Milk plan: ',
+                        style: TextStyle(
+                          color: status.color,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        status.label,
+                        key: const Key('accountStatusLabel'),
+                        style: TextStyle(
+                          color: status.color,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (onOpen != null)
+                        Icon(
+                          Icons.chevron_right,
+                          color: status.color,
+                          size: 18,
+                        ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(status.detail),
-            ),
-            trailing: onOpen == null ? null : const Icon(Icons.chevron_right),
           ),
         );
       },

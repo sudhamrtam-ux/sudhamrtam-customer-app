@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import '../../database/customer_profile_database_service.dart';
+import '../../services/account_sync_service.dart';
 import '../../models/cart_manager.dart';
 import '../../models/catalog_repository.dart';
 import '../../models/combo_offer.dart';
@@ -12,6 +14,7 @@ import '../../services/offer_api_client.dart';
 import '../../services/order_api_client.dart';
 import '../checkout/order_destination.dart';
 import '../shop/product_image.dart';
+import '../../models/milk_subscription.dart';
 import '../../models/milk_subscription_manager.dart';
 import 'account_status.dart';
 import 'address_details_card.dart';
@@ -20,8 +23,19 @@ import 'offer_ticker.dart';
 import 'tomorrow_milk_card.dart';
 
 const _green = Color(0xFF82B440);
-const _paleGreen = Color(0xFFF5F8F0);
-const _borderGreen = Color(0xFFE1EBCF);
+const _darkGreen = Color(0xFF4F7A1F);
+const _paleGreen = Color(0xFFF2F7EA);
+const _ink = Color(0xFF1F2A14);
+
+/// The modern card look on Home (owner, 2026-11-17): white, rounded,
+/// with a soft shadow instead of a border.
+BoxDecoration _cardDecoration({Color color = Colors.white}) => BoxDecoration(
+  color: color,
+  borderRadius: BorderRadius.circular(20),
+  boxShadow: const [
+    BoxShadow(color: Color(0x14000000), blurRadius: 18, offset: Offset(0, 6)),
+  ],
+);
 
 /// Loads the owner's order rules; null when there is no server.
 typedef OrderRulesLoader = Future<OrderRules> Function();
@@ -33,6 +47,36 @@ typedef OffersLoader = Future<List<String>> Function();
 
 OffersLoader? _defaultOffersLoader() =>
     apiBaseUrl.isEmpty ? null : OfferApiClient(baseUrl: apiBaseUrl).fetchOffers;
+
+/// The customer's name from their profile; null without one.
+Future<String?> _savedCustomerName() async {
+  final profile = await CustomerProfileDatabaseService.instance.getProfileById(
+    AccountSyncService.localCustomerId,
+  );
+  final name = profile?.fullName.trim() ?? '';
+  return name.isEmpty ? null : name;
+}
+
+/// "Good morning", "Good afternoon" or "Good evening" at [time].
+String greetingFor(DateTime time) => time.hour >= 4 && time.hour < 12
+    ? 'Good morning'
+    : time.hour >= 12 && time.hour < 17
+    ? 'Good afternoon'
+    : 'Good evening';
+
+/// "Good morning, Asha 😊" (owner, 2026-11-17): the first name only,
+/// skipping initials ("V. Naga Raju" → "Naga").
+String greetingLine(DateTime time, String? name) {
+  final words = [
+    for (final w in (name ?? '').trim().split(RegExp(r'\s+')))
+      if (w.replaceAll('.', '').isNotEmpty) w.replaceAll('.', ''),
+  ];
+  final first =
+      words.where((w) => w.length > 1).firstOrNull ?? words.firstOrNull ?? '';
+  return first.isEmpty
+      ? '${greetingFor(time)} 😊'
+      : '${greetingFor(time)}, $first 😊';
+}
 
 /// Home tab: shortcuts into the shop, today's delivery cut-off,
 /// one-tap adding of daily essentials, and the milk plan.
@@ -49,6 +93,7 @@ class HomeScreen extends StatefulWidget {
     OrderRulesLoader? loadRules,
     OffersLoader? loadOffers,
     DateTime Function()? clock,
+    this.loadCustomerName = _savedCustomerName,
   }) : loadRules = loadRules ?? _defaultRulesLoader(),
        loadOffers = loadOffers ?? _defaultOffersLoader(),
        clock = clock ?? DateTime.now;
@@ -74,6 +119,9 @@ class HomeScreen extends StatefulWidget {
   /// Null when the app has no server: no offer line.
   final OffersLoader? loadOffers;
   final DateTime Function() clock;
+
+  /// The customer's name for the greeting; tests replace it.
+  final Future<String?> Function() loadCustomerName;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -203,7 +251,21 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
-          // Combo offers (owner decision 2026-11-15), under the offer line.
+          // Welcome first, with the milk plan as a small button
+          // (owner, 2026-11-17).
+          _Greeting(
+            loadName: widget.loadCustomerName,
+            now: widget.clock,
+            status: AccountStatusCard(
+              plans: widget.milkPlans,
+              onOpen: widget.onOpenMilkPlan,
+              today: widget.clock,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Hidden unless an address lacks its map spot or details.
+          const AddressDetailsCard(),
+          // Combo offers (owner decision 2026-11-15).
           if (_combos.combos.isNotEmpty) ...[
             ComboCards(
               combos: _combos.combos,
@@ -212,28 +274,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          Text(
-            'Welcome to Sudhamrtam',
-            style: Theme.of(context).textTheme.headlineSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          const Text('Pure farm goodness delivered to your doorstep.'),
-          const SizedBox(height: 16),
-          // Hidden unless an address lacks society, block or flat.
-          const AddressDetailsCard(),
-          AccountStatusCard(
-            plans: widget.milkPlans,
-            onOpen: widget.onOpenMilkPlan,
-            today: widget.clock,
-          ),
           // Skip tomorrow / extra milk tomorrow (owner decision 2026-11-15).
           TomorrowMilkCard(
             key: ValueKey('tomorrow-$_tomorrowTick'),
             client: sudhamrtamMilkTomorrow,
             onChanged: () => sudhamrtamMilkSync.refresh(force: true),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
           if (_rules != null) ...[
             const SizedBox(height: 16),
@@ -273,8 +320,11 @@ class _HomeScreenState extends State<HomeScreen> {
             products: products,
             onOpen: (category) => widget.onOpenShop?.call(category),
           ),
-          const SizedBox(height: 20),
-          _MilkPlanCard(onTap: widget.onOpenMilkPlan),
+          const SizedBox(height: 24),
+          _MilkPlanCard(
+            onTap: widget.onOpenMilkPlan,
+            plans: widget.milkPlans ?? sudhamrtamMilkSubscriptions,
+          ),
           const SizedBox(height: 24),
           const Center(
             child: Text(
@@ -300,39 +350,89 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: _green,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF9CCB57), _green, _darkGreen],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x3382B440),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          const Text(
-            'Pure Goodness, Naturally',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+          // Soft leaf shapes for depth.
+          Positioned(
+            right: -30,
+            top: -30,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.10),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Fresh dairy, natural honey and traditional wood-pressed oils.',
-            style: TextStyle(color: Colors.white, fontSize: 15),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            key: const Key('homeShopNow'),
-            onPressed: onShopNow,
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: _green,
+          Positioned(
+            right: 18,
+            bottom: 14,
+            child: Icon(
+              Icons.eco,
+              size: 84,
+              color: Colors.white.withValues(alpha: 0.18),
             ),
-            icon: const Icon(Icons.storefront_outlined),
-            label: const Text(
-              'Shop Now',
-              style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Pure Goodness, Naturally',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Fresh dairy, natural honey and traditional wood-pressed oils.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    fontSize: 14,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  key: const Key('homeShopNow'),
+                  onPressed: onShopNow,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: _darkGreen,
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  icon: const Icon(Icons.storefront_outlined),
+                  label: const Text(
+                    'Shop Now',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -410,15 +510,18 @@ class _DeliveryCard extends StatelessWidget {
     return Container(
       key: const Key('homeDeliveryCard'),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _paleGreen,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _borderGreen),
-      ),
+      decoration: _cardDecoration(),
       child: Row(
         children: [
-          const Icon(Icons.schedule_outlined, color: _green, size: 32),
-          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: const BoxDecoration(
+              color: _paleGreen,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.schedule_outlined, color: _darkGreen),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -431,7 +534,7 @@ class _DeliveryCard extends StatelessWidget {
                 Text(
                   detail,
                   style: const TextStyle(
-                    color: _green,
+                    color: _darkGreen,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -468,14 +571,23 @@ class _SectionTitle extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold),
+                ?.copyWith(fontWeight: FontWeight.w800, color: _ink),
           ),
         ),
         if (actionLabel != null)
           TextButton(
             onPressed: onAction,
-            style: TextButton.styleFrom(foregroundColor: _green),
-            child: Text(actionLabel!),
+            style: TextButton.styleFrom(foregroundColor: _darkGreen),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  actionLabel!,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const Icon(Icons.chevron_right, size: 18),
+              ],
+            ),
           ),
       ],
     );
@@ -506,16 +618,18 @@ class _QuickAddCard extends StatelessWidget {
     return Container(
       key: Key('quickAdd_${product.id}'),
       width: 160,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _paleGreen,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _borderGreen),
-      ),
+      padding: const EdgeInsets.all(10),
+      decoration: _cardDecoration(),
       child: Column(
         children: [
-          SizedBox(
+          Container(
             height: 140,
+            width: double.infinity,
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: _paleGreen,
+              borderRadius: BorderRadius.circular(14),
+            ),
             child: ProductImage(
               productId: product.id,
               icon: product.icon,
@@ -533,20 +647,29 @@ class _QuickAddCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             '₹${product.price.toStringAsFixed(0)} / ${product.unit}',
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
+            style: const TextStyle(
+              fontSize: 13,
+              color: _darkGreen,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const Spacer(),
           if (quantity == 0)
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton(
+              child: FilledButton.icon(
                 onPressed: onAdd,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _green,
-                  side: const BorderSide(color: _green),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _green,
+                  foregroundColor: Colors.white,
+                  shape: const StadiumBorder(),
                   visualDensity: VisualDensity.compact,
                 ),
-                child: const Text('ADD'),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text(
+                  'ADD',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             )
           else
@@ -635,40 +758,64 @@ class _CategoryGrid extends StatelessWidget {
         final category = categories[index];
         final count = counts[category]!;
 
-        return Material(
-          color: _paleGreen,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: _borderGreen),
-          ),
-          child: InkWell(
-            key: Key('homeCategory_$category'),
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => onOpen(category),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: ProductImage(
-                      productId: firstProduct[category]!.id,
-                      icon: firstProduct[category]!.icon,
-                      iconSize: 56,
-                      borderRadius: 10,
+        return DecoratedBox(
+          decoration: _cardDecoration(),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: Key('homeCategory_$category'),
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => onOpen(category),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _paleGreen,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: ProductImage(
+                          productId: firstProduct[category]!.id,
+                          icon: firstProduct[category]!.icon,
+                          iconSize: 56,
+                          borderRadius: 10,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    category,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    count == 1 ? '1 product' : '$count products',
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                ],
+                    const SizedBox(height: 10),
+                    Text(
+                      category,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _ink,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _paleGreen,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        count == 1 ? '1 product' : '$count products',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: _darkGreen,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -683,49 +830,158 @@ class _CategoryGrid extends StatelessWidget {
 // =====================================================
 
 class _MilkPlanCard extends StatelessWidget {
-  const _MilkPlanCard({required this.onTap});
+  const _MilkPlanCard({required this.onTap, required this.plans});
 
   final VoidCallback? onTap;
+  final MilkSubscriptionManager plans;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: _green),
-      ),
-      child: InkWell(
-        key: const Key('homeMilkPlan'),
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(Icons.calendar_month_outlined, color: _green, size: 32),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return ListenableBuilder(
+      listenable: plans,
+      builder: (context, _) {
+        // With a plan: manage it; without: start one.
+        final hasPlan = plans.subscriptions.any(
+          (p) => p.status != MilkSubscriptionStatus.cancelled,
+        );
+        return DecoratedBox(
+          decoration: _cardDecoration(color: _paleGreen),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: const Key('homeMilkPlan'),
+              borderRadius: BorderRadius.circular(20),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
                   children: [
-                    Text(
-                      'Set up a Milk Plan',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: const BoxDecoration(
+                        color: _green,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.calendar_month_outlined,
+                        color: Colors.white,
+                      ),
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Choose your milk, quantity and delivery time.',
-                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            hasPlan ? 'Your Milk Plan' : 'Set up a Milk Plan',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _ink,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            hasPlan
+                                ? 'Change quantity, pause or add vacation days.'
+                                : 'Choose your milk, quantity and delivery time.',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const Icon(Icons.chevron_right, color: _darkGreen),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: _green),
-            ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// =====================================================
+// GREETING
+// =====================================================
+
+/// "Welcome to Sudhamrtam" at the top, with the milk plan status as a
+/// small button under it (owner, 2026-11-17).
+class _Greeting extends StatefulWidget {
+  const _Greeting({
+    required this.status,
+    required this.loadName,
+    required this.now,
+  });
+
+  final Widget status;
+  final Future<String?> Function() loadName;
+  final DateTime Function() now;
+
+  @override
+  State<_Greeting> createState() => _GreetingState();
+}
+
+class _GreetingState extends State<_Greeting> {
+  String? _name;
+
+  @override
+  void initState() {
+    super.initState();
+    // A new name (signing in, editing the profile) shows at once.
+    sudhamrtamAccount.addListener(_load);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    sudhamrtamAccount.removeListener(_load);
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final name = await widget.loadName();
+      if (mounted && name != _name) setState(() => _name = name);
+    } catch (_) {
+      // Only a greeting: without the name it still says hello.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          greetingLine(widget.now(), _name),
+          key: const Key('homeGreeting'),
+          style: const TextStyle(
+            color: _darkGreen,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
           ),
         ),
-      ),
+        const SizedBox(height: 2),
+        Text(
+          'Welcome to Sudhamrtam',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: _ink,
+            letterSpacing: -0.2,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Pure farm goodness delivered to your doorstep.',
+          style: TextStyle(color: Colors.black54, fontSize: 14),
+        ),
+        const SizedBox(height: 12),
+        widget.status,
+      ],
     );
   }
 }

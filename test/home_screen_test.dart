@@ -48,6 +48,7 @@ void main() {
     OrderRulesLoader? loadRules,
     OffersLoader? loadOffers,
     DateTime? now,
+    String? name,
   }) async {
     tester.view.physicalSize = const Size(1080, 5000);
     tester.view.devicePixelRatio = 2;
@@ -69,6 +70,7 @@ void main() {
             loadRules: loadRules,
             loadOffers: loadOffers,
             clock: now == null ? null : () => now,
+            loadCustomerName: () async => name,
           ),
         ),
       ),
@@ -107,6 +109,51 @@ void main() {
     expect(
       tester.getTopLeft(find.byKey(const Key('offer-ticker'))).dy,
       lessThan(tester.getTopLeft(find.text('Welcome to Sudhamrtam')).dy),
+    );
+    await finish(tester);
+  });
+
+  test('the greeting follows the time of day, with the first name', () {
+    expect(
+      greetingLine(DateTime(2026, 11, 17, 7), 'Asha Rani'),
+      'Good morning, Asha 😊',
+    );
+    expect(greetingLine(DateTime(2026, 11, 17, 13), null), 'Good afternoon 😊');
+    expect(greetingLine(DateTime(2026, 11, 17, 19), '  '), 'Good evening 😊');
+    expect(
+      greetingLine(DateTime(2026, 11, 17, 2), 'Bala'),
+      'Good evening, Bala 😊',
+    );
+    // Initials are skipped.
+    expect(
+      greetingLine(DateTime(2026, 11, 17, 9), 'V Naga Raju'),
+      'Good morning, Naga 😊',
+    );
+    expect(
+      greetingLine(DateTime(2026, 11, 17, 9), 'K. Ravi'),
+      'Good morning, Ravi 😊',
+    );
+    expect(greetingLine(DateTime(2026, 11, 17, 9), 'V'), 'Good morning, V 😊');
+  });
+
+  testWidgets('Home greets the customer by name above the welcome', (
+    tester,
+  ) async {
+    await pumpHome(
+      tester,
+      loadOffers: () async => [],
+      now: DateTime(2026, 11, 17, 8),
+      name: 'Asha',
+    );
+    expect(find.text('Good morning, Asha 😊'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const Key('homeGreeting'))).dy,
+      lessThan(tester.getTopLeft(find.text('Welcome to Sudhamrtam')).dy),
+    );
+    // The milk plan status is a small button under the welcome.
+    expect(
+      tester.getTopLeft(find.byKey(const Key('accountStatus'))).dy,
+      greaterThan(tester.getTopLeft(find.text('Welcome to Sudhamrtam')).dy),
     );
     await finish(tester);
   });
