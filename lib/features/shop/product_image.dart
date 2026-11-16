@@ -47,10 +47,21 @@ class ProductImage extends StatelessWidget {
   final Color iconColor;
   final double borderRadius;
 
+  /// This product's photo, else one of its other sizes' (a size added
+  /// later, e.g. Paneer 200 g, shows the Paneer photo).
+  String get _photoId {
+    bool hasPhoto(String id) =>
+        productImageAssets.containsKey(id) || productPhotoUrls.containsKey(id);
+    if (hasPhoto(productId)) return productId;
+    return productOtherSizes[productId]?.where(hasPhoto).firstOrNull ??
+        productId;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final asset = productImageAssets[productId];
-    final url = productPhotoUrls[productId];
+    final photoId = _photoId;
+    final asset = productImageAssets[photoId];
+    final url = productPhotoUrls[photoId];
     final fallback = Center(
       child: Icon(icon, size: iconSize, color: iconColor),
     );

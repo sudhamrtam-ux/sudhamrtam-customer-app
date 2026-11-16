@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sudhamrtam_customer_app/features/shop/product_image.dart';
 import 'package:sudhamrtam_customer_app/models/product_catalog.dart';
+import 'package:sudhamrtam_customer_app/models/product_photos.dart';
 
 void main() {
   test('every product photo and the logo are bundled', () {
@@ -48,5 +49,29 @@ void main() {
     expect(find.byType(Image), findsOneWidget);
     expect(find.byIcon(Icons.breakfast_dining_outlined), findsOneWidget);
     expect(find.byIcon(Icons.local_drink_outlined), findsNothing);
+  });
+
+  testWidgets("a new size without a photo shows its product's", (tester) async {
+    productOtherSizes = {
+      'paneer_200_g': ['paneer'],
+    };
+    addTearDown(() => productOtherSizes = const {});
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: SizedBox(
+          height: 100,
+          child: ProductImage(
+            productId: 'paneer_200_g',
+            icon: Icons.breakfast_dining_outlined,
+          ),
+        ),
+      ),
+    );
+    final image = tester.widget<Image>(find.byType(Image));
+    expect(
+      (image.image as AssetImage).assetName,
+      'assets/images/products/paneer.jpg',
+    );
+    expect(find.byIcon(Icons.breakfast_dining_outlined), findsNothing);
   });
 }

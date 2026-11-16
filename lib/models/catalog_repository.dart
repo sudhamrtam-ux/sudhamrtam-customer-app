@@ -167,12 +167,25 @@ class CatalogRepository extends ChangeNotifier {
       for (final item in items)
         if (item.photoUrl != null) item.id: item.photoUrl!,
     });
+    _setOtherSizes(products);
+  }
+
+  static void _setOtherSizes(List<Product> products) {
+    productOtherSizes = {
+      for (final sizes in productsByName(products))
+        for (final p in sizes)
+          p.id: [
+            for (final other in sizes)
+              if (other.id != p.id) other.id,
+          ],
+    };
   }
 
   void _useBuiltIn() {
     setProductPhotoUrls(const {});
     _source = CatalogSource.builtIn;
     _products = _builtIn;
+    _setOtherSizes(_builtIn);
     _knownProducts = {for (final product in _builtIn) product.id: product};
   }
 
