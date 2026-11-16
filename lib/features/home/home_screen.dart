@@ -160,14 +160,15 @@ class _HomeScreenState extends State<HomeScreen> {
       animation: Listenable.merge([_catalog, _cart, _combos]),
       builder: (context, _) {
         final products = _catalog.products;
-        // One card per product (its usual size: first in the catalog).
+        // One card per product, in its main size (owner decision
+        // 2026-11-16): 1 L or 1 kg when sold, else the first.
         final essentials = [
           for (final sizes in productsByName(
             products
                 .where((p) => p.isAvailable && p.category == 'Fresh Dairy')
                 .toList(),
           ))
-            sizes.first,
+            mainSize(sizes),
         ].take(4).toList();
 
         return SafeArea(

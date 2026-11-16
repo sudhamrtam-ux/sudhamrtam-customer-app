@@ -216,3 +216,15 @@ List<List<Product>> productsByName(List<Product> products) {
   }
   return groups.values.toList();
 }
+
+/// A product's main size (owner decision 2026-11-16): 1 L or 1 kg when
+/// sold in it (Buffalo Milk 1 L, not 500 ml), else the first size.
+Product mainSize(List<Product> sizes) =>
+    sizes
+        .where(
+          (p) => const {'1 l', '1 kg'}.contains(
+            p.unit.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '),
+          ),
+        )
+        .firstOrNull ??
+    sizes.first;
