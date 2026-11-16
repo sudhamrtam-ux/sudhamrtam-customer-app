@@ -160,10 +160,15 @@ class _HomeScreenState extends State<HomeScreen> {
       animation: Listenable.merge([_catalog, _cart, _combos]),
       builder: (context, _) {
         final products = _catalog.products;
-        final essentials = products
-            .where((p) => p.isAvailable && p.category == 'Fresh Dairy')
-            .take(4)
-            .toList();
+        // One card per product (its usual size: first in the catalog).
+        final essentials = [
+          for (final sizes in productsByName(
+            products
+                .where((p) => p.isAvailable && p.category == 'Fresh Dairy')
+                .toList(),
+          ))
+            sizes.first,
+        ].take(4).toList();
 
         return SafeArea(
           child: Column(
@@ -604,7 +609,11 @@ class _CategoryGrid extends StatelessWidget {
               productImageAssets.containsKey(product.id))) {
         firstProduct[product.category] = product;
       }
-      counts[product.category] = (counts[product.category] ?? 0) + 1;
+    }
+    // Products, not sizes: Honey in three sizes is one product.
+    for (final sizes in productsByName(products)) {
+      final category = sizes.first.category;
+      counts[category] = (counts[category] ?? 0) + 1;
     }
     final categories = firstProduct.keys.toList();
 

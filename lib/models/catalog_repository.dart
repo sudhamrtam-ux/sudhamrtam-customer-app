@@ -193,3 +193,13 @@ class CatalogRepository extends ChangeNotifier {
     return _knownProducts[id]?.copyWith(isAvailable: false);
   }
 }
+
+/// The products grouped by name, in catalog order: one entry per
+/// product, holding all its sizes (Honey 250 g, 500 g and 1 kg).
+List<List<Product>> productsByName(List<Product> products) {
+  final groups = <String, List<Product>>{};
+  for (final product in products) {
+    (groups[product.name] ??= []).add(product);
+  }
+  return groups.values.toList();
+}

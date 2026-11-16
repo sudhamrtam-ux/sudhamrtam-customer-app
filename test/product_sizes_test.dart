@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sudhamrtam_customer_app/app/sudhamrtam_app.dart';
 import 'package:sudhamrtam_customer_app/database/milk_database_service.dart';
 import 'package:sudhamrtam_customer_app/features/shop/product_details_screen.dart';
+import 'package:sudhamrtam_customer_app/features/shop/shop_screen.dart';
 
 void main() {
   late Directory directory;
@@ -64,6 +65,28 @@ void main() {
           .selected,
       isTrue,
     );
+  });
+
+  testWidgets('the Shop shows honey once, with its sizes', (tester) async {
+    tester.view.physicalSize = const Size(1080, 6000);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await tester.runAsync(sudhamrtamCatalog.initialize);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: ShopScreen())),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Honey (Multi Flower)'), findsOneWidget);
+    expect(find.text('From ₹150'), findsOneWidget);
+    expect(find.byKey(const Key('sizes-honey_250g')), findsOneWidget);
+    expect(find.text('3 sizes'), findsOneWidget);
+
+    // It opens on the cheapest size, with the others to choose from.
+    await tester.tap(find.text('Honey (Multi Flower)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Price: ₹150.00'), findsOneWidget);
+    expect(find.text('1 kg · ₹550'), findsOneWidget);
   });
 
   testWidgets(

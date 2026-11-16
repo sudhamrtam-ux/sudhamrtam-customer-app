@@ -39,9 +39,12 @@ class ShopScreen extends StatelessWidget {
         }.toList();
         // A category that no longer exists falls back to all.
         final selected = categories.contains(category) ? category : null;
-        final products = selected == null
-            ? allProducts
-            : allProducts.where((p) => p.category == selected).toList();
+        // One card per product; its sizes are chosen on its page.
+        final products = productsByName(
+          selected == null
+              ? allProducts
+              : allProducts.where((p) => p.category == selected).toList(),
+        );
 
         return SafeArea(
           child: RefreshIndicator(
@@ -105,7 +108,7 @@ class ShopScreen extends StatelessWidget {
                           childAspectRatio: 0.68,
                         ),
                     itemBuilder: (context, index) =>
-                        _ProductCard(product: products[index]),
+                        _ProductCard(sizes: products[index]),
                   ),
                 const SizedBox(height: 20),
                 const Center(
@@ -166,13 +169,23 @@ class _CatalogStatus extends StatelessWidget {
 // =====================================================
 
 class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product});
+  const _ProductCard({required this.sizes});
 
-  final Product product;
+  /// The product in each of its sizes (often just one).
+  final List<Product> sizes;
+
+  /// The size shown and opened: the cheapest one on sale.
+  Product get product {
+    final onSale = sizes.where((p) => p.isAvailable).toList()
+      ..sort((a, b) => a.price.compareTo(b.price));
+    return onSale.firstOrNull ?? sizes.first;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final product = this.product;
     final available = product.isAvailable;
+    final sizesOnSale = sizes.where((p) => p.isAvailable).length;
     final color = available ? _green : Colors.grey;
 
     return InkWell(
@@ -235,11 +248,19 @@ class _ProductCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                available
-                    ? '₹${product.price.toStringAsFixed(0)} / ${product.unit}'
-                    : 'Not available',
+                !available
+                    ? 'Not available'
+                    : sizesOnSale > 1
+                    ? 'From ₹${product.price.toStringAsFixed(0)}'
+                    : '₹${product.price.toStringAsFixed(0)} / ${product.unit}',
                 style: TextStyle(fontWeight: FontWeight.w600, color: color),
               ),
+              if (sizesOnSale > 1)
+                Text(
+                  '$sizesOnSale sizes',
+                  key: Key('sizes-${product.id}'),
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
             ],
           ),
         ),
