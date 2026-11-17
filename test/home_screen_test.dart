@@ -150,10 +150,15 @@ void main() {
       tester.getTopLeft(find.byKey(const Key('homeGreeting'))).dy,
       lessThan(tester.getTopLeft(find.text('Welcome to Sudhamrtam')).dy),
     );
-    // The milk plan status is a small button under the welcome.
+    // The milk plan badge sits in the top-right corner, beside the
+    // welcome; the banner comes right after (owner, 2026-11-17).
+    final badge = tester.getRect(find.byKey(const Key('accountStatus')));
+    final welcome = tester.getRect(find.text('Welcome to Sudhamrtam'));
+    expect(badge.left, greaterThan(welcome.right));
+    expect(badge.top, lessThan(welcome.bottom));
     expect(
-      tester.getTopLeft(find.byKey(const Key('accountStatus'))).dy,
-      greaterThan(tester.getTopLeft(find.text('Welcome to Sudhamrtam')).dy),
+      tester.getTopLeft(find.byKey(const Key('homeShopNow'))).dy,
+      lessThan(tester.getTopLeft(find.text('Daily Essentials')).dy),
     );
     await finish(tester);
   });
@@ -214,6 +219,9 @@ void main() {
     await tester.pump();
     expect(cart.quantityFor('cow_milk'), 2);
     expect(find.descendant(of: card, matching: find.text('2')), findsOneWidget);
+    // Home says what is waiting in the cart (owner, 2026-11-17).
+    expect(find.byKey(const Key('homeCartWaiting')), findsOneWidget);
+    expect(find.text('2 items in your cart · ₹180'), findsOneWidget);
     await drainSaves(tester);
 
     for (var i = 0; i < 2; i++) {
@@ -228,6 +236,8 @@ void main() {
       find.descendant(of: card, matching: find.text('ADD')),
       findsOneWidget,
     );
+    // An empty cart is not mentioned.
+    expect(find.byKey(const Key('homeCartWaiting')), findsNothing);
 
     await finish(tester);
   });

@@ -81,10 +81,18 @@ String billLitres(int ml) => '${(ml / 1000).toStringAsFixed(2)} L';
 /// A reminder on the Milk Plan tab: unpaid bills, or a way to the
 /// paid ones. Shows nothing when signed out or when there are none.
 class MilkBillsReminder extends StatefulWidget {
-  const MilkBillsReminder({super.key, this.api, this.launcher});
+  const MilkBillsReminder({
+    super.key,
+    this.api,
+    this.launcher,
+    this.unpaidOnly = false,
+  });
 
   final MilkBillApiClient? api;
   final PaymentLauncher? launcher;
+
+  /// Home shows it only when a bill is waiting to be paid.
+  final bool unpaidOnly;
 
   @override
   State<MilkBillsReminder> createState() => _MilkBillsReminderState();
@@ -130,6 +138,7 @@ class _MilkBillsReminderState extends State<MilkBillsReminder> {
     if (bills == null || bills.isEmpty) return const SizedBox.shrink();
 
     final unpaid = bills.where((b) => b.isUnpaid).toList();
+    if (unpaid.isEmpty && widget.unpaidOnly) return const SizedBox.shrink();
     final overdue = unpaid.any((b) => b.overdue);
     final total = unpaid.fold(0, (sum, b) => sum + b.totalPaise);
 

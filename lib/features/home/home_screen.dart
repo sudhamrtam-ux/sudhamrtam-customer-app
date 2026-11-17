@@ -13,6 +13,7 @@ import '../../services/catalog_api_client.dart' show apiBaseUrl;
 import '../../services/offer_api_client.dart';
 import '../../services/order_api_client.dart';
 import '../checkout/order_destination.dart';
+import '../milk_bills/milk_bills_screen.dart';
 import '../shop/product_image.dart';
 import '../../models/milk_subscription.dart';
 import '../../models/milk_subscription_manager.dart';
@@ -253,6 +254,8 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           // Welcome first, with the milk plan as a small button
           // (owner, 2026-11-17).
+          // Welcome, with the milk plan badge in the corner, then the
+          // banner (owner, 2026-11-17).
           _Greeting(
             loadName: widget.loadCustomerName,
             now: widget.clock,
@@ -260,17 +263,24 @@ class _HomeScreenState extends State<HomeScreen> {
               plans: widget.milkPlans,
               onOpen: widget.onOpenMilkPlan,
               today: widget.clock,
+              compact: true,
             ),
           ),
+          const SizedBox(height: 14),
+          _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
           const SizedBox(height: 16),
-          // Hidden unless an address lacks its map spot or details.
+          // What the customer should know at once; each only when it
+          // applies.
+          // An address without its map spot or details.
           const AddressDetailsCard(),
-          // Combo offers (owner decision 2026-11-15).
-          if (_combos.combos.isNotEmpty) ...[
-            ComboCards(
-              combos: _combos.combos,
-              cart: _cart,
-              onOpenCart: widget.onOpenCart,
+          // A milk bill to pay.
+          const MilkBillsReminder(unpaidOnly: true),
+          // Items left in the cart.
+          if (_cart.totalQuantity > 0) ...[
+            _CartWaitingCard(
+              items: _cart.totalQuantity,
+              subtotal: _cart.subtotal,
+              onOpen: widget.onOpenCart,
             ),
             const SizedBox(height: 12),
           ],
@@ -280,11 +290,18 @@ class _HomeScreenState extends State<HomeScreen> {
             client: sudhamrtamMilkTomorrow,
             onChanged: () => sudhamrtamMilkSync.refresh(force: true),
           ),
-          const SizedBox(height: 16),
-          _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
           if (_rules != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             _DeliveryCard(rules: _rules!, now: widget.clock()),
+          ],
+          // Combo offers (owner decision 2026-11-15).
+          if (_combos.combos.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            ComboCards(
+              combos: _combos.combos,
+              cart: _cart,
+              onOpenCart: widget.onOpenCart,
+            ),
           ],
           if (essentials.isNotEmpty) ...[
             const SizedBox(height: 28),
@@ -382,16 +399,16 @@ class _HeroCard extends StatelessWidget {
             ),
           ),
           Positioned(
-            right: 18,
-            bottom: 14,
+            right: 16,
+            bottom: 10,
             child: Icon(
               Icons.eco,
-              size: 84,
+              size: 72,
               color: Colors.white.withValues(alpha: 0.18),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -399,7 +416,7 @@ class _HeroCard extends StatelessWidget {
                   'Pure Goodness, Naturally',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.2,
                   ),
@@ -413,7 +430,7 @@ class _HeroCard extends StatelessWidget {
                     height: 1.35,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 FilledButton.icon(
                   key: const Key('homeShopNow'),
                   onPressed: onShopNow,
@@ -953,6 +970,17 @@ class _GreetingState extends State<_Greeting> {
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: _texts(context)),
+        const SizedBox(width: 12),
+        widget.status,
+      ],
+    );
+  }
+
+  Widget _texts(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -979,9 +1007,80 @@ class _GreetingState extends State<_Greeting> {
           'Pure farm goodness delivered to your doorstep.',
           style: TextStyle(color: Colors.black54, fontSize: 14),
         ),
-        const SizedBox(height: 12),
-        widget.status,
       ],
+    );
+  }
+}
+
+// =====================================================
+// CART WAITING
+// =====================================================
+
+/// "3 items in your cart · ₹450": items left in the cart, one tap to
+/// check out.
+class _CartWaitingCard extends StatelessWidget {
+  const _CartWaitingCard({
+    required this.items,
+    required this.subtotal,
+    required this.onOpen,
+  });
+
+  final int items;
+  final double subtotal;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: _cardDecoration(),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const Key('homeCartWaiting'),
+          borderRadius: BorderRadius.circular(20),
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(
+                    color: _paleGreen,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.shopping_cart_outlined,
+                    color: _darkGreen,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$items ${items == 1 ? 'item' : 'items'} in your cart'
+                        ' · ₹${subtotal.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _ink,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Finish your order before the cut-off.',
+                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: _darkGreen),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

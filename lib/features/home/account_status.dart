@@ -154,7 +154,12 @@ class AccountStatusCard extends StatelessWidget {
     this.plans,
     this.onOpen,
     this.today = DateTime.now,
+    this.compact = false,
   });
+
+  /// A small badge for a corner of Home (owner, 2026-11-17): "Milk
+  /// plan" over the status, details in the Milk Plan tab it opens.
+  final bool compact;
 
   /// Defaults to the app's milk plans.
   final MilkSubscriptionManager? plans;
@@ -168,6 +173,56 @@ class AccountStatusCard extends StatelessWidget {
       listenable: manager,
       builder: (context, _) {
         final status = accountStatusFor(manager.subscriptions, today());
+        if (compact) {
+          return Tooltip(
+            message: status.detail,
+            child: Material(
+              key: const Key('accountStatus'),
+              color: status.color.withValues(alpha: 0.10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: status.color.withValues(alpha: 0.45)),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: onOpen,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 7),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Milk plan',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: status.color,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(status.icon, color: status.color, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            status.label,
+                            key: const Key('accountStatusLabel'),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: status.color,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
         // A small button with text (owner, 2026-11-17); the details
         // are in the Milk Plan tab it opens.
         return Align(
