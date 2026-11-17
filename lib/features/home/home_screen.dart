@@ -20,6 +20,7 @@ import '../../models/milk_subscription_manager.dart';
 import 'account_status.dart';
 import 'address_details_card.dart';
 import 'combo_cards.dart';
+import 'glance_cards.dart';
 import 'offer_ticker.dart';
 import 'tomorrow_milk_card.dart';
 
@@ -275,6 +276,13 @@ class _HomeScreenState extends State<HomeScreen> {
           const AddressDetailsCard(),
           // A milk bill to pay.
           const MilkBillsReminder(unpaidOnly: true),
+          // New messages from Sudhamrtam.
+          const NewMessagesCard(),
+          // The last order: on its way, or just delivered.
+          LastOrderCard(
+            key: ValueKey('last-order-$_tomorrowTick'),
+            now: widget.clock,
+          ),
           // Items left in the cart.
           if (_cart.totalQuantity > 0) ...[
             _CartWaitingCard(
