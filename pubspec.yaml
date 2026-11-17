@@ -47,6 +47,7 @@ dependencies:
   url_launcher: ^6.3.3
   google_maps_flutter: ^2.19.0
   geolocator: ^14.1.2
+  video_player: ^2.14.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -76,6 +77,8 @@ flutter:
   assets:
     - assets/images/
     - assets/images/products/
+    # The opening animation (owner, 2026-11-17).
+    - assets/videos/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

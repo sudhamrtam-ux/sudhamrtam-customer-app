@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The opening animation's background (owner, 2026-11-17): Android's
+         own launch screen uses it, so the video follows without a flash. -->
+    <color name="splash_background">#F8E4C2</color>
+</resources>

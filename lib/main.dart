@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'app/checkout_startup_controller.dart';
+import 'app/splash_video.dart';
 import 'app/sudhamrtam_app.dart';
 import 'core/theme/app_theme.dart';
 import 'database/checkout_recovery_executor.dart';
@@ -28,6 +29,17 @@ import 'services/support_api_client.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // The opening animation (owner, 2026-11-17) plays first, while the
+  // app gets ready below; the app opens when both are done.
+  final splashDone = Completer<void>();
+  runApp(
+    SplashVideoApp(
+      onDone: () {
+        if (!splashDone.isCompleted) splashDone.complete();
+      },
+    ),
+  );
 
   // Phone login through the backend, only when this build has
   // a server (API_BASE_URL). Optional: a failure here must not
@@ -124,6 +136,8 @@ Future<void> main() async {
   sudhamrtamAccount.attach();
   // Milk plans: upload phone-only plans and mirror the account.
   sudhamrtamMilkSync.attach();
+
+  await splashDone.future;
 
   if (startupController.isReady) {
     runApp(const SudhamrtamApp());
