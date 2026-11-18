@@ -10,7 +10,7 @@ void main() {
 
   test('Protected SQLite v6 migration fixture remains valid', () async {
     const backupFolder =
-        r'C:\Sudhamrtam\backups\milestone_126_7_migration_test';
+        r'D:\Sudhamrtam\backups\milestone_126_7_migration_test';
 
     final fixtureFile = File(
       '$backupFolder${Platform.pathSeparator}'

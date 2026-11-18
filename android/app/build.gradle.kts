@@ -8,7 +8,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Release signing key (C:\Sudhamrtam\signing): android/key.properties,
+// Release signing key (D:\Sudhamrtam\signing): android/key.properties,
 // never in git. Without it (another computer), release builds use the
 // debug key and cannot update apps installed with the real key.
 val keystoreProperties = Properties()

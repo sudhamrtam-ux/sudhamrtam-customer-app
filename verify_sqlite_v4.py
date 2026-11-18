@@ -1,7 +1,7 @@
 ﻿import sqlite3
 from pathlib import Path
 
-backup_root = Path(r"C:\Sudhamrtam\backups")
+backup_root = Path(r"D:\Sudhamrtam\backups")
 
 v3_file = (
     backup_root

@@ -6,7 +6,7 @@ Future<void> main() async {
   sqfliteFfiInit();
 
   const databasePath =
-      r'C:\Sudhamrtam\backups\milestone_126_7_android_sqlite_v5\sudhamrtam_milk.db';
+      r'D:\Sudhamrtam\backups\milestone_126_7_android_sqlite_v5\sudhamrtam_milk.db';
 
   final db = await databaseFactoryFfi.openDatabase(
     databasePath,

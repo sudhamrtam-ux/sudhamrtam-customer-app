@@ -8,7 +8,7 @@ Future<void> main() async {
   sqfliteFfiInit();
 
   const testDatabasePath =
-      r'C:\Sudhamrtam\backups\milestone_126_7_migration_test\sudhamrtam_milk.db';
+      r'D:\Sudhamrtam\backups\milestone_126_7_migration_test\sudhamrtam_milk.db';
 
   final service = MilkDatabaseService.instance;
 

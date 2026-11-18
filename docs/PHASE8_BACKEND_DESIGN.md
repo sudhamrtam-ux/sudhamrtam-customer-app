@@ -22,7 +22,7 @@ Flutter app ──HTTPS/JSON──▶  Sudhamrtam API (Node.js + TypeScript)  �
 
 - **API:** Node.js with TypeScript and a lightweight framework (Fastify). The JSON API is versioned under `/v1`.
 - **Database:** PostgreSQL, with schema changes managed by versioned migration files.
-- **Location:** a separate repository, `C:\Sudhamrtam\sudhamrtam_backend`. The app repository stays Flutter-only.
+- **Location:** a separate repository, `D:\Sudhamrtam\sudhamrtam_backend`. The app repository stays Flutter-only.
 - **Hosting:** to be decided (see §9). Use an India region (Mumbai), since customer data falls under India's DPDP Act 2023.
 - **Admin panel and website (Phases 9 and 12)** use the same API, with staff roles.
 
@@ -138,7 +138,7 @@ This maps directly onto the app's existing code. `OrderSubmissionService`'s `sav
 
 Needed from the old database: **areas, routes, products and prices only.**
 
-Please export those tables (phpMyAdmin → Export → SQL, or `mysqldump`) to a folder **outside any git repository**, for example `C:\Sudhamrtam\old_site_export\`.
+Please export those tables (phpMyAdmin → Export → SQL, or `mysqldump`) to a folder **outside any git repository**, for example `D:\Sudhamrtam\old_site_export\`.
 
 - **Do not** include customer, user, login or password tables. They aren't needed, and they contain personal data.
 - I will read the export, propose how each table maps onto the new schema (§3), and write an import script for your review.

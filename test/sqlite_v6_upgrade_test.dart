@@ -12,7 +12,7 @@ void main() {
 
   test('SQLite v5 to v7 upgrade preserves v6 checkout schema', () async {
     const sourcePath =
-        r'C:\Sudhamrtam\backups\milestone_126_7_migration_test\sudhamrtam_milk_before_v6.db';
+        r'D:\Sudhamrtam\backups\milestone_126_7_migration_test\sudhamrtam_milk_before_v6.db';
 
     final sourceFile = File(sourcePath);
 

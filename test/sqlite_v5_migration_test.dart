@@ -12,7 +12,7 @@ void main() {
 
   test('SQLite v5 backup upgrades to v7 without data loss', () async {
     const sourcePath =
-        r'C:\Sudhamrtam\backups\milestone_126_7_migration_test\sudhamrtam_milk_before_v6.db';
+        r'D:\Sudhamrtam\backups\milestone_126_7_migration_test\sudhamrtam_milk_before_v6.db';
 
     final sourceFile = File(sourcePath);
 

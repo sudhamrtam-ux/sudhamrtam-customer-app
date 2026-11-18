@@ -20,8 +20,8 @@ Sudhamrtam sells premium, farm-fresh and natural products: **Buffalo Milk, Cow M
 
 ## 3. Local environment
 
-- Flutter project: `C:\Sudhamrtam\sudhamrtam_customer_app`
-- Backup previously reported: `C:\Sudhamrtam\sudhamrtam_customer_app_backup`
+- Flutter project: `D:\Sudhamrtam\sudhamrtam_customer_app`
+- Backup previously reported: `D:\Sudhamrtam\sudhamrtam_customer_app_backup`
 - Android SDK: `C:\Android\Sdk`
 - Flutter version previously reported: **3.47.9 stable**.
 - Android NDK version previously installed: `28.2.13676358`.
@@ -57,7 +57,7 @@ The project started from a Flutter default/demo scaffold and a starter ZIP whose
 ## 6. Expected source layout at handoff
 
 ```text
-C:\Sudhamrtam\sudhamrtam_customer_app\
+D:\Sudhamrtam\sudhamrtam_customer_app\
 ├── lib\
 │   ├── main.dart
 │   ├── app\

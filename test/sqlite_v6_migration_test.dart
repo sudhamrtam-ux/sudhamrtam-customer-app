@@ -10,7 +10,7 @@ void main() {
     sqfliteFfiInit();
 
     const sourcePath =
-        r'C:\Sudhamrtam\backups\milestone_126_7_migration_test\sudhamrtam_milk_before_v6.db';
+        r'D:\Sudhamrtam\backups\milestone_126_7_migration_test\sudhamrtam_milk_before_v6.db';
 
     expect(
       File(sourcePath).existsSync(),
