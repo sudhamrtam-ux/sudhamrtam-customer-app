@@ -8,9 +8,7 @@ Sudhamrtam customer app: a Flutter (Android first, iOS later) shopping app for a
 
 Separate product from Ayyappa Diksha (`../AyyappaDiksha`, `../ayyappa_diksha_backend`): own repository (`github.com/sudhamrtam-ux/sudhamrtam-customer-app`), own backend, own Firebase project and signing key. Never share code by path, copy files across, or push one project's commits to the other's remote. A session working on this app stays in this folder.
 
-`AGENTS.md` and `SUDHAMRTAM_CODEX_HANDOFF.md` hold the original working agreement. **The handoff doc is badly out of date** (it describes a Step 45 scaffold with only a Home screen). Trust the source tree, not the doc's status sections.
-
-## Working agreement (from AGENTS.md)
+## Working agreement
 
 - The user is on Windows + VS Code, is new to Flutter, and tests on a Motorola moto g85 5G over USB.
 - Work one step at a time and wait for explicit user confirmation between steps. Inspect before modifying.
