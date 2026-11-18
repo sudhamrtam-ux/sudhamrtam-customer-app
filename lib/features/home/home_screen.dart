@@ -531,6 +531,10 @@ class _DeliveryCard extends StatelessWidget {
     final terms = rules.deliveryFeePaise == 0
         ? 'Free delivery on orders of ₹$minimum or more'
         : 'Minimum order ₹$minimum';
+    // Only what the server offers now (checkout follows the same rules).
+    final payments = rules.offersOnlinePayment
+        ? 'Cash on Delivery or pay online'
+        : 'Cash on Delivery';
 
     return Container(
       key: const Key('homeDeliveryCard'),
@@ -565,7 +569,7 @@ class _DeliveryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$terms • Cash on Delivery',
+                  '$terms • $payments',
                   style: const TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ],

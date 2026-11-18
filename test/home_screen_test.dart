@@ -265,6 +265,31 @@ void main() {
     await finish(tester);
   });
 
+  testWidgets('the card says online payment only when the server offers it', (
+    tester,
+  ) async {
+    await pumpHome(
+      tester,
+      loadRules: () async => const OrderRules(
+        minimumOrderPaise: 20000,
+        deliveryFeePaise: 0,
+        cutoffHourIst: 21,
+        paymentMethods: ['cash_on_delivery', 'online'],
+      ),
+      now: DateTime.utc(2026, 11, 7, 4, 30),
+    );
+
+    expect(
+      find.text(
+        'Free delivery on orders of ₹200 or more • '
+        'Cash on Delivery or pay online',
+      ),
+      findsOneWidget,
+    );
+
+    await finish(tester);
+  });
+
   testWidgets('after the cut-off: shows the later delivery date', (
     tester,
   ) async {
