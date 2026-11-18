@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sudhamrtam customer app: a Flutter (Android first, iOS later) shopping app for a premium organic dairy/oil brand. Android package: `com.sudhamrtam.customer`. Data lives on the phone in SQLite (`sqflite`). A build can optionally talk to the Sudhamrtam backend (`../sudhamrtam_backend`, Node/PostgreSQL) for the catalog, phone login, the profile and saved addresses, placing orders (Cash on Delivery or online with Cashfree), milk plans and monthly milk bills; order history is still kept on the phone. Brand primary green is `#82B440` (premium, organic, pastoral style).
 
+Separate product from Ayyappa Diksha (`../AyyappaDiksha`, `../ayyappa_diksha_backend`): own repository (`github.com/sudhamrtam-ux/sudhamrtam-customer-app`), own backend, own Firebase project and signing key. Never share code by path, copy files across, or push one project's commits to the other's remote. A session working on this app stays in this folder.
+
 `AGENTS.md` and `SUDHAMRTAM_CODEX_HANDOFF.md` hold the original working agreement. **The handoff doc is badly out of date** (it describes a Step 45 scaffold with only a Home screen). Trust the source tree, not the doc's status sections.
 
 ## Working agreement (from AGENTS.md)
