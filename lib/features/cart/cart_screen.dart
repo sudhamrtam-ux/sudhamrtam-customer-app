@@ -268,14 +268,6 @@ class CartScreen extends StatelessWidget {
                 ),
               ),
 
-            const SizedBox(height: 12),
-
-            const Text(
-              'You can review checkout options. '
-              'Actual order placement is not yet available.',
-              style: TextStyle(color: Colors.black54),
-            ),
-
             const SizedBox(height: 16),
 
             FilledButton.icon(
