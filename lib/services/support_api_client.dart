@@ -14,7 +14,15 @@ class SupportException implements Exception {
   /// The customer must sign in (again).
   final bool unauthorized;
 
-  const SupportException(this.message, {this.code, this.unauthorized = false});
+  /// ORDER_HAS_QUERY: the order's conversation, to write in instead.
+  final String? queryId;
+
+  const SupportException(
+    this.message, {
+    this.code,
+    this.unauthorized = false,
+    this.queryId,
+  });
 
   @override
   String toString() => message;
@@ -45,10 +53,25 @@ class SupportQuery {
   /// Set once Sudhamrtam has handled it.
   final DateTime? handledAt;
 
-  /// Sudhamrtam's reply, if any.
+  /// Sudhamrtam's latest reply, if any.
   final String? reply;
 
-  const SupportQuery({
+  /// The order it is about (one conversation per order).
+  final String? orderId;
+
+  /// e.g. "SUD0000020".
+  final String? orderRef;
+
+  /// The latest message.
+  final DateTime lastMessageAt;
+
+  /// Sudhamrtam wrote last.
+  final bool lastFromSudhamrtam;
+
+  /// A reply the customer has not opened yet.
+  final bool unread;
+
+  SupportQuery({
     required this.id,
     this.ref,
     required this.topic,
@@ -56,7 +79,15 @@ class SupportQuery {
     required this.createdAt,
     this.handledAt,
     this.reply,
-  });
+    this.orderId,
+    this.orderRef,
+    DateTime? lastMessageAt,
+    this.lastFromSudhamrtam = false,
+    this.unread = false,
+  }) : lastMessageAt = lastMessageAt ?? createdAt;
+
+  /// Resolved by Sudhamrtam; writing again reopens it.
+  bool get isResolved => handledAt != null;
 
   factory SupportQuery.fromJson(Map<String, dynamic> json) => SupportQuery(
     id: json['id'] as String,
@@ -68,7 +99,101 @@ class SupportQuery {
         ? null
         : DateTime.parse(json['handled_at'] as String),
     reply: json['reply'] as String?,
+    orderId: json['order_id'] as String?,
+    orderRef: json['order_ref'] as String?,
+    lastMessageAt: json['last_message_at'] == null
+        ? null
+        : DateTime.parse(json['last_message_at'] as String),
+    lastFromSudhamrtam: json['last_from'] == 'staff',
+    unread: json['unread'] as bool? ?? false,
   );
+}
+
+/// One message in a conversation.
+class SupportMessage {
+  final String id;
+
+  /// Written by Sudhamrtam (else by the customer).
+  final bool fromSudhamrtam;
+  final String body;
+  final DateTime createdAt;
+
+  const SupportMessage({
+    required this.id,
+    required this.fromSudhamrtam,
+    required this.body,
+    required this.createdAt,
+  });
+
+  factory SupportMessage.fromJson(Map<String, dynamic> json) => SupportMessage(
+    id: json['id'] as String,
+    fromSudhamrtam: json['from'] == 'staff',
+    body: json['body'] as String,
+    createdAt: DateTime.parse(json['created_at'] as String),
+  );
+}
+
+/// The order a conversation is about, as the server has it.
+class SupportOrder {
+  final String id;
+  final String orderRef;
+
+  /// pending, delivered, not_delivered, cancelled...
+  final String status;
+  final String paymentStatus;
+  final String deliveryDate;
+  final int totalPaise;
+
+  /// "2 × Curd (1 kg)".
+  final List<String> items;
+
+  const SupportOrder({
+    required this.id,
+    required this.orderRef,
+    required this.status,
+    required this.paymentStatus,
+    required this.deliveryDate,
+    required this.totalPaise,
+    required this.items,
+  });
+
+  factory SupportOrder.fromJson(Map<String, dynamic> json) => SupportOrder(
+    id: json['id'] as String,
+    orderRef: json['order_ref'] as String,
+    status: json['status'] as String,
+    paymentStatus: json['payment_status'] as String,
+    deliveryDate: json['delivery_date'] as String,
+    totalPaise: (json['total_paise'] as num).toInt(),
+    items: [
+      for (final i in (json['items'] as List).cast<Map<String, dynamic>>())
+        '${i['quantity']} × ${i['product_name']} (${i['unit_label']})',
+    ],
+  );
+}
+
+/// A query with all its messages and its order.
+class SupportConversation {
+  final SupportQuery query;
+  final List<SupportMessage> messages;
+  final SupportOrder? order;
+
+  const SupportConversation({
+    required this.query,
+    required this.messages,
+    this.order,
+  });
+
+  factory SupportConversation.fromJson(Map<String, dynamic> json) =>
+      SupportConversation(
+        query: SupportQuery.fromJson(json['query'] as Map<String, dynamic>),
+        messages: [
+          for (final m in json['messages'] as List)
+            SupportMessage.fromJson(m as Map<String, dynamic>),
+        ],
+        order: json['order'] == null
+            ? null
+            : SupportOrder.fromJson(json['order'] as Map<String, dynamic>),
+      );
 }
 
 /// A new ID per query, reused when sending is retried, so it is
@@ -101,18 +226,41 @@ class SupportApiClient {
 
   bool get isSignedIn => token() != null;
 
-  /// Sends it; retrying with the same [id] saves it once.
+  /// Sends it; retrying with the same [id] saves it once. With
+  /// [orderId] it is that order's conversation; when the order has one
+  /// already, a [SupportException] with code ORDER_HAS_QUERY gives its
+  /// [SupportException.queryId].
   Future<SupportQuery> send(
     String id, {
     required String topic,
     required String message,
+    String? orderId,
   }) async {
     final json = await _send('PUT', 'v1/support-queries/$id', {
       'topic': topic,
       'message': message,
+      'order_id': ?orderId,
     });
     return SupportQuery.fromJson(json['query'] as Map<String, dynamic>);
   }
+
+  /// One conversation; opening it marks Sudhamrtam's replies read.
+  Future<SupportConversation> fetchConversation(String id) async =>
+      SupportConversation.fromJson(
+        await _send('GET', 'v1/support-queries/$id'),
+      );
+
+  /// Writes in a conversation (reopens a resolved one); retrying with
+  /// the same [messageId] saves it once.
+  Future<SupportConversation> sendMessage(
+    String id,
+    String messageId,
+    String body,
+  ) async => SupportConversation.fromJson(
+    await _send('PUT', 'v1/support-queries/$id/messages/$messageId', {
+      'body': body,
+    }),
+  );
 
   /// The customer's queries, newest first.
   Future<List<SupportQuery>> fetchMine() async {
@@ -175,6 +323,7 @@ class SupportApiClient {
       json?['message'] as String? ??
           'Something went wrong. Please try again, or call us.',
       code: json?['error'] as String?,
+      queryId: json?['query_id'] as String?,
     );
   }
 }

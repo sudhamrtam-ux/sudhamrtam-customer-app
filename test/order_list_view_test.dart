@@ -15,6 +15,7 @@ import 'package:sudhamrtam_customer_app/models/customer_order.dart';
 import 'package:sudhamrtam_customer_app/models/order_item.dart';
 import 'package:sudhamrtam_customer_app/models/product.dart';
 import 'package:sudhamrtam_customer_app/services/order_api_client.dart';
+import 'package:sudhamrtam_customer_app/services/support_api_client.dart';
 
 /// My Orders as cards: a header (placed, total, number), where the order
 /// is, the items with photos and "Buy it again". Prices are SAMPLE data.
@@ -103,7 +104,11 @@ void main() {
     }
   }
 
-  Future<void> open(WidgetTester tester, {OrderApiClient? api}) async {
+  Future<void> open(
+    WidgetTester tester, {
+    OrderApiClient? api,
+    SupportApiClient? support,
+  }) async {
     tester.view.physicalSize = const Size(1080, 4000);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
@@ -111,6 +116,7 @@ void main() {
       MaterialApp(
         home: OrderHistoryScreen(
           api: api,
+          support: support,
           productLookup: (id) => id == milk.id ? milk : null,
         ),
       ),
@@ -161,6 +167,24 @@ void main() {
     expect(find.text('Arriving 6 December'), findsNothing);
   });
 
+  testWidgets('on a tablet the buttons stand beside the items', (tester) async {
+    await open(tester);
+    // A tablet in portrait: 1200 px at 2 = 600 wide (the HONOR Pad).
+    tester.view.physicalSize = const Size(1200, 4000);
+    tester.view.devicePixelRatio = 2;
+    await tester.pump();
+
+    expect(find.text('DELIVER TO'), findsNWidgets(2));
+    final help = find.byKey(const Key('help-aaaa0000aaaa0000aaaa0000aaaa0001'));
+    final buy = find.byKey(const Key('buy-again-buffalo_milk'));
+    expect(help, findsOneWidget);
+    // Beside, not below: the help button is right of the item, at its
+    // height.
+    expect(tester.getTopLeft(help).dx, greaterThan(tester.getTopRight(buy).dx));
+    expect(tester.getTopLeft(help).dy, lessThan(tester.getBottomLeft(buy).dy));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Buy it again puts one in the cart', (tester) async {
     await open(tester);
 
@@ -194,6 +218,46 @@ void main() {
     expect(find.textContaining('No internet connection'), findsOneWidget);
     // The phone's statuses are still shown.
     expect(find.text('Arriving 6 December'), findsOneWidget);
+  });
+
+  testWidgets('an order with a help conversation says so', (tester) async {
+    final support = SupportApiClient(
+      baseUrl: 'https://api.test',
+      token: () => 'tok',
+      httpClient: MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            'queries': [
+              {
+                'id': 'q_help_000001',
+                'ref': 'Q-1009',
+                'topic': 'order',
+                'message': 'Late',
+                'created_at': '2026-11-19T05:00:00.000Z',
+                'handled_at': null,
+                'reply': 'On its way',
+                'order_id': 'aaaa0000aaaa0000aaaa0000aaaa0001',
+                'order_ref': 'SUD0000001',
+                'last_message_at': '2026-11-19T06:00:00.000Z',
+                'last_from': 'staff',
+                'unread': true,
+              },
+            ],
+          }),
+          200,
+        ),
+      ),
+    );
+    await open(tester, support: support);
+    await settle(tester);
+
+    expect(
+      find.text('Help request Q-1009  ·  New reply', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.text('Open help conversation'), findsOneWidget);
+    // The other order has none yet.
+    expect(find.text('Get help with this order'), findsOneWidget);
   });
 
   // Last: it changes the saved statuses.

@@ -7,6 +7,7 @@ import '../../core/company.dart';
 import '../../core/widgets/page_app_bar.dart';
 import '../../services/support_api_client.dart';
 import '../feedback/feedback_screen.dart' show feedbackDate;
+import 'support_conversation_screen.dart';
 
 const _brandGreen = Color(0xFF82B440);
 
@@ -107,6 +108,16 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  /// The whole conversation; the list updates when it closes.
+  Future<void> _openConversation(SupportQuery q) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SupportConversationScreen(queryId: q.id, api: _api),
+      ),
+    );
+    await _load();
   }
 
   Future<void> _open(Uri uri, String copyText) async {
@@ -339,54 +350,88 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             Card(
               key: Key('supportQuery-${q.id}'),
               margin: const EdgeInsets.only(bottom: 10),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${supportTopics[q.topic] ?? 'Query'}  ·  '
-                            '${feedbackDate(q.createdAt)}',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => _openConversation(q),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${supportTopics[q.topic] ?? 'Query'}  ·  '
+                              '${feedbackDate(q.createdAt)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
-                        _StatusPill(answered: q.handledAt != null),
-                      ],
-                    ),
-                    if (q.ref != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: SelectableText(
-                          'Query no. ${q.ref}',
-                          key: Key('supportRef-${q.id}'),
-                          style: const TextStyle(
-                            color: Colors.black54,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
+                          _StatusPill(
+                            text: q.unread
+                                ? 'New reply'
+                                : q.isResolved
+                                ? 'Resolved'
+                                : 'Open',
+                            done: q.isResolved && !q.unread,
+                            alert: q.unread,
                           ),
-                        ),
+                        ],
                       ),
-                    const SizedBox(height: 6),
-                    Text(q.message),
-                    if (q.reply != null) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F7E8),
-                          borderRadius: BorderRadius.circular(10),
+                      if (q.orderRef != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            'About order ${q.orderRef}',
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12.5,
+                            ),
+                          ),
                         ),
-                        child: Text(
-                          'Sudhamrtam: ${q.reply}',
-                          style: const TextStyle(color: Color(0xFF3F6B17)),
+                      if (q.ref != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: SelectableText(
+                            'Query no. ${q.ref}',
+                            key: Key('supportRef-${q.id}'),
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 6),
+                      Text(q.message),
+                      if (q.reply != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F7E8),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'Sudhamrtam: ${q.reply}',
+                            style: const TextStyle(color: Color(0xFF3F6B17)),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Open conversation ›',
+                        style: TextStyle(
+                          color: Color(0xFF007185),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -396,23 +441,41 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.answered});
+  const _StatusPill({
+    required this.text,
+    required this.done,
+    required this.alert,
+  });
 
-  final bool answered;
+  final String text;
+
+  /// Resolved: green.
+  final bool done;
+
+  /// A new reply: deep orange.
+  final bool alert;
 
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
     decoration: BoxDecoration(
-      color: answered ? const Color(0xFFE3F1D3) : const Color(0xFFFFF1D6),
+      color: alert
+          ? const Color(0xFFFFE0CC)
+          : done
+          ? const Color(0xFFE3F1D3)
+          : const Color(0xFFFFF1D6),
       borderRadius: BorderRadius.circular(10),
     ),
     child: Text(
-      answered ? 'Answered' : 'Open',
+      text,
       style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w700,
-        color: answered ? const Color(0xFF3F6B17) : const Color(0xFF9A5B00),
+        color: alert
+            ? const Color(0xFFBF360C)
+            : done
+            ? const Color(0xFF3F6B17)
+            : const Color(0xFF9A5B00),
       ),
     ),
   );

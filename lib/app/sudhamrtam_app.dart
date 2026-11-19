@@ -20,6 +20,7 @@ import '../services/support_api_client.dart';
 import '../services/milk_bill_api_client.dart';
 import '../services/milk_plan_sync_service.dart';
 import '../services/phone_auth_service.dart';
+import '../features/support/support_conversation_screen.dart';
 import '../services/push_notifications.dart';
 
 /// Phone login, or null when this build has no server
@@ -163,6 +164,16 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
   void _open(PushTap tap) {
     final inbox = sudhamrtamMessages;
     final navigator = sudhamrtamNavigatorKey.currentState;
+    // Sudhamrtam replied to a help request: open that conversation.
+    final queryId = tap.id;
+    if (tap.type == 'support_reply' && queryId != null && navigator != null) {
+      navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) => SupportConversationScreen(queryId: queryId),
+        ),
+      );
+      return;
+    }
     // A bill is ready or due: open the milk bills.
     if (tap.type == 'bill' && navigator != null) {
       navigator.push(
@@ -181,7 +192,9 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
   void _arrived(PushArrival arrival) {
     // "Milk delivered" (or why not), or a bill: a note while the app
     // is open; a bill can be opened from it.
-    if (arrival.tap.type == 'delivery' || arrival.tap.type == 'bill') {
+    if (arrival.tap.type == 'delivery' ||
+        arrival.tap.type == 'bill' ||
+        arrival.tap.type == 'support_reply') {
       sudhamrtamMessengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text(
@@ -189,7 +202,7 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
           ),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 6),
-          action: arrival.tap.type == 'bill'
+          action: arrival.tap.type != 'delivery'
               ? SnackBarAction(
                   label: 'Open',
                   onPressed: () => _open(arrival.tap),

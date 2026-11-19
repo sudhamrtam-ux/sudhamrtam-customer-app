@@ -10,6 +10,9 @@ import '../../models/product.dart';
 import '../../services/order_api_client.dart';
 import '../checkout/order_destination.dart';
 import '../shop/product_image.dart';
+import '../../services/support_api_client.dart';
+import '../support/help_support_screen.dart';
+import '../support/support_conversation_screen.dart';
 import 'order_details_screen.dart';
 import 'order_number.dart';
 import 'order_status_labels.dart';
@@ -82,11 +85,16 @@ class OrderHistoryScreen extends StatefulWidget {
     super.key,
     OrderApiClient? api,
     OrderProductLookup? productLookup,
+    SupportApiClient? support,
   }) : api = api ?? OrderDestination.server,
-       productLookup = productLookup ?? _shopProduct;
+       productLookup = productLookup ?? _shopProduct,
+       support = support ?? sudhamrtamSupport;
 
   /// Payment statuses come from here; null without a server.
   final OrderApiClient? api;
+
+  /// Each order's help conversation; null without a server.
+  final SupportApiClient? support;
 
   /// For photos and "Buy it again".
   final OrderProductLookup productLookup;
@@ -113,6 +121,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   /// (or there is no server).
   String? _paymentsProblem;
 
+  /// The help conversation of each order that has one.
+  Map<String, SupportQuery> _help = const {};
+
   final _search = TextEditingController();
   String _query = '';
   bool _openOnly = false;
@@ -132,6 +143,58 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   void _loadOrders() {
     _ordersFuture = OrderDatabaseService.instance.getAllOrders();
     _loadPayments();
+    _loadHelp();
+  }
+
+  Future<void> _loadHelp() async {
+    final support = widget.support;
+    if (support == null || !support.isSignedIn) return;
+    try {
+      final mine = await support.fetchMine();
+      if (!mounted) return;
+      setState(
+        () => _help = {
+          for (final q in mine)
+            if (q.orderId != null) q.orderId!: q,
+        },
+      );
+    } on SupportException {
+      // The cards offer "Get help" as before.
+    }
+  }
+
+  /// The order's conversation (a new one when it has none); Help &
+  /// Support without a server or sign-in.
+  Future<void> _openHelp(CustomerOrder order) async {
+    final support = widget.support;
+    final navigator = Navigator.of(context);
+    if (support == null || !support.isSignedIn) {
+      await navigator.push(
+        MaterialPageRoute<void>(builder: (_) => const HelpSupportScreen()),
+      );
+      return;
+    }
+    final server = _payments[order.id];
+    final info = SupportOrderInfo(
+      orderId: order.id,
+      title: orderTitle(order.id, server?.orderRef),
+      status: orderHeadline(order, effectiveStatus(order, server)).text,
+      lines: [
+        for (final i in order.items)
+          '${i.quantity} × ${i.productName} (${i.unit})',
+      ],
+      total: '₹${order.subtotal.toStringAsFixed(2)}',
+    );
+    await navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => SupportConversationScreen(
+          queryId: _help[order.id]?.id,
+          order: info,
+          api: support,
+        ),
+      ),
+    );
+    await _loadHelp();
   }
 
   Future<void> _loadPayments() async {
@@ -400,9 +463,30 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   // ORDER CARD
   // ==========================================
 
-  Widget _headerField(String label, String value) {
+  /// From this width the card spreads out: header in one row, the
+  /// buttons in a column beside the items.
+  static const double _wideCard = 520;
+
+  /// The list does not get wider than this (tablets, computers).
+  static const double _maxListWidth = 1000;
+
+  static const Color _linkColor = Color(0xFF007185);
+
+  /// [child] at most [_maxListWidth] wide, centred.
+  Widget _limitWidth(Widget child) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: _maxListWidth),
+      child: child,
+    ),
+  );
+
+  Widget _headerField(
+    String label,
+    String value, {
+    CrossAxisAlignment align = CrossAxisAlignment.start,
+  }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: align,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
@@ -414,57 +498,107 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           ),
         ),
         const SizedBox(height: 2),
-        Text(value, style: const TextStyle(fontSize: 14)),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 14),
+        ),
       ],
     );
   }
 
-  Widget _buildHeader(CustomerOrder order, OrderPaymentStatus? server) {
+  /// Who receives it: the delivery contact, or the store for pickup.
+  String _deliverTo(CustomerOrder order) {
+    if (order.fulfillmentMethod == FulfillmentMethod.pickup) {
+      return 'Store pickup';
+    }
+    final name = order.recipientName?.trim();
+    return name == null || name.isEmpty ? 'Home delivery' : name;
+  }
+
+  Widget _orderNumber(CustomerOrder order, OrderPaymentStatus? server) =>
+      OrderNumberText(
+        key: ValueKey('${order.id}-${server?.orderRef}'),
+        orderId: order.id,
+        orderRef: server?.orderRef,
+        maxLines: 1,
+        style: const TextStyle(fontSize: 12, color: Colors.black54),
+      );
+
+  Widget _detailsLink(CustomerOrder order) => InkWell(
+    key: Key('details_${order.id}'),
+    onTap: () => _openOrderDetails(order),
+    child: const Padding(
+      padding: EdgeInsets.symmetric(vertical: 4),
+      child: Text(
+        'View order details',
+        style: TextStyle(color: _linkColor, fontWeight: FontWeight.w600),
+      ),
+    ),
+  );
+
+  Widget _buildHeader(
+    CustomerOrder order,
+    OrderPaymentStatus? server, {
+    required bool wide,
+  }) {
+    final placed = _headerField('ORDER PLACED', longDate(order.createdAt));
+    final total = _headerField(
+      'TOTAL',
+      '₹${order.subtotal.toStringAsFixed(2)}',
+      align: wide ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+    );
+    final deliverTo = _headerField(
+      order.fulfillmentMethod == FulfillmentMethod.pickup
+          ? 'PICKUP'
+          : 'DELIVER TO',
+      _deliverTo(order),
+    );
+
     return Container(
       color: _headerGrey,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _headerField('ORDER PLACED', longDate(order.createdAt)),
-              ),
-              _headerField('TOTAL', '₹${order.subtotal.toStringAsFixed(2)}'),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OrderNumberText(
-                  key: ValueKey('${order.id}-${server?.orderRef}'),
-                  orderId: order.id,
-                  orderRef: server?.orderRef,
-                  maxLines: 1,
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-              ),
-              InkWell(
-                key: Key('details_${order.id}'),
-                onTap: () => _openOrderDetails(order),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 4),
-                  child: Text(
-                    'View order details',
-                    style: TextStyle(
-                      color: Color(0xFF007185),
-                      fontWeight: FontWeight.w600,
-                    ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      child: wide
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 150, child: placed),
+                SizedBox(width: 100, child: total),
+                Expanded(child: deliverTo),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      _orderNumber(order, server),
+                      _detailsLink(order),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: placed),
+                    total,
+                  ],
+                ),
+                const SizedBox(height: 8),
+                deliverTo,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _orderNumber(order, server)),
+                    _detailsLink(order),
+                  ],
+                ),
+              ],
+            ),
     );
   }
 
@@ -472,12 +606,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     final product = widget.productLookup(item.productId);
     final combo = isComboProductId(item.productId);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox.square(
-            dimension: 72,
+            dimension: 80,
             child: ProductImage(
               key: Key('order-photo-${item.productId}'),
               productId: item.productId,
@@ -490,7 +624,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               borderRadius: 8,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,7 +634,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFF007185),
+                    color: _linkColor,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -510,7 +645,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   '₹${item.totalPrice.toStringAsFixed(2)}',
                   style: const TextStyle(fontSize: 13, color: Colors.black54),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 FilledButton.icon(
                   key: Key('buy-again-${item.productId}'),
                   onPressed: () => _buyAgain(item),
@@ -531,84 +666,193 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     );
   }
 
+  /// "View order details" and "Get help with this order".
+  List<Widget> _actions(CustomerOrder order) {
+    final style = OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(42),
+      shape: const StadiumBorder(),
+      foregroundColor: Colors.black87,
+      side: const BorderSide(color: _border),
+    );
+    return [
+      OutlinedButton(
+        key: Key('details-button-${order.id}'),
+        onPressed: () => _openOrderDetails(order),
+        style: style,
+        child: const Text('View order details'),
+      ),
+      OutlinedButton(
+        key: Key('help-${order.id}'),
+        onPressed: () => _openHelp(order),
+        style: style,
+        child: Text(
+          _help.containsKey(order.id)
+              ? 'Open help conversation'
+              : 'Get help with this order',
+        ),
+      ),
+    ];
+  }
+
+  /// "Help request Q-1023 · New reply" under the status, when the order
+  /// has a conversation; tapping it opens it.
+  Widget? _helpLine(CustomerOrder order) {
+    final q = _help[order.id];
+    if (q == null) return null;
+    final (String state, Color color) = q.unread
+        ? ('New reply', const Color(0xFFE65100))
+        : q.isResolved
+        ? ('Resolved', const Color(0xFF4E8A1E))
+        : q.lastFromSudhamrtam
+        ? ('Replied', const Color(0xFF4E8A1E))
+        : ('Waiting for Sudhamrtam', Colors.black54);
+    return InkWell(
+      key: Key('help-line-${order.id}'),
+      onTap: () => _openHelp(order),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Icon(
+              q.unread ? Icons.mark_chat_unread_outlined : Icons.chat_outlined,
+              size: 18,
+              color: color,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Help request ${q.ref ?? ''}',
+                      style: const TextStyle(color: Colors.black87),
+                    ),
+                    const TextSpan(text: '  ·  '),
+                    TextSpan(
+                      text: state,
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: q.unread ? FontWeight.bold : null,
+                      ),
+                    ),
+                  ],
+                ),
+                style: const TextStyle(fontSize: 13.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildOrderCard(CustomerOrder order) {
     final server = _payments[order.id];
     final headline = orderHeadline(order, effectiveStatus(order, server));
     final payment = paymentLabel(order, server);
     final more = order.items.length - _itemsShown;
 
+    // Where the order is now, how it is paid, and its items.
+    final summary = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(headline.icon, color: headline.color, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                headline.text,
+                key: Key('delivery_${order.id}'),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: headline.color,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            StatusChip(payment, key: Key('payment_${order.id}')),
+            Text(
+              _formatFulfillment(order.fulfillmentMethod),
+              style: const TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+          ],
+        ),
+        ?_helpLine(order),
+        const SizedBox(height: 16),
+        for (final item in order.items.take(_itemsShown)) _buildItemRow(item),
+        if (more > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              '+ $more more ${more == 1 ? 'item' : 'items'}',
+              style: const TextStyle(color: Colors.black54),
+            ),
+          ),
+      ],
+    );
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: _border),
         borderRadius: BorderRadius.circular(10),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildHeader(order, server),
-          const Divider(height: 1, color: _border),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // WHERE THE ORDER IS NOW
-                Text(
-                  headline.text,
-                  key: Key('delivery_${order.id}'),
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: headline.color,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    StatusChip(payment, key: Key('payment_${order.id}')),
-                    Text(
-                      _formatFulfillment(order.fulfillmentMethod),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.black54,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= _wideCard;
+          final actions = _actions(order);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(order, server, wide: wide),
+              const Divider(height: 1, color: _border),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                child: wide
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: summary),
+                          const SizedBox(width: 24),
+                          SizedBox(
+                            width: 210,
+                            child: Column(
+                              children: [
+                                for (final a in actions) ...[
+                                  a,
+                                  const SizedBox(height: 10),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          summary,
+                          for (final a in actions) ...[
+                            a,
+                            const SizedBox(height: 10),
+                          ],
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // ITEMS
-                for (final item in order.items.take(_itemsShown))
-                  _buildItemRow(item),
-                if (more > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      '+ $more more ${more == 1 ? 'item' : 'items'}',
-                      style: const TextStyle(color: Colors.black54),
-                    ),
-                  ),
-
-                OutlinedButton(
-                  onPressed: () => _openOrderDetails(order),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(40),
-                    shape: const StadiumBorder(),
-                    foregroundColor: Colors.black87,
-                  ),
-                  child: const Text('View order details'),
-                ),
-                const SizedBox(height: 10),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -702,7 +946,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               padding: const EdgeInsets.all(14),
               itemCount: shown.length + 1 + (shown.isEmpty ? 1 : 0),
               itemBuilder: (context, index) {
-                if (index == 0) return _buildTop(orders.length, shown.length);
+                if (index == 0) {
+                  return _limitWidth(_buildTop(orders.length, shown.length));
+                }
                 if (shown.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.only(top: 40),
@@ -714,7 +960,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     ),
                   );
                 }
-                return _buildOrderCard(shown[index - 1]);
+                return _limitWidth(_buildOrderCard(shown[index - 1]));
               },
             ),
           );

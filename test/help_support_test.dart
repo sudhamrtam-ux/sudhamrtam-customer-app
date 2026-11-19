@@ -96,7 +96,7 @@ void main() {
     await pump(tester, client());
     expect(find.text('Bill question'), findsOneWidget);
     expect(find.text('Sudhamrtam: Fixed, please check.'), findsOneWidget);
-    expect(find.text('Answered'), findsOneWidget);
+    expect(find.text('Resolved'), findsOneWidget);
     expect(find.text('Query no. Q-1001'), findsOneWidget);
 
     // Topic and message are needed.
