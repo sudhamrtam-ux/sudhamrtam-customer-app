@@ -54,10 +54,12 @@ Email: Contact@sudhamrtam.in
 | Contact phone | +91 86882 21433 |
 | Website | (none yet, or the brand site if one exists) |
 | Privacy policy URL | https://api.sudhamrtam.in/privacy |
-| Account deletion URL | https://api.sudhamrtam.in/privacy (section on deleting your account) |
+| Account deletion URL | https://api.sudhamrtam.in/delete-account |
 
-## Graphics still needed
+## Graphics
 
-- App icon 512 × 512 PNG (from the launcher icon).
-- Feature graphic 1024 × 500 PNG/JPG.
-- Phone screenshots: at least 2 (up to 8), e.g. Home, Shop, product, Cart, Milk Plan, Milk Bills.
+Ready in this folder: `graphics/icon-512.png`, `graphics/feature-graphic-1024x500.png` and five phone
+screenshots in `screenshots/` (Home, Shop, product, Cart, Milk plan).
+
+The other Play Console forms (app access, content rating, target audience, release) are in
+`play-console-answers.md`.

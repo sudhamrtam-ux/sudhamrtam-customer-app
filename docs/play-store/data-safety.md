@@ -10,7 +10,7 @@ Worked out from the code (customer app 1.0.1+2, backend 3866101) and the privacy
 | Does your app collect or share any of the required user data types? | **Yes** |
 | Is all of the user data collected by your app encrypted in transit? | **Yes** (HTTPS only; release builds refuse plain HTTP) |
 | Do you provide a way for users to request that their data is deleted? | **Yes**: in the app (Account → Delete my account) and the web link below |
-| Account deletion web link | https://api.sudhamrtam.in/privacy (section "Your rights") |
+| Account deletion web link | https://api.sudhamrtam.in/delete-account (in the app or by email/phone, without the app) |
 
 "Shared" below is **No** everywhere: Google does not count service providers that process data
 for us (Hostinger, Supabase, Firebase, Cashfree, MSG91) as sharing. We do not sell data or give
