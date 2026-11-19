@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../models/cart_manager.dart';
 import '../checkout/checkout_screen.dart';
+import '../shop/product_image.dart';
 import '../../models/combo_offer.dart';
 
 const _brandGreen = Color(0xFF82B440);
@@ -132,7 +133,18 @@ class CartScreen extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Icon(item.product.icon, size: 40, color: _brandGreen),
+                      // The product's photo, as in the shop (its icon
+                      // when there is none, e.g. a combo).
+                      SizedBox.square(
+                        dimension: 64,
+                        child: ProductImage(
+                          key: Key('cart-photo-${item.product.id}'),
+                          productId: item.product.id,
+                          icon: item.product.icon,
+                          iconSize: 40,
+                          borderRadius: 8,
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
