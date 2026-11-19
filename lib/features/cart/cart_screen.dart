@@ -286,14 +286,6 @@ class CartScreen extends StatelessWidget {
                 minimumSize: const Size.fromHeight(52),
               ),
             ),
-
-            const SizedBox(height: 12),
-
-            const Text(
-              'Preview only — no order or payment will be created.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.black54, fontSize: 12),
-            ),
           ],
         );
       },
