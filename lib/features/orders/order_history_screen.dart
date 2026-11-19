@@ -69,11 +69,12 @@ StatusLabel orderHeadline(CustomerOrder order, OrderStatus status) {
   );
 }
 
-/// Still on its way to the customer (not delivered, picked up or
-/// cancelled).
+/// Still on its way to the customer (not delivered, picked up, given
+/// up on or cancelled).
 bool isOpenOrder(OrderStatus status) =>
     status != OrderStatus.delivered &&
     status != OrderStatus.pickedUp &&
+    status != OrderStatus.notDelivered &&
     status != OrderStatus.cancelled;
 
 class OrderHistoryScreen extends StatefulWidget {
@@ -108,6 +109,10 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   /// (no server, offline, or a local test order).
   Map<String, OrderPaymentStatus> _payments = const {};
 
+  /// Why the latest statuses could not be read; null when they were
+  /// (or there is no server).
+  String? _paymentsProblem;
+
   final _search = TextEditingController();
   String _query = '';
   bool _openOnly = false;
@@ -134,7 +139,13 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     if (api == null) return;
     try {
       final payments = await api.fetchPaymentStatuses();
-      if (mounted) setState(() => _payments = payments);
+      if (mounted) {
+        setState(() {
+          _payments = payments;
+          _paymentsProblem = null;
+        });
+      }
+      await _saveServerStatuses(payments);
       // Keep the short order numbers for offline use and the details.
       final refs = {
         for (final e in payments.entries)
@@ -145,8 +156,46 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       } catch (_) {
         // They show again next time.
       }
-    } catch (_) {
-      // Offline: the cards show the payment method instead.
+    } catch (error) {
+      // The cards show what the phone knows: the payment method, and
+      // the status saved here.
+      debugPrint('My Orders: latest statuses not loaded: $error');
+      if (mounted) {
+        setState(
+          () => _paymentsProblem = error is OrderApiException
+              ? error.message
+              : 'Could not read the latest order statuses.',
+        );
+      }
+    }
+  }
+
+  /// Keeps the server's Cancelled / Delivered on the phone too, so the
+  /// details page and the home card show it, also offline. Not
+  /// delivered is only shown: the phone's orders table (schema v3)
+  /// does not take that status, and the server keeps telling it.
+  Future<void> _saveServerStatuses(
+    Map<String, OrderPaymentStatus> payments,
+  ) async {
+    try {
+      final local = await _ordersFuture;
+      var changed = false;
+      for (final order in local) {
+        final status = effectiveStatus(order, payments[order.id]);
+        if (status != order.status && status != OrderStatus.notDelivered) {
+          changed |= await OrderDatabaseService.instance.updateOrderStatus(
+            order.id,
+            status,
+          );
+        }
+      }
+      if (changed && mounted) {
+        setState(() {
+          _ordersFuture = OrderDatabaseService.instance.getAllOrders();
+        });
+      }
+    } catch (error) {
+      debugPrint('My Orders: statuses not saved: $error');
     }
   }
 
@@ -173,9 +222,13 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   }
 
   void _openOrderDetails(CustomerOrder order) {
+    // The status the card shows (the server's when known).
+    final shown = order.copyWith(
+      status: effectiveStatus(order, _payments[order.id]),
+    );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => OrderDetailsScreen(order: order),
+        builder: (context) => OrderDetailsScreen(order: shown),
       ),
     );
   }
@@ -258,9 +311,32 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   // ==========================================
 
   Widget _buildTop(int total, int shown) {
+    final problem = _paymentsProblem;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (problem != null)
+          Container(
+            key: const Key('orders-status-problem'),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.cloud_off_outlined, color: Colors.orange),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Showing the statuses saved on this phone. $problem',
+                  ),
+                ),
+              ],
+            ),
+          ),
         TextField(
           key: const Key('order-search'),
           controller: _search,

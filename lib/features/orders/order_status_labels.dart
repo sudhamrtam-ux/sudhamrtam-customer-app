@@ -41,6 +41,12 @@ StatusLabel deliveryLabel(OrderStatus status) {
       return const StatusLabel('Delivered', _green, Icons.check_circle_outline);
     case OrderStatus.pickedUp:
       return const StatusLabel('Picked up', _green, Icons.check_circle_outline);
+    case OrderStatus.notDelivered:
+      return const StatusLabel(
+        'Not delivered',
+        Color(0xFFE65100),
+        Icons.error_outline,
+      );
     case OrderStatus.cancelled:
       return const StatusLabel('Cancelled', Colors.red, Icons.cancel_outlined);
   }
@@ -83,11 +89,19 @@ StatusLabel paymentLabel(CustomerOrder order, OrderPaymentStatus? server) {
         );
 }
 
-/// The order status to show: the server's "cancelled" wins (an
-/// unpaid online order cancelled after the cut-off).
+/// The order status to show: the server's "cancelled" (by staff, or an
+/// unpaid online order after the cut-off), "delivered" and "not
+/// delivered" win over the status saved on the phone.
 OrderStatus effectiveStatus(CustomerOrder order, OrderPaymentStatus? server) {
-  if (server != null && server.orderStatus == 'cancelled') {
-    return OrderStatus.cancelled;
+  switch (server?.orderStatus) {
+    case 'cancelled':
+      return OrderStatus.cancelled;
+    case 'delivered':
+      return order.fulfillmentMethod == FulfillmentMethod.pickup
+          ? OrderStatus.pickedUp
+          : OrderStatus.delivered;
+    case 'not_delivered':
+      return OrderStatus.notDelivered;
   }
   return order.status;
 }

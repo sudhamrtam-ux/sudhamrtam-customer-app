@@ -159,6 +159,7 @@ String _dayText(DateTime day, DateTime today) {
       serverStatus ??
       switch (order.status) {
         OrderStatus.delivered || OrderStatus.pickedUp => 'delivered',
+        OrderStatus.notDelivered => 'not_delivered',
         OrderStatus.cancelled => 'cancelled',
         _ => 'pending',
       };

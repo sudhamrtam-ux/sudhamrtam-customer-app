@@ -15,6 +15,9 @@ enum OrderStatus {
   readyForPickup,
   delivered,
   pickedUp,
+
+  /// The delivery person could not deliver it (from the server).
+  notDelivered,
   cancelled,
 }
 
