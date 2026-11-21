@@ -1,0 +1,41 @@
+# Sudhamrtam website: the customer app built for the web, on Hostinger
+# (LiteSpeed/Apache), in public_html of sudhamrtam.in.
+#
+# public_html may also hold other sites' folders (e.g. the staff app's
+# subdomain folder): this file applies to them too, so every redirect
+# below is limited to the sudhamrtam.in addresses.
+#
+# HTTPS: use hPanel's own "Force HTTPS" (Security > SSL). A rule here
+# can loop behind Hostinger's CDN.
+
+Options -Indexes
+DirectoryIndex index.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # One address, sudhamrtam.in: the browser keeps the sign-in and the
+  # cart per address, so www would look like a different site.
+  RewriteCond %{HTTP_HOST} ^www\.sudhamrtam\.in$ [NC]
+  RewriteRule ^ https://sudhamrtam.in%{REQUEST_URI} [L,R=301]
+
+  # The old PHP site's pages (index.php, products.php, about.php,
+  # login.php, ...): old links and bookmarks open the website.
+  RewriteCond %{HTTP_HOST} ^sudhamrtam\.in$ [NC]
+  RewriteRule ^[A-Za-z_]+\.php$ / [L,R=301]
+</IfModule>
+
+<IfModule mod_mime.c>
+  AddType application/wasm .wasm
+  AddType application/manifest+json .webmanifest
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  # Always ask for the newest page: it names this build's files
+  # (main.dart.<hash>.js, see tool/build_web.py), so a new upload is
+  # seen at once.
+  <FilesMatch "^(index\.html|manifest\.json)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
