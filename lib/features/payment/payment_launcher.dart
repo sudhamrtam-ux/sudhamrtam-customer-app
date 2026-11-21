@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_cashfree_pg_sdk/api/cferrorresponse/cferrorresponse.dart';
 import 'package:flutter_cashfree_pg_sdk/api/cfpayment/cfwebcheckoutpayment.dart';
 import 'package:flutter_cashfree_pg_sdk/api/cfpaymentgateway/cfpaymentgatewayservice.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_cashfree_pg_sdk/api/cftheme/cftheme.dart';
 import 'package:flutter_cashfree_pg_sdk/utils/cfenums.dart';
 
 import '../../services/order_api_client.dart';
+import 'web_checkout.dart';
 
 /// How the payment screen closed. This is never proof of payment:
 /// only the server's check (with Cashfree) decides that.
@@ -31,10 +33,13 @@ abstract class PaymentLauncher {
   Future<PaymentLaunchResult> launch(PaymentSession session);
 }
 
-/// Cashfree's web checkout (UPI apps, cards, net banking).
+/// Cashfree's web checkout (UPI apps, cards, net banking). On the
+/// website: Cashfree's pop-up checkout over the page (the SDK's own
+/// web checkout would leave the website).
 class CashfreePaymentLauncher implements PaymentLauncher {
   @override
   Future<PaymentLaunchResult> launch(PaymentSession session) {
+    if (kIsWeb) return launchWebCheckout(session);
     final completer = Completer<PaymentLaunchResult>();
 
     try {
