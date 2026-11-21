@@ -7,6 +7,7 @@ import '../../services/account_sync_service.dart';
 import '../../services/catalog_api_client.dart';
 import '../../core/widgets/page_app_bar.dart';
 import 'map_location_field.dart';
+import 'web_maps.dart';
 
 /// Loads the delivery areas for the area choice; null when this
 /// build has no server.
@@ -38,7 +39,7 @@ class AddressFormScreen extends StatefulWidget {
        loadAreas = loadAreas ?? _defaultAreaLoader(),
        loadSocieties = loadSocieties ?? _defaultSocietyLoader(),
        findLocation = findLocation ?? findCurrentLocation,
-       mapBuilder = mapBuilder ?? googleMapPin;
+       mapBuilder = mapBuilder ?? (googleMapsLoaded ? googleMapPin : null);
 
   final CustomerAddress? existingAddress;
   final AccountSyncService account;
@@ -47,7 +48,8 @@ class AddressFormScreen extends StatefulWidget {
 
   /// The phone's GPS and the map; tests replace them.
   final CurrentLocationFinder findLocation;
-  final MapPinBuilder mapBuilder;
+  /// Null: no map can be drawn (the website without a Maps key).
+  final MapPinBuilder? mapBuilder;
 
   @override
   State<AddressFormScreen> createState() => _AddressFormScreenState();

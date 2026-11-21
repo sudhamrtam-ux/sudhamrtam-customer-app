@@ -48,8 +48,10 @@ typedef MapPinBuilder = Widget Function(
 /// Where the map starts before a spot is marked (Hyderabad).
 const MapPoint mapStartPoint = MapPoint(17.4933, 78.3915);
 
-/// The phone's GPS, asking for permission first.
+/// The phone's GPS, asking for permission first. On the website: the
+/// browser's location, which asks the customer itself.
 Future<MapPoint> findCurrentLocation() async {
+  if (kIsWeb) return _findBrowserLocation();
   if (!await Geolocator.isLocationServiceEnabled()) {
     throw const LocationProblem(
       'Location is off on this phone. Turn it on, then try again, '
@@ -87,6 +89,39 @@ Future<MapPoint> findCurrentLocation() async {
     throw const LocationProblem(
       'Could not find your location. Please try again outside or near '
       'a window, or tap the map at your home.',
+    );
+  }
+}
+
+/// The website: the browser asks for permission; there is no settings
+/// page to open, so the messages say where to allow it.
+Future<MapPoint> _findBrowserLocation() async {
+  const blocked = LocationProblem(
+    'Your browser did not share your location. Allow location for this '
+    'site (the icon next to the web address), then try again.',
+  );
+  try {
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      throw blocked;
+    }
+    final position = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 20),
+      ),
+    );
+    return MapPoint(position.latitude, position.longitude);
+  } on LocationProblem {
+    rethrow;
+  } catch (_) {
+    throw const LocationProblem(
+      'Could not find your location. Please try again from home, with '
+      "your phone's or computer's location turned on.",
     );
   }
 }
@@ -177,13 +212,15 @@ class _GoogleMapPinState extends State<_GoogleMapPin> {
 
 /// Address form: the spot on the map (owner decision 2026-11-16: every
 /// address needs one, so the delivery partner can navigate to it).
+/// [mapBuilder] null: no map can be drawn (the website without a Maps
+/// key); the customer then uses their current location only.
 class MapLocationField extends FormField<MapPoint> {
   MapLocationField({
     super.key,
     super.initialValue,
     required ValueChanged<MapPoint> onChanged,
     required CurrentLocationFinder findLocation,
-    required MapPinBuilder mapBuilder,
+    required MapPinBuilder? mapBuilder,
     super.enabled,
   }) : super(
          validator: (pin) => pin == null
@@ -210,7 +247,7 @@ class _MapLocationBody extends StatefulWidget {
   final FormFieldState<MapPoint> field;
   final ValueChanged<MapPoint> onChanged;
   final CurrentLocationFinder findLocation;
-  final MapPinBuilder mapBuilder;
+  final MapPinBuilder? mapBuilder;
 
   @override
   State<_MapLocationBody> createState() => _MapLocationBodyState();
@@ -260,7 +297,8 @@ class _MapLocationBodyState extends State<_MapLocationBody> {
     final field = widget.field;
     final pin = field.value;
     final enabled = field.widget.enabled;
-    final showMap = pin != null || _showMap;
+    final mapBuilder = widget.mapBuilder;
+    final showMap = mapBuilder != null && (pin != null || _showMap);
 
     return InputDecorator(
       key: const Key('mapLocationField'),
@@ -275,13 +313,38 @@ class _MapLocationBodyState extends State<_MapLocationBody> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            pin == null
+            mapBuilder == null
+                ? (pin == null
+                      ? 'So our delivery partner can reach you, please '
+                            'use your current location while you are at '
+                            'home.'
+                      : 'Your home is marked. At home now? Update it '
+                            'with your current location.')
+                : pin == null
                 ? 'Mark your home on the map so our delivery partner '
                       'can reach you. At home now? Use your current '
                       'location.'
                 : 'Drag the pin, or tap the map, to put it at your gate.',
             style: theme.textTheme.bodyMedium,
           ),
+          if (mapBuilder == null && pin != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              key: const Key('mapPinSaved'),
+              children: [
+                Icon(Icons.location_on, color: theme.colorScheme.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Location marked '
+                    '(${pin.latitude.toStringAsFixed(5)}, '
+                    '${pin.longitude.toStringAsFixed(5)})',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           if (showMap) ...[
             ClipRRect(
@@ -289,7 +352,7 @@ class _MapLocationBodyState extends State<_MapLocationBody> {
               child: SizedBox(
                 key: const Key('mapPinView'),
                 height: 260,
-                child: widget.mapBuilder(
+                child: mapBuilder(
                   context,
                   pin,
                   enabled ? _move : (_) {},
@@ -324,7 +387,7 @@ class _MapLocationBodyState extends State<_MapLocationBody> {
                   _finding ? 'Finding you…' : 'Use my current location',
                 ),
               ),
-              if (!showMap)
+              if (!showMap && mapBuilder != null)
                 OutlinedButton.icon(
                   key: const Key('chooseOnMap'),
                   onPressed: enabled

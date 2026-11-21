@@ -22,6 +22,7 @@ app.*.map.json
 /android/local.properties
 /android/key.properties
 /android/maps-key.txt
+/web/maps-key.txt
 /android/app/debug/
 /android/app/profile/
 /android/app/release/
