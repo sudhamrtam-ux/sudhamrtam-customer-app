@@ -104,10 +104,17 @@ void main() {
     }
   }
 
+  /// Opens My Orders and waits for it to load: the phone's orders
+  /// (SQLite), then the server's statuses, which are saved back and may
+  /// reload the list. Waits until the spinner is gone and [until] (what
+  /// the test expects once loading is done) is shown, at most 5 s of
+  /// real time, so a busy machine (the whole suite in parallel) cannot
+  /// make the test look too early.
   Future<void> open(
     WidgetTester tester, {
     OrderApiClient? api,
     SupportApiClient? support,
+    Finder? until,
   }) async {
     tester.view.physicalSize = const Size(1080, 4000);
     tester.view.devicePixelRatio = 2.5;
@@ -121,7 +128,10 @@ void main() {
         ),
       ),
     );
-    for (var i = 0; i < 20; i++) {
+    bool loaded() =>
+        find.byType(CircularProgressIndicator).evaluate().isEmpty &&
+        (until == null || until.evaluate().isNotEmpty);
+    for (var i = 0; i < 500 && (i < 20 || !loaded()); i++) {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 10)),
       );
@@ -213,6 +223,7 @@ void main() {
           (_) async => throw const SocketException('offline'),
         ),
       ),
+      until: find.byKey(const Key('orders-status-problem')),
     );
     expect(find.byKey(const Key('orders-status-problem')), findsOneWidget);
     expect(find.textContaining('No internet connection'), findsOneWidget);
@@ -248,7 +259,11 @@ void main() {
         ),
       ),
     );
-    await open(tester, support: support);
+    await open(
+      tester,
+      support: support,
+      until: find.text('Open help conversation'),
+    );
     await settle(tester);
 
     expect(
@@ -294,7 +309,7 @@ void main() {
         ),
       ),
     );
-    await open(tester, api: api);
+    await open(tester, api: api, until: find.text('Not delivered'));
     await settle(tester);
 
     expect(find.text('Cancelled'), findsOneWidget);
