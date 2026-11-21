@@ -154,8 +154,9 @@ stay blank in the copy installed from Play.
 ## Must do before submitting
 
 1. **Account deletion page:** `https://api.sudhamrtam.in/delete-account` (backend, 19 Nov). Check it
-   opens after the server is redeployed. Requests that arrive by email or phone are deleted by hand:
-   confirm the number, then delete the account.
+   opens after the server is redeployed. Requests that arrive by email or phone: confirm them with the
+   customer's number, then the owner opens the customer in the staff app → **Delete account** (at the
+   bottom of the customer's page; refused while money is owed or a delivery is due).
 2. **Reviewer number** in `OTP_TEST_NUMBERS` (section 3).
 3. **Cashfree.** Still the sandbox on the live server. Fine for internal testing; before production,
    switch to live or take the keys off Hostinger so only Cash on Delivery shows.
