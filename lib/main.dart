@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app/checkout_startup_controller.dart';
@@ -7,6 +8,7 @@ import 'app/splash_video.dart';
 import 'app/sudhamrtam_app.dart';
 import 'core/theme/app_theme.dart';
 import 'database/checkout_recovery_executor.dart';
+import 'database/web_database_setup.dart';
 import 'features/checkout/order_destination.dart';
 import 'features/checkout/checkout_recovery_gate_screen.dart';
 import 'features/messages/message_inbox.dart';
@@ -29,6 +31,8 @@ import 'services/support_api_client.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // The website keeps the app's SQLite database in the browser.
+  useWebDatabaseIfNeeded();
 
   // The opening animation (owner, 2026-11-17) plays first, while the
   // app gets ready below; the app opens when both are done.
@@ -107,9 +111,9 @@ Future<void> main() async {
     }
 
     // Phone notifications (Firebase): optional; the app works
-    // without them.
+    // without them. Not on the website.
     final auth = sudhamrtamAuth;
-    if (auth is ApiPhoneAuthGateway) {
+    if (auth is ApiPhoneAuthGateway && !kIsWeb) {
       try {
         final push = PushNotifications(
           platform: await FirebasePushPlatform.start(),
