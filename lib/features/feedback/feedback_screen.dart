@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../app/sudhamrtam_app.dart';
 import '../../services/feedback_api_client.dart';
 import '../../core/widgets/page_app_bar.dart';
@@ -111,7 +113,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   @override
   Widget build(BuildContext context) {
     final api = _api;
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(title: const Text('Send Feedback')),
       body: SafeArea(
         child: api == null

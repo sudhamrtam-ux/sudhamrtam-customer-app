@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../models/combo_offer.dart';
 import '../../models/customer_order.dart';
 import '../../models/order_item.dart';
@@ -140,7 +142,7 @@ class OrderDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(title: const Text('Order Details')),
       body: ListView(
         padding: const EdgeInsets.all(16),

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../app/sudhamrtam_app.dart';
 import '../../core/widgets/page_app_bar.dart';
 import '../../services/support_api_client.dart';
@@ -195,7 +197,7 @@ class _SupportConversationScreenState extends State<SupportConversationScreen> {
     final conversation = _conversation;
     final query = conversation?.query;
     final api = _api;
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(
         title: Text(query?.ref == null ? 'Get help' : 'Help · ${query!.ref}'),
         actions: [

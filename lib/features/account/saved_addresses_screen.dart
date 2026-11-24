@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../app/sudhamrtam_app.dart';
 import '../../database/customer_address_database_service.dart';
 import '../../models/customer_address.dart';
@@ -435,10 +437,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
   Widget build(BuildContext context) {
     final isBusy = _isDeleting || _isUpdatingDefault;
 
-    return Scaffold(
-      appBar: PageAppBar(
-        title: const Text('Saved Addresses'),
-      ),
+    return SiteScaffold(
+      appBar: PageAppBar(title: const Text('Saved Addresses')),
 
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

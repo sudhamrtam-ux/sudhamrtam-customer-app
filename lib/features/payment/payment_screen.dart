@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../database/order_database_service.dart';
 import '../../models/customer_order.dart';
 import '../../services/order_api_client.dart';
@@ -258,7 +260,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     // Delivery is free, so the total is the items' subtotal.
     final total = '₹${widget.order.subtotal.toStringAsFixed(2)}';
 
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(title: const Text('Payment')),
       body: SafeArea(
         child: ListView(

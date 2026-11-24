@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import '../../core/widgets/page_app_bar.dart';
+import '../../core/widgets/site_layout.dart';
 import '../home/home_screen.dart';
 import '../messages/messages_screen.dart';
 import '../shop/product_image.dart';
 import '../shop/shop_screen.dart';
+import 'site_header.dart';
 import '../cart/cart_screen.dart';
 import '../milk_plan/milk_plan_screen.dart';
 import '../milk_plan/milk_sqlite_test_screen.dart';
@@ -64,8 +66,60 @@ class _CustomerShellState extends State<CustomerShell> {
     });
   }
 
+  void _select(int index) {
+    setState(() {
+      // The Shop tab itself always opens on all products.
+      if (index == 1) _shopCategory = null;
+      _selectedIndex = index;
+    });
+    // Home and Milk Plan show the plans: fetch any change
+    // Sudhamrtam made (e.g. an approval).
+    if (index == 0 || index == 2) {
+      unawaited(sudhamrtamMilkSync.refresh());
+    }
+  }
+
+  /// The website's footer, on Home and Shop on a wide screen.
+  Widget? _footer(BuildContext context) {
+    if (!isWideSite(context)) return null;
+    return ListenableBuilder(
+      listenable: sudhamrtamCatalog,
+      builder: (context, _) => SiteFooter(
+        categories: {for (final p in sudhamrtamCatalog.products) p.category}
+            .toList(),
+        onOpenCategory: _openShop,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // A computer's browser or a tablet on its side: a website.
+    if (isWideSite(context)) {
+      return Scaffold(
+        key: const Key('site-shell'),
+        backgroundColor: const Color(0xFFF7F9F3),
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(72),
+          child: SiteHeader(selectedIndex: _selectedIndex, onSelect: _select),
+        ),
+        // Home, Shop and Cart lay themselves out as web pages; Milk
+        // Plan and Account sit in a readable column in the middle.
+        body: _selectedIndex <= 1 || _selectedIndex == 3
+            ? _buildSelectedScreen(context)
+            : Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: _selectedIndex == 2 || _selectedIndex == 4
+                        ? 1100
+                        : 860,
+                  ),
+                  child: _buildSelectedScreen(context),
+                ),
+              ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         // Away from Home: an arrow back to it.
@@ -118,23 +172,12 @@ class _CustomerShellState extends State<CustomerShell> {
       ),
 
       // Main screen content.
-      body: _buildSelectedScreen(),
+      body: _buildSelectedScreen(context),
 
       // Bottom navigation.
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            // The Shop tab itself always opens on all products.
-            if (index == 1) _shopCategory = null;
-            _selectedIndex = index;
-          });
-          // Home and Milk Plan show the plans: fetch any change
-          // Sudhamrtam made (e.g. an approval).
-          if (index == 0 || index == 2) {
-            unawaited(sudhamrtamMilkSync.refresh());
-          }
-        },
+        onDestinationSelected: _select,
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -173,13 +216,14 @@ class _CustomerShellState extends State<CustomerShell> {
   }
 
   // Display the screen selected in bottom navigation.
-  Widget _buildSelectedScreen() {
+  Widget _buildSelectedScreen(BuildContext context) {
     switch (_selectedIndex) {
       case 0:
         return HomeScreen(
           onOpenShop: _openShop,
           onOpenMilkPlan: () => setState(() => _selectedIndex = 2),
           onOpenCart: () => setState(() => _selectedIndex = 3),
+          footer: _footer(context),
         );
 
       case 1:
@@ -187,6 +231,7 @@ class _CustomerShellState extends State<CustomerShell> {
           category: _shopCategory,
           onCategoryChanged: (category) =>
               setState(() => _shopCategory = category),
+          footer: _footer(context),
         );
 
       case 2:
@@ -202,8 +247,4 @@ class _CustomerShellState extends State<CustomerShell> {
         return HomeScreen(onOpenShop: _openShop);
     }
   }
-
-  // Temporary placeholder for the Account screen.
-
-  // Account tab with access to Customer Order History.
 }

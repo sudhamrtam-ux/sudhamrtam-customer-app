@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sudhamrtam_customer_app/features/account/account_screen.dart';
+import 'package:sudhamrtam_customer_app/features/account/customer_name.dart';
 import 'package:sudhamrtam_customer_app/features/account/phone_login_screen.dart';
+import 'package:sudhamrtam_customer_app/services/account_sync_service.dart';
 import 'package:sudhamrtam_customer_app/services/phone_auth_service.dart';
 
 /// In-memory login that accepts code 123456.
@@ -132,7 +134,34 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(PhoneLoginScreen), findsNothing);
-      expect(find.text('Signed in as +919999900001'), findsOneWidget);
+      // No name saved yet: the number, easy to read.
+      expect(find.text('Signed in as +91 99999 00001'), findsOneWidget);
+    });
+
+    testWidgets('signed in: the name, not the number', (tester) async {
+      Widget shown() => SignedInName(
+        auth: auth,
+        account: AccountSyncService.localOnly(),
+        loadName: () async => 'Hari',
+        builder: (context, user, name) => Text(
+          user == null ? 'Account' : name ?? phoneText(user.phoneNumber),
+        ),
+      );
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: shown())));
+      await tester.pump();
+      expect(find.text('Account'), findsOneWidget);
+
+      final sent = await auth.requestCode('+919999900001');
+      await auth.confirmCode((sent as PhoneCodeSent).verificationId, '123456');
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Hari'), findsOneWidget);
+
+      await auth.signOut();
+      await tester.pump();
+      expect(find.text('Account'), findsOneWidget);
+      expect(phoneText('+919052301616'), '+91 90523 01616');
+      expect(phoneText('12345'), '12345');
     });
 
     testWidgets('A wrong code shows an error and stays on the screen', (

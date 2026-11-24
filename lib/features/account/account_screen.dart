@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+
+import 'customer_name.dart';
+
+import '../../core/widgets/site_layout.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/sudhamrtam_app.dart';
@@ -100,6 +105,28 @@ class AccountScreen extends StatelessWidget {
   }
 
   /// Builds a reusable Account menu tile.
+  /// A section's tiles: one under the other on a phone; on a website
+  /// (owner, 2026-11-24) three a row, like a shop's account page.
+  Widget _tileGroup(BuildContext context, List<Widget> tiles) {
+    if (!isWideSite(context)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: tiles,
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = (constraints.maxWidth - 24) / 3;
+        return Wrap(
+          spacing: 12,
+          children: [
+            for (final tile in tiles) SizedBox(width: width, child: tile),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildAccountTile({
     required IconData icon,
     required String title,
@@ -182,37 +209,39 @@ class AccountScreen extends StatelessWidget {
 
         const SizedBox(height: 12),
 
-        // My Profile — active.
-        _buildAccountTile(
-          icon: Icons.person_outline,
-          title: 'My Profile',
-          subtitle: 'View and update your personal details',
-          onTap: () => _openCustomerProfile(context),
-        ),
+        _tileGroup(context, [
+          // My Profile — active.
+          _buildAccountTile(
+            icon: Icons.person_outline,
+            title: 'My Profile',
+            subtitle: 'View and update your personal details',
+            onTap: () => _openCustomerProfile(context),
+          ),
 
-        // Saved Addresses — active.
-        _buildAccountTile(
-          icon: Icons.location_on_outlined,
-          title: 'Saved Addresses',
-          subtitle: 'Manage your delivery addresses',
-          onTap: () => _openSavedAddresses(context),
-        ),
+          // Saved Addresses — active.
+          _buildAccountTile(
+            icon: Icons.location_on_outlined,
+            title: 'Saved Addresses',
+            subtitle: 'Manage your delivery addresses',
+            onTap: () => _openSavedAddresses(context),
+          ),
 
-        // My Orders — existing working feature.
-        _buildAccountTile(
-          icon: Icons.receipt_long_outlined,
-          title: 'My Orders',
-          subtitle: 'View your order history and order status',
-          onTap: () => _openOrderHistory(context),
-        ),
+          // My Orders — existing working feature.
+          _buildAccountTile(
+            icon: Icons.receipt_long_outlined,
+            title: 'My Orders',
+            subtitle: 'View your order history and order status',
+            onTap: () => _openOrderHistory(context),
+          ),
 
-        // Milk Bills — monthly bills from the server.
-        _buildAccountTile(
-          icon: Icons.request_quote_outlined,
-          title: 'Milk Bills',
-          subtitle: 'See and pay your monthly milk bills',
-          onTap: () => _openMilkBills(context),
-        ),
+          // Milk Bills — monthly bills from the server.
+          _buildAccountTile(
+            icon: Icons.request_quote_outlined,
+            title: 'Milk Bills',
+            subtitle: 'See and pay your monthly milk bills',
+            onTap: () => _openMilkBills(context),
+          ),
+        ]),
 
         const SizedBox(height: 20),
 
@@ -228,21 +257,23 @@ class AccountScreen extends StatelessWidget {
 
         const SizedBox(height: 12),
 
-        // Send Feedback — stars, topic and message to the team.
-        _buildAccountTile(
-          icon: Icons.rate_review_outlined,
-          title: 'Send Feedback',
-          subtitle: 'Tell us how we are doing',
-          onTap: () => _openFeedback(context),
-        ),
+        _tileGroup(context, [
+          // Send Feedback — stars, topic and message to the team.
+          _buildAccountTile(
+            icon: Icons.rate_review_outlined,
+            title: 'Send Feedback',
+            subtitle: 'Tell us how we are doing',
+            onTap: () => _openFeedback(context),
+          ),
 
-        // Help & Support: call, email or raise a query.
-        _buildAccountTile(
-          icon: Icons.help_outline,
-          title: 'Help & Support',
-          subtitle: 'Call us, email us or raise a query',
-          onTap: () => _openHelpSupport(context),
-        ),
+          // Help & Support: call, email or raise a query.
+          _buildAccountTile(
+            icon: Icons.help_outline,
+            title: 'Help & Support',
+            subtitle: 'Call us, email us or raise a query',
+            onTap: () => _openHelpSupport(context),
+          ),
+        ]),
 
         const SizedBox(height: 20),
 
@@ -257,33 +288,35 @@ class AccountScreen extends StatelessWidget {
 
         const SizedBox(height: 12),
 
-        _buildAccountTile(
-          icon: Icons.privacy_tip_outlined,
-          title: 'Privacy Policy',
-          subtitle: 'What we collect and how we use it',
-          onTap: () => _openPage(context, sudhamrtamPrivacyUrl),
-        ),
+        _tileGroup(context, [
+          _buildAccountTile(
+            icon: Icons.privacy_tip_outlined,
+            title: 'Privacy Policy',
+            subtitle: 'What we collect and how we use it',
+            onTap: () => _openPage(context, sudhamrtamPrivacyUrl),
+          ),
 
-        _buildAccountTile(
-          icon: Icons.description_outlined,
-          title: 'Terms of Use',
-          subtitle: 'Orders, milk plans, bills and payments',
-          onTap: () => _openPage(context, sudhamrtamTermsUrl),
-        ),
+          _buildAccountTile(
+            icon: Icons.description_outlined,
+            title: 'Terms of Use',
+            subtitle: 'Orders, milk plans, bills and payments',
+            onTap: () => _openPage(context, sudhamrtamTermsUrl),
+          ),
 
-        _buildAccountTile(
-          icon: Icons.currency_rupee,
-          title: 'Refunds and Cancellations',
-          subtitle: 'Cancel before 9 PM; refunds in 5–7 working days',
-          onTap: () => _openPage(context, sudhamrtamRefundsUrl),
-        ),
+          _buildAccountTile(
+            icon: Icons.currency_rupee,
+            title: 'Refunds and Cancellations',
+            subtitle: 'Cancel before 9 PM; refunds in 5–7 working days',
+            onTap: () => _openPage(context, sudhamrtamRefundsUrl),
+          ),
 
-        _buildAccountTile(
-          icon: Icons.contact_phone_outlined,
-          title: 'Contact us',
-          subtitle: 'Phone, email and address',
-          onTap: () => _openPage(context, sudhamrtamContactUrl),
-        ),
+          _buildAccountTile(
+            icon: Icons.contact_phone_outlined,
+            title: 'Contact us',
+            subtitle: 'Phone, email and address',
+            onTap: () => _openPage(context, sudhamrtamContactUrl),
+          ),
+        ]),
 
         // Delete my account: signed in, with the server only.
         if ((auth ?? sudhamrtamAuth) case final ApiPhoneAuthGateway gateway)
@@ -390,12 +423,20 @@ class _SignInCard extends StatelessWidget {
           );
         }
 
+        // The name, with the number under it (owner, 2026-11-24).
         return Card(
           child: ListTile(
             leading: const Icon(Icons.verified_user, color: _brandGreen),
-            title: Text('Signed in as ${user.phoneNumber ?? 'unknown number'}'),
-            // The Reg No on every bill (once a plan is approved).
-            subtitle: const _RegNoLine(),
+            title: SignedInName(
+              auth: gateway,
+              builder: (context, _, name) => Text(
+                'Signed in as ${name ?? phoneText(user.phoneNumber)}',
+                key: const Key('accountSignedInAs'),
+              ),
+            ),
+            // The number, and the Reg No on every bill (once a plan is
+            // approved).
+            subtitle: _RegNoLine(phone: phoneText(user.phoneNumber)),
             trailing: TextButton(
               onPressed: gateway.signOut,
               child: const Text('Sign out'),
@@ -407,10 +448,13 @@ class _SignInCard extends StatelessWidget {
   }
 }
 
-/// "Reg No: SM-1002 · Phone number verified": the number on every
-/// bill (owner decision 2026-11-11), once a plan is approved.
+/// "+91 90523 01616 · Reg No: SM-1002 · Phone number verified": the
+/// Reg No is the number on every bill (owner decision 2026-11-11), once
+/// a plan is approved.
 class _RegNoLine extends StatefulWidget {
-  const _RegNoLine();
+  const _RegNoLine({required this.phone});
+
+  final String phone;
 
   @override
   State<_RegNoLine> createState() => _RegNoLineState();
@@ -423,9 +467,11 @@ class _RegNoLineState extends State<_RegNoLine> {
   Widget build(BuildContext context) => FutureBuilder<String?>(
     future: _regNo,
     builder: (context, regNo) => Text(
-      regNo.data == null
-          ? 'Phone number verified'
-          : 'Reg No: ${regNo.data} · Phone number verified',
+      [
+        if (widget.phone.isNotEmpty) widget.phone,
+        if (regNo.data != null) 'Reg No: ${regNo.data}',
+        'Phone number verified',
+      ].join(' · '),
       key: const Key('accountRegNo'),
     ),
   );

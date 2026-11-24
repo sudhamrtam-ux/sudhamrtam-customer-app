@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import '../../core/widgets/site_layout.dart';
 import '../../models/catalog_repository.dart';
 import '../../models/product.dart';
 import 'product_details_screen.dart';
@@ -14,7 +15,11 @@ class ShopScreen extends StatelessWidget {
     this.catalog,
     this.category,
     this.onCategoryChanged,
+    this.footer,
   });
+
+  /// The website's footer, below the products (wide screens only).
+  final Widget? footer;
 
   /// Optional override for tests; defaults to the app catalog.
   final CatalogRepository? catalog;
@@ -50,76 +55,110 @@ class ShopScreen extends StatelessWidget {
           child: RefreshIndicator(
             color: _green,
             onRefresh: repository.refresh,
-            child: ListView(
+            child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              children: [
-                Text(
-                  'Our Products',
-                  style: Theme.of(context).textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Discover pure dairy and naturally crafted farm products.',
-                ),
-                if (repository.canUseServer)
-                  _CatalogStatus(repository: repository),
-                if (onCategoryChanged != null && categories.length > 1) ...[
-                  const SizedBox(height: 16),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final option in <String?>[null, ...categories])
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
-                              key: Key('shopCategory_${option ?? 'all'}'),
-                              label: Text(option ?? 'All'),
-                              selected: option == selected,
-                              selectedColor: _green.withValues(alpha: 0.25),
-                              onSelected: (_) => onCategoryChanged!(option),
-                            ),
+              slivers: [
+                SliverPadding(
+                  padding: sitePagePadding(
+                    context,
+                    top: isWideSite(context) ? 24 : 16,
+                    bottom: isWideSite(context) ? 40 : 16,
+                  ),
+                  sliver: SliverList.list(
+                    children: [
+                      Text(
+                        'Our Products',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Discover pure dairy and naturally crafted farm products.',
+                      ),
+                      if (repository.canUseServer)
+                        _CatalogStatus(repository: repository),
+                      if (onCategoryChanged != null &&
+                          categories.length > 1) ...[
+                        const SizedBox(height: 16),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (final option in <String?>[
+                                null,
+                                ...categories,
+                              ])
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ChoiceChip(
+                                    key: Key('shopCategory_${option ?? 'all'}'),
+                                    label: Text(option ?? 'All'),
+                                    selected: option == selected,
+                                    selectedColor: _green.withValues(
+                                      alpha: 0.25,
+                                    ),
+                                    onSelected: (_) =>
+                                        onCategoryChanged!(option),
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                if (products.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      'No products are available yet.',
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                else
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: products.length,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.68,
                         ),
-                    itemBuilder: (context, index) =>
-                        _ProductCard(sizes: products[index]),
-                  ),
-                const SizedBox(height: 20),
-                const Center(
-                  child: Text(
-                    'Pure • Natural • Traditional',
-                    style: TextStyle(
-                      color: _green,
-                      fontWeight: FontWeight.w600,
-                    ),
+                      ],
+                      const SizedBox(height: 20),
+                      if (products.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'No products are available yet.',
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      else
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: products.length,
+                          // Phones: two a row. A website: four or more, at a
+                          // normal size.
+                          gridDelegate: isWideSite(context)
+                              ? const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 290,
+                                  crossAxisSpacing: 20,
+                                  mainAxisSpacing: 20,
+                                  childAspectRatio: 0.74,
+                                )
+                              : const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                  childAspectRatio: 0.68,
+                                ),
+                          itemBuilder: (context, index) =>
+                              _ProductCard(sizes: products[index]),
+                        ),
+                      const SizedBox(height: 20),
+                      const Center(
+                        child: Text(
+                          'Pure • Natural • Traditional',
+                          style: TextStyle(
+                            color: _green,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                if (footer != null)
+                  SliverFillRemaining(
+                    // A short page: the footer still sits at the bottom.
+                    hasScrollBody: false,
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: footer,
+                    ),
+                  ),
               ],
             ),
           ),

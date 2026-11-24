@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
+import '../../core/widgets/site_layout.dart';
 import '../../services/milk_plan_api_client.dart';
 import '../account/phone_login_screen.dart';
 import '../milk_bills/milk_bills_screen.dart';
@@ -19,248 +20,252 @@ import 'vacation_days_screen.dart';
 class MilkPlanScreen extends StatelessWidget {
   const MilkPlanScreen({super.key});
 
+  static const _brandGreen = Color(0xFF82B440);
+
+  Widget _sectionTitle(BuildContext context, String title) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(
+      title,
+      style: Theme.of(context).textTheme.titleMedium
+          ?.copyWith(fontWeight: FontWeight.bold),
+    ),
+  );
+
+  /// Buffalo and cow milk, side by side.
+  Widget _startPlan(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _sectionTitle(context, 'Start a new plan'),
+      IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _MilkProductCard(
+                name: 'Buffalo Milk',
+                description: 'Rich and creamy',
+                icon: Icons.water_drop,
+                onTap: () => openMilkPlanSetup(context, 'Buffalo Milk'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _MilkProductCard(
+                name: 'Cow Milk',
+                description: 'Fresh and wholesome',
+                icon: Icons.water_drop_outlined,
+                onTap: () => openMilkPlanSetup(context, 'Cow Milk'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  /// The customer's plans, one card per milk.
+  Widget _myPlans(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _sectionTitle(context, 'My milk plans'),
+      ListenableBuilder(
+        listenable: sudhamrtamMilkSync,
+        builder: (context, _) {
+          final message = sudhamrtamMilkSync.message;
+          if (message == null) return const SizedBox.shrink();
+          return Container(
+            key: const Key('milkSyncMessage'),
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(message),
+                TextButton(
+                  onPressed: sudhamrtamMilkSync.syncNow,
+                  child: const Text('Try again'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+      ListenableBuilder(
+        listenable: sudhamrtamMilkSubscriptions,
+        builder: (context, child) {
+          final subscriptions = sudhamrtamMilkSubscriptions.subscriptions;
+
+          if (subscriptions.isEmpty) {
+            return Container(
+              key: const Key('noMilkPlans'),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F8F0),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.event_note_outlined, size: 32, color: _brandGreen),
+                  SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'No milk plans yet',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Choose Buffalo Milk or Cow Milk to start one.',
+                          style: TextStyle(color: Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final group in sudhamrtamMilkSubscriptions.duplicatePlans)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: DuplicatePlansBanner(group: group),
+                ),
+              // One card per milk, with every shift in it.
+              for (final productId in const ['buffalo_milk', 'cow_milk'])
+                if (sudhamrtamMilkSubscriptions.plansFor(productId).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: MilkProductCard(
+                      key: ValueKey('milk_$productId'),
+                      productId: productId,
+                      plans: sudhamrtamMilkSubscriptions.plansFor(productId),
+                    ),
+                  ),
+              _CancelledPlans(
+                plans: [
+                  for (final plan in subscriptions)
+                    if (plan.status == MilkSubscriptionStatus.cancelled) plan,
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    ],
+  );
+
+  /// How often milk can come, as small tiles two a row.
+  Widget _deliveryOptions(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _sectionTitle(context, 'Delivery options'),
+      GridView.count(
+        key: const Key('deliveryOptions'),
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 2.6,
+        children: const [
+          _DeliveryOption(
+            icon: Icons.calendar_today_outlined,
+            title: 'Daily',
+            subtitle: 'Every day',
+          ),
+          _DeliveryOption(
+            icon: Icons.date_range_outlined,
+            title: 'Alternate days',
+            subtitle: 'Every other day',
+          ),
+          _DeliveryOption(
+            icon: Icons.event_available_outlined,
+            title: 'Selected days',
+            subtitle: 'Your weekdays',
+          ),
+          _DeliveryOption(
+            icon: Icons.calendar_month_outlined,
+            title: 'Random days',
+            subtitle: 'Dates you pick',
+          ),
+        ],
+      ),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
-    const brandGreen = Color(0xFF82B440);
+    final wide = isWideSite(context);
+
+    final heading = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Milk Plans',
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Fresh milk at your door, early morning to evening. '
+          'Pause it any time you travel.',
+          style: TextStyle(color: Colors.black54),
+        ),
+      ],
+    );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Milk Plan')),
+      // The app's bar (phone) or the site's header is above this page,
+      // and the page has its own heading.
       body: SafeArea(
         child: RefreshIndicator(
           // Pull down: the latest from Sudhamrtam (e.g. an approval).
           onRefresh: () => sudhamrtamMilkSync.refresh(force: true),
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.fromLTRB(16, wide ? 24 : 16, 16, 24),
             children: [
               const MilkBillsReminder(),
-
-              // Main heading
-              Text(
-                'Fresh Milk, Early Morning to Evening',
-                style: Theme.of(context).textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-
-              const SizedBox(height: 8),
-
-              const Text(
-                'Choose a convenient milk delivery plan '
-                'for your family.',
-                style: TextStyle(fontSize: 15, color: Colors.black54),
-              ),
-
-              const SizedBox(height: 24),
-
-              // =================================================
-              // BUFFALO MILK
-              // =================================================
-              _MilkProductCard(
-                name: 'Buffalo Milk',
-                description: 'Rich, creamy farm-fresh buffalo milk.',
-                icon: Icons.water_drop,
-                onTap: () => openMilkPlanSetup(context, 'Buffalo Milk'),
-              ),
-
-              const SizedBox(height: 16),
-
-              // =================================================
-              // COW MILK
-              // =================================================
-              _MilkProductCard(
-                name: 'Cow Milk',
-                description: 'Fresh, wholesome cow milk.',
-                icon: Icons.water_drop_outlined,
-                onTap: () => openMilkPlanSetup(context, 'Cow Milk'),
-              ),
-
-              const SizedBox(height: 32),
-
-              // =================================================
-              // SAVED SUBSCRIPTIONS
-              // =================================================
-              Text(
-                'My Milk Subscriptions',
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-
-              const SizedBox(height: 8),
-
-              const Text(
-                'View and manage your saved milk delivery plans.',
-                style: TextStyle(color: Colors.black54),
-              ),
-
-              const SizedBox(height: 16),
-
-              ListenableBuilder(
-                listenable: sudhamrtamMilkSync,
-                builder: (context, _) {
-                  final message = sudhamrtamMilkSync.message;
-                  if (message == null) return const SizedBox.shrink();
-                  return Container(
-                    key: const Key('milkSyncMessage'),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF8E1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(message),
-                        TextButton(
-                          onPressed: sudhamrtamMilkSync.syncNow,
-                          child: const Text('Try again'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-
-              ListenableBuilder(
-                listenable: sudhamrtamMilkSubscriptions,
-                builder: (context, child) {
-                  final subscriptions =
-                      sudhamrtamMilkSubscriptions.subscriptions;
-
-                  if (subscriptions.isEmpty) {
-                    return Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F8F0),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Column(
-                        children: [
-                          Icon(
-                            Icons.event_note_outlined,
-                            size: 42,
-                            color: brandGreen,
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            'No Milk Subscriptions Yet',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Choose Buffalo Milk or Cow Milk '
-                            'above to create your first plan.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.black54),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return Column(
-                    children: [
-                      for (final group
-                          in sudhamrtamMilkSubscriptions.duplicatePlans)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: DuplicatePlansBanner(group: group),
-                        ),
-                      // One card per milk, with every shift in it.
-                      for (final productId in const [
-                        'buffalo_milk',
-                        'cow_milk',
-                      ])
-                        if (sudhamrtamMilkSubscriptions
-                            .plansFor(productId)
-                            .isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: MilkProductCard(
-                              key: ValueKey('milk_$productId'),
-                              productId: productId,
-                              plans: sudhamrtamMilkSubscriptions.plansFor(
-                                productId,
-                              ),
-                            ),
-                          ),
-                      _CancelledPlans(
-                        plans: [
-                          for (final plan in subscriptions)
-                            if (plan.status == MilkSubscriptionStatus.cancelled)
-                              plan,
-                        ],
-                      ),
-                    ],
-                  );
-                },
-              ),
-
-              const SizedBox(height: 28),
-
-              // =================================================
-              // DELIVERY OPTIONS
-              // =================================================
-              Text(
-                'Flexible Delivery Options',
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-
-              const SizedBox(height: 16),
-
-              const _DeliveryOption(
-                icon: Icons.calendar_today_outlined,
-                title: 'Daily Delivery',
-                subtitle: 'Fresh milk delivered every day.',
-              ),
-
-              const _DeliveryOption(
-                icon: Icons.date_range_outlined,
-                title: 'Alternate Days',
-                subtitle: 'Milk delivered every other day.',
-              ),
-
-              const _DeliveryOption(
-                icon: Icons.event_available_outlined,
-                title: 'Selected Days',
-                subtitle: 'Choose your preferred weekdays.',
-              ),
-
-              const _DeliveryOption(
-                icon: Icons.calendar_month_outlined,
-                title: 'Random Days',
-                subtitle: 'Choose individual delivery dates.',
-              ),
-
-              const SizedBox(height: 24),
-
-              // =================================================
-              // BRAND VALUES
-              // =================================================
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F8F0),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Row(
+              heading,
+              const SizedBox(height: 18),
+              if (wide)
+                // A website (owner, 2026-11-24): the plans on the left,
+                // starting one and the options on the right.
+                Row(
+                  key: const Key('milkPlanWide'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.verified_outlined, color: brandGreen),
-                    SizedBox(width: 12),
+                    Expanded(flex: 3, child: _myPlans(context)),
+                    const SizedBox(width: 24),
                     Expanded(
-                      child: Text(
-                        'Pure • Natural • Delivered Fresh',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _startPlan(context),
+                          const SizedBox(height: 22),
+                          _deliveryOptions(context),
+                        ],
                       ),
                     ),
                   ],
-                ),
-              ),
+                )
+              else ...[
+                _startPlan(context),
+                const SizedBox(height: 22),
+                _myPlans(context),
+                const SizedBox(height: 22),
+                _deliveryOptions(context),
+              ],
             ],
           ),
         ),
@@ -736,73 +741,64 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
             ],
           ),
 
+        // Edit, pause and cancel side by side (owner, 2026-11-24: less
+        // scrolling).
         if (!isCancelled && !widget.compact) ...[
-          const SizedBox(height: 8),
-
-          // ===============================================
-          // EDIT SUBSCRIPTION
-          // ===============================================
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _isProcessing
-                  ? null
-                  : () => _editSubscription(context),
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Edit Subscription'),
-              style: FilledButton.styleFrom(
-                backgroundColor: brandGreen,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  key: const Key('planEdit'),
+                  onPressed: _isProcessing
+                      ? null
+                      : () => _editSubscription(context),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const FittedBox(child: Text('Edit plan')),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: brandGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                ),
               ),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // ===============================================
-          // PAUSE / RESUME SUBSCRIPTION
-          // ===============================================
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _isProcessing
-                  ? null
-                  : () => _changeStatus(pause: isActive),
-              icon: Icon(
-                isActive
-                    ? Icons.pause_circle_outline
-                    : Icons.play_circle_outline,
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('planPause'),
+                  onPressed: _isProcessing
+                      ? null
+                      : () => _changeStatus(pause: isActive),
+                  icon: Icon(
+                    isActive
+                        ? Icons.pause_circle_outline
+                        : Icons.play_circle_outline,
+                    size: 18,
+                  ),
+                  label: FittedBox(child: Text(isActive ? 'Pause' : 'Resume')),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: brandGreen,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                ),
               ),
-              label: Text(
-                isActive ? 'Pause Subscription' : 'Resume Subscription',
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('planCancel'),
+                  onPressed: _isProcessing
+                      ? null
+                      : () => _confirmCancellation(context),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const FittedBox(child: Text('Cancel')),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                ),
               ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: brandGreen,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // ===============================================
-          // CANCEL SUBSCRIPTION
-          // ===============================================
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _isProcessing
-                  ? null
-                  : () => _confirmCancellation(context),
-              icon: const Icon(Icons.cancel_outlined),
-              label: const Text('Cancel Subscription'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
+            ],
           ),
         ],
 
@@ -883,7 +879,7 @@ class _ShiftScheduleSummary extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFF5F8F0),
         borderRadius: BorderRadius.circular(12),
@@ -912,11 +908,13 @@ class _ShiftScheduleSummary extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(_frequencyLabel),
           const SizedBox(height: 4),
+          // "Daily Delivery", or "Selected Days · Mon, Wed, Fri".
           Text(
-            _scheduleDetails,
+            schedule.frequency == MilkDeliveryFrequency.daily ||
+                    schedule.frequency == MilkDeliveryFrequency.alternateDays
+                ? _frequencyLabel
+                : '$_frequencyLabel · $_scheduleDetails',
             style: const TextStyle(color: Colors.black54, fontSize: 13),
           ),
         ],
@@ -946,53 +944,78 @@ class _MilkProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     const brandGreen = Color(0xFF82B440);
 
-    return Card(
-      elevation: 1,
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFE1EBCF)),
+      ),
       child: InkWell(
+        key: Key('startPlan-$name'),
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
               Container(
-                width: 64,
-                height: 64,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F8F0),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: brandGreen, size: 34),
+                child: Icon(icon, color: brandGreen, size: 24),
               ),
-
-              const SizedBox(width: 16),
-
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       name,
                       style: const TextStyle(
-                        fontSize: 17,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-
-                    const SizedBox(height: 6),
-
                     Text(
                       description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         color: Colors.black54,
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Start plan',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF3F6B17),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          Icons.arrow_forward,
+                          size: 14,
+                          color: Color(0xFF3F6B17),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-
-              const Icon(Icons.arrow_forward_ios, size: 16, color: brandGreen),
             ],
           ),
         ),
@@ -1002,7 +1025,7 @@ class _MilkProductCard extends StatelessWidget {
 }
 
 // ============================================================
-// REUSABLE DELIVERY OPTION ROW
+// DELIVERY OPTION TILE
 // ============================================================
 
 class _DeliveryOption extends StatelessWidget {
@@ -1020,31 +1043,35 @@ class _DeliveryOption extends StatelessWidget {
   Widget build(BuildContext context) {
     const brandGreen = Color(0xFF82B440);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F8F0),
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Row(
         children: [
-          Icon(icon, color: brandGreen, size: 28),
-
-          const SizedBox(width: 16),
-
+          Icon(icon, color: brandGreen, size: 22),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-
-                const SizedBox(height: 4),
-
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ],
             ),

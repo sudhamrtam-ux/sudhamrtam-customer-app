@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../app/sudhamrtam_app.dart';
 import '../../database/order_database_service.dart';
 import '../../database/order_ref_service.dart';
@@ -896,7 +898,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(
         title: const Text('My Orders'),
         actions: [

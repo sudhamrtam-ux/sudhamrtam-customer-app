@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../app/sudhamrtam_app.dart';
 import '../../database/customer_profile_database_service.dart';
 import '../../services/account_api_client.dart';
@@ -255,7 +257,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
           Navigator.of(context).pop();
         }
       },
-      child: Scaffold(
+      child: SiteScaffold(
         appBar: PageAppBar(title: const Text('My Profile')),
         body: _buildBody(),
       ),

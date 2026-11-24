@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../database/customer_address_database_service.dart';
 import '../../database/pending_order_submission_service.dart';
+import '../../models/cart_item.dart';
 import '../../models/customer_address.dart';
 import '../../models/combo_offer.dart';
 import '../../models/customer_order.dart';
@@ -20,6 +21,8 @@ import 'durable_checkout_coordinator.dart';
 import 'order_destination.dart';
 import 'order_preparation_service.dart';
 import '../../core/widgets/page_app_bar.dart';
+import '../../core/widgets/site_layout.dart';
+import '../shop/product_image.dart';
 
 const _brandGreen = Color(0xFF82B440);
 
@@ -1285,6 +1288,483 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  /// The line under Place Order.
+  String get _footnote => _serverMode
+      ? (_paysOnline
+            ? 'Your order is sent to Sudhamrtam. You pay online on the '
+                  'next screen.'
+            : 'Your order is sent to Sudhamrtam. Cash on Delivery.')
+      : widget.enableTestOrders
+      ? 'Test order — saved on this phone only. '
+            'Not sent to Sudhamrtam. No payment is taken.'
+      : 'No order or payment will be created from this preview screen.';
+
+  String get _paymentText => _paymentMethod == OrderPaymentMethod.online
+      ? (_serverMode
+            ? 'Pay Online (UPI / Card / Net Banking)'
+            : 'Online Payment')
+      : _serverMode
+      ? 'Cash on Delivery'
+      : 'Cash on Delivery / Pickup';
+
+  /// A numbered step on the left of the website checkout.
+  Widget _wideStep(int number, String title, Widget child, {Key? key}) {
+    return Container(
+      key: key,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE3EAD6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 13,
+                backgroundColor: _brandGreen,
+                child: Text(
+                  '$number',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryLine(String label, String value, {bool bold = false}) {
+    final style = TextStyle(
+      fontSize: bold ? 17 : 14,
+      fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+      color: bold ? const Color(0xFF2F4A14) : null,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Text(label, style: style)),
+          const SizedBox(width: 12),
+          Text(value, style: style),
+        ],
+      ),
+    );
+  }
+
+  /// "Deliver on", "Pay by", "To": what was chosen, short.
+  Widget _summaryChoice(IconData icon, String text, {Key? key}) {
+    return Padding(
+      key: key,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: _brandGreen),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _wideCheckout({
+    required List<CartItem> items,
+    required bool hasUnpricedProducts,
+    required CustomerAddress? selectedAddress,
+    required List<String> validationErrors,
+    required List<({String message, String? action, VoidCallback? onAction})>
+    serverRequirements,
+    required bool canPlaceOrder,
+    required String placeOrderLabel,
+    required bool isRetry,
+  }) {
+    final padding = sitePagePadding(context, top: 24, bottom: 24);
+    final isDelivery = _fulfillmentMethod == FulfillmentMethod.delivery;
+    final rules = _rules;
+    final count = sudhamrtamCart.totalQuantity;
+    final itemsLabel = '$count ${count == 1 ? 'item' : 'items'}';
+    final fee = (rules?.deliveryFeePaise ?? 0) / 100;
+    final subtotal = sudhamrtamCart.subtotal;
+
+    String rupees(double amount) => '₹${amount.toStringAsFixed(2)}';
+
+    Widget option({
+      required Key key,
+      required String title,
+      required String subtitle,
+      required IconData icon,
+      required bool selected,
+      required VoidCallback onTap,
+    }) => Expanded(
+      child: KeyedSubtree(
+        key: key,
+        child: _optionCard(
+          title: title,
+          subtitle: subtitle,
+          icon: icon,
+          selected: selected,
+          onTap: onTap,
+        ),
+      ),
+    );
+
+    final left = ListView(
+      key: const Key('checkout-wide-steps'),
+      padding: EdgeInsets.only(top: padding.top, bottom: 24),
+      children: [
+        // Wraps onto two lines when the column is narrow.
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.end,
+          alignment: WrapAlignment.spaceBetween,
+          runSpacing: 4,
+          children: [
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.end,
+              children: [
+                Text(
+                  'Review your order',
+                  style: Theme.of(context).textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 10),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Text(
+                    '($itemsLabel)',
+                    style: const TextStyle(color: Colors.black54, fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+            Wrap(
+              children: [
+                TextButton.icon(
+                  key: const Key('checkoutEditCart'),
+                  onPressed: () => openTab(context, cartTab),
+                  icon: const Icon(Icons.shopping_cart_outlined, size: 18),
+                  label: const Text('Edit cart'),
+                ),
+                TextButton.icon(
+                  key: const Key('checkoutContinueShopping'),
+                  onPressed: () => openTab(context, shopTab),
+                  icon: const Icon(Icons.storefront_outlined, size: 18),
+                  label: const Text('Continue shopping'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // 1. Where.
+        _wideStep(
+          1,
+          _serverMode ? 'Delivery address' : 'Delivery or pickup',
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!_serverMode) ...[
+                Row(
+                  children: [
+                    option(
+                      key: const Key('checkout-option-delivery'),
+                      title: 'Home Delivery',
+                      subtitle: 'Deliver to your selected address',
+                      icon: Icons.local_shipping_outlined,
+                      selected: isDelivery,
+                      onTap: () {
+                        setState(
+                          () => _fulfillmentMethod = FulfillmentMethod.delivery,
+                        );
+                        _loadSavedAddresses();
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    option(
+                      key: const Key('checkout-option-pickup'),
+                      title: 'Store Pickup',
+                      subtitle: 'Collect your order from Sudhamrtam',
+                      icon: Icons.storefront_outlined,
+                      selected: !isDelivery,
+                      onTap: () => setState(
+                        () => _fulfillmentMethod = FulfillmentMethod.pickup,
+                      ),
+                    ),
+                  ],
+                ),
+                if (isDelivery) const SizedBox(height: 12),
+              ],
+              if (isDelivery) _buildAddressSelection(),
+            ],
+          ),
+          key: const Key('checkout-step-address'),
+        ),
+
+        // 2. When, and anything for the delivery partner.
+        if (isDelivery)
+          _wideStep(
+            2,
+            'Delivery date and instructions',
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_serverMode && rules != null && rules.maxDaysAhead > 0) ...[
+                  Expanded(child: _buildDeliveryDate(rules)),
+                  const SizedBox(width: 20),
+                ],
+                Expanded(child: _buildDeliveryInstructions()),
+              ],
+            ),
+            key: const Key('checkout-step-date'),
+          ),
+
+        // 3. How to pay.
+        _wideStep(
+          isDelivery ? 3 : 2,
+          'Payment',
+          Row(
+            children: [
+              option(
+                key: const Key('checkout-option-cod'),
+                title: _serverMode
+                    ? 'Cash on Delivery'
+                    : 'Cash on Delivery / Pickup',
+                subtitle: 'Pay when you receive your order',
+                icon: Icons.payments_outlined,
+                selected: _paymentMethod == OrderPaymentMethod.cashOnDelivery,
+                onTap: () => setState(
+                  () => _paymentMethod = OrderPaymentMethod.cashOnDelivery,
+                ),
+              ),
+              if (!_serverMode || _onlineOffered) ...[
+                const SizedBox(width: 12),
+                option(
+                  key: const Key('checkout-option-online'),
+                  title: _serverMode ? 'Pay Online' : 'Online Payment',
+                  subtitle: _serverMode
+                      ? 'UPI, cards and net banking (Cashfree)'
+                      : 'UPI, cards and other online options',
+                  icon: Icons.credit_card_outlined,
+                  selected: _paymentMethod == OrderPaymentMethod.online,
+                  onTap: () => setState(
+                    () => _paymentMethod = OrderPaymentMethod.online,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          key: const Key('checkout-step-payment'),
+        ),
+
+        // 4. What.
+        _wideStep(
+          isDelivery ? 4 : 3,
+          'Your items',
+          Column(
+            children: [
+              for (final item in items)
+                Padding(
+                  key: Key('checkout-item-${item.product.id}'),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      SizedBox.square(
+                        dimension: 52,
+                        child: ProductImage(
+                          productId: item.product.id,
+                          icon: item.product.icon,
+                          iconSize: 30,
+                          borderRadius: 8,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.product.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '${item.quantity} × ${item.product.unit}',
+                              style: const TextStyle(color: Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        item.product.price.isFinite && item.product.price > 0
+                            ? rupees(item.totalPrice)
+                            : 'Pending',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          key: const Key('checkout-step-items'),
+        ),
+      ],
+    );
+
+    final addressText = !isDelivery
+        ? 'Store pickup'
+        : _addressesLoading
+        ? 'Loading saved addresses...'
+        : selectedAddress == null
+        ? 'No delivery address selected'
+        : '${selectedAddress.recipientName}, '
+              '${selectedAddress.formattedAddress}';
+
+    final summary = Container(
+      key: const Key('checkout-wide-summary'),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE3EAD6)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Order summary',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          _summaryLine(
+            'Items ($itemsLabel)',
+            hasUnpricedProducts ? 'Pending' : rupees(subtotal),
+          ),
+          if (_serverMode && rules != null)
+            _summaryLine('Delivery', fee == 0 ? 'Free' : rupees(fee)),
+          const Divider(height: 18),
+          _summaryLine(
+            'Order total',
+            hasUnpricedProducts ? 'Pending' : rupees(subtotal + fee),
+            bold: true,
+          ),
+          const SizedBox(height: 10),
+          if (isDelivery && _serverMode && rules != null)
+            _summaryChoice(
+              Icons.event_outlined,
+              'Delivery: ${_deliveryDateText(rules)}',
+            ),
+          _summaryChoice(
+            isDelivery ? Icons.location_on_outlined : Icons.storefront_outlined,
+            addressText,
+            key: const Key('checkout-summary-address'),
+          ),
+          _summaryChoice(Icons.payments_outlined, _paymentText),
+          if (validationErrors.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _validationCard(validationErrors),
+          ],
+          if (serverRequirements.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _serverRequirementsCard(serverRequirements),
+          ],
+          if (_showFaultSimulation) ...[
+            const SizedBox(height: 12),
+            _faultSimulationCard(),
+          ],
+          if (_submissionError != null) ...[
+            const SizedBox(height: 12),
+            _submissionErrorCard(_submissionError!),
+          ],
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            key: const Key('checkout-place-order'),
+            onPressed: canPlaceOrder ? _placeOrder : null,
+            icon: _isSubmitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    !_ordersEnabled
+                        ? Icons.lock_outline
+                        : isRetry
+                        ? Icons.refresh
+                        : Icons.check_circle_outline,
+                  ),
+            label: Text(placeOrderLabel),
+            style: FilledButton.styleFrom(
+              backgroundColor: _brandGreen,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(50),
+              shape: const StadiumBorder(),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _footnote,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.black54, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+
+    return ColoredBox(
+      color: const Color(0xFFF7F9F3),
+      child: Padding(
+        padding: EdgeInsets.only(left: padding.left, right: padding.right),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: left),
+            const SizedBox(width: 24),
+            SizedBox(
+              width: 360,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(top: padding.top + 52, bottom: 24),
+                child: summary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1389,6 +1869,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               : isRetry
               ? 'Retry Test Order'
               : 'Place Test Order';
+
+          // A website (owner, 2026-11-24): two columns, the order
+          // box with Place Order always in view.
+          if (isWideSite(context)) {
+            return _wideCheckout(
+              items: items,
+              hasUnpricedProducts: hasUnpricedProducts,
+              selectedAddress: selectedAddress,
+              validationErrors: validation.isValid
+                  ? const []
+                  : validation.errors,
+              serverRequirements: isRetry ? const [] : serverRequirements,
+              canPlaceOrder: canPlaceOrder,
+              placeOrderLabel: placeOrderLabel,
+              isRetry: isRetry,
+            );
+          }
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -1663,14 +2160,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 12),
 
               Text(
-                _serverMode
-                    ? 'Your order is sent to Sudhamrtam. '
-                          'Cash on Delivery.'
-                    : widget.enableTestOrders
-                    ? 'Test order — saved on this phone only. '
-                          'Not sent to Sudhamrtam. No payment is taken.'
-                    : 'No order or payment will be created '
-                          'from this preview screen.',
+                _footnote,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.black54, fontSize: 12),
               ),

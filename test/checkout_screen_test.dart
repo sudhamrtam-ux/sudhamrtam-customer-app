@@ -95,8 +95,9 @@ void main() {
     bool enableTestOrders = true,
   }) async {
     // Tall surface so the whole checkout list is built
-    // without scrolling.
-    tester.view.physicalSize = const Size(1200, 6000);
+    // without scrolling. 800 wide: the phone layout (a website's two
+    // columns start at 900; see site_layout_test.dart).
+    tester.view.physicalSize = const Size(800, 6000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 

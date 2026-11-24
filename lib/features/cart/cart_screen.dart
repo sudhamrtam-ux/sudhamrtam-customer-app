@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
 import '../../models/cart_manager.dart';
+import '../../core/widgets/site_layout.dart';
 import '../checkout/checkout_screen.dart';
+import 'cart_wide.dart';
 import '../shop/product_image.dart';
 import '../../models/combo_offer.dart';
 
@@ -73,6 +75,9 @@ class CartScreen extends StatelessWidget {
             ),
           );
         }
+
+        // A website: items on the left, the order box on the right.
+        if (isWideSite(context)) return WideCart(items: items);
 
         final hasUnpricedProducts = items.any(
           (item) => item.product.price <= 0,

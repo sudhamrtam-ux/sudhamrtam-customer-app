@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../core/widgets/site_layout.dart';
+
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -133,7 +136,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   @override
   Widget build(BuildContext context) {
     final api = _api;
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(title: const Text('Help & Support')),
       body: SafeArea(
         child: RefreshIndicator(

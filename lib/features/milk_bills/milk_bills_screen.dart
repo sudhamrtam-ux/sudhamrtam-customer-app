@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../app/sudhamrtam_app.dart';
 import '../../models/milk_subscription_manager.dart';
 import '../../services/milk_bill_api_client.dart';
@@ -252,7 +254,7 @@ class _MilkBillsScreenState extends State<MilkBillsScreen> {
   @override
   Widget build(BuildContext context) {
     final bills = _bills;
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(title: const Text('Milk Bills')),
       body: SafeArea(
         child: bills == null
@@ -584,7 +586,7 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
     final bill = _bill;
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(
         title: Text('Bill for ${billMonthLabel(bill.month)}'),
         actions: [

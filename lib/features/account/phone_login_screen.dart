@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../core/widgets/site_layout.dart';
+
 import 'package:flutter/services.dart';
 
 import '../../services/phone_auth_service.dart';
@@ -133,7 +136,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   Widget build(BuildContext context) {
     final enteringCode = _codeSent != null;
 
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(title: const Text('Sign in')),
       body: SafeArea(
         child: ListView(

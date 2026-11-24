@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../app/sudhamrtam_app.dart';
 import '../../models/customer_address.dart';
 import '../../services/account_api_client.dart';
@@ -23,8 +25,9 @@ typedef SocietyLoader = Future<List<SocietyChoice>> Function(String areaId);
 SocietyLoader? _defaultSocietyLoader() =>
     CatalogApiClient.fromEnvironment()?.fetchSocieties;
 
-/// The society choice that means "type it".
-const _notListed = '__not_listed__';
+/// The society choice that means "not in a listed society": the
+/// customer types the whole address (owner decision 2026-11-24).
+const _noSociety = '__no_society__';
 
 class AddressFormScreen extends StatefulWidget {
   AddressFormScreen({
@@ -48,6 +51,7 @@ class AddressFormScreen extends StatefulWidget {
 
   /// The phone's GPS and the map; tests replace them.
   final CurrentLocationFinder findLocation;
+
   /// Null: no map can be drawn (the website without a Maps key).
   final MapPinBuilder? mapBuilder;
 
@@ -71,19 +75,23 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   final _postalCodeController = TextEditingController();
   final _blockController = TextEditingController();
   final _flatController = TextEditingController();
-  final _typedSocietyController = TextEditingController();
   final _noteController = TextEditingController();
 
-  /// Society, block and flat (owner decisions 2026-11-11): flat is
-  /// always needed; society and block unless an independent house.
-  bool _isHouse = false;
+  /// Two ways to give the address (owner decision 2026-11-24):
+  /// - a society from the area's list: block and flat, and the society's
+  ///   own address (set up by Sudhamrtam) fills in the rest;
+  /// - not in a listed society: house or flat number and the whole
+  ///   address. Saved as a house (no block, no society).
+  /// Null: not chosen yet.
   String? _society;
   List<SocietyChoice> _societies = const [];
+
+  bool get _inSociety => _society != null && _society != _noSociety;
 
   /// The chosen society, when it gives the address (owner decision
   /// 2026-11-14): then only flat, block and a note are typed.
   SocietyChoice? get _societyWithAddress {
-    if (_isHouse || _society == null || _society == _notListed) return null;
+    if (!_inSociety) return null;
     for (final s in _societies) {
       if (s.id == _society && s.hasAddress) return s;
     }
@@ -131,13 +139,24 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _stateController.text = address.state;
     _postalCodeController.text = address.postalCode;
     _isDefault = address.isDefault;
-    _isHouse = address.isHouse;
     _blockController.text = address.block ?? '';
     _flatController.text = address.flat ?? '';
-    _typedSocietyController.text = address.societyOther ?? '';
     _noteController.text = address.deliveryNote ?? '';
     _society =
-        address.societyId ?? (address.societyOther == null ? null : _notListed);
+        address.societyId ??
+        (address.isHouse || address.societyOther != null ? _noSociety : null);
+    // A society name typed before (2026-11-24) is kept in the address.
+    final typed = address.societyOther?.trim() ?? '';
+    if (address.societyId == null &&
+        typed.isNotEmpty &&
+        !'${address.addressLine1} ${address.addressLine2 ?? ''} ${address.landmark}'
+            .contains(typed)) {
+      _addressLine2Controller.text = [
+        typed,
+        if ((address.addressLine2 ?? '').trim().isNotEmpty)
+          address.addressLine2!.trim(),
+      ].join(', ');
+    }
     // Shown until the list arrives.
     if (address.societyId != null && address.societyName != null) {
       _societies = [
@@ -154,18 +173,16 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       if (!mounted || areaId != _areaId) return;
       setState(() {
         _societies = list;
-        if (_society != null &&
-            _society != _notListed &&
-            !list.any((s) => s.id == _society)) {
+        if (_inSociety && !list.any((s) => s.id == _society)) {
           _society = null;
         }
       });
     } catch (_) {
-      // Without the list the customer can still type the society.
+      // Without the list the customer types the whole address.
       if (mounted && areaId == _areaId) {
         setState(() {
           _societies = const [];
-          _society ??= _notListed;
+          _society ??= _noSociety;
         });
       }
     }
@@ -256,7 +273,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 setState(() {
                   _areaId = value;
                   _societies = const [];
-                  if (_society != _notListed) _society = null;
+                  if (_inSociety) _society = null;
                 });
                 if (value != null) _loadSocieties(value);
               },
@@ -279,12 +296,12 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _postalCodeController.dispose();
     _blockController.dispose();
     _flatController.dispose();
-    _typedSocietyController.dispose();
     _noteController.dispose();
     super.dispose();
   }
 
-  /// Independent house; society, block/tower and flat.
+  /// The society (or none), then block/tower and flat, or the house
+  /// number.
   Widget _buildSocietyFields() {
     String? required(String? value, String message) =>
         value == null || value.trim().isEmpty ? message : null;
@@ -299,69 +316,47 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             borderSide: BorderSide(color: _brandGreen, width: 2),
           ),
         );
-    // With a server the society is chosen from the list (or "Not
-    // listed"); without one it is typed.
+    // With a server the society is chosen from the area's list;
+    // without one the whole address is typed.
     final picks = widget.loadSocieties != null;
+    final inSociety = picks && _inSociety;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CheckboxListTile(
-          key: const Key('houseField'),
-          contentPadding: EdgeInsets.zero,
-          controlAffinity: ListTileControlAffinity.leading,
-          activeColor: _brandGreen,
-          title: const Text('Independent house / not in a society'),
-          value: _isHouse,
-          onChanged: _isSaving
-              ? null
-              : (v) => setState(() => _isHouse = v ?? false),
-        ),
-        const SizedBox(height: 8),
-        if (!_isHouse) ...[
-          if (picks)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: DropdownButtonFormField<String>(
-                key: ValueKey('societyField-$_areaId-${_societies.length}'),
-                initialValue: _society,
-                isExpanded: true,
-                decoration: decoration(
-                  'Society / Apartment',
-                  help: _areaId == null
-                      ? 'Choose your area first.'
-                      : 'Not in the list? Choose "Not listed" and type it.',
-                ),
-                items: [
-                  for (final s in _societies)
-                    DropdownMenuItem(value: s.id, child: Text(s.name)),
-                  const DropdownMenuItem(
-                    value: _notListed,
-                    child: Text('Not listed — type it'),
+        if (picks)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: DropdownButtonFormField<String>(
+              key: ValueKey('societyField-$_areaId-${_societies.length}'),
+              initialValue: _society,
+              isExpanded: true,
+              decoration: decoration(
+                'Society / Apartment',
+                help: _areaId == null
+                    ? 'Choose your area first.'
+                    : 'Choose your society and we fill in its address.',
+              ),
+              items: [
+                for (final s in _societies)
+                  DropdownMenuItem(value: s.id, child: Text(s.name)),
+                const DropdownMenuItem(
+                  key: Key('noSocietyOption'),
+                  value: _noSociety,
+                  child: Text(
+                    "Not in a listed society — I'll enter my address",
                   ),
-                ],
-                onChanged: _isSaving || _areaId == null
-                    ? null
-                    : (v) => setState(() => _society = v),
-                validator: (v) =>
-                    v == null ? 'Please choose your society' : null,
-              ),
-            ),
-          if (!picks || _society == _notListed)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: TextFormField(
-                key: const Key('typedSocietyField'),
-                controller: _typedSocietyController,
-                enabled: !_isSaving,
-                textCapitalization: TextCapitalization.words,
-                decoration: decoration(
-                  'Society / Apartment Name',
-                  hint: 'e.g. Green Towers',
                 ),
-                validator: (v) => required(v, 'Please enter your society name'),
-              ),
+              ],
+              onChanged: _isSaving || _areaId == null
+                  ? null
+                  : (v) => setState(() => _society = v),
+              validator: (v) => v == null
+                  ? 'Please choose your society, or "Not in a listed society"'
+                  : null,
             ),
+          ),
+        if (inSociety)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: TextFormField(
@@ -376,7 +371,6 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
               validator: (v) => required(v, 'Please enter your block or tower'),
             ),
           ),
-        ],
         Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: TextFormField(
@@ -385,14 +379,14 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             enabled: !_isSaving,
             textCapitalization: TextCapitalization.characters,
             decoration: decoration(
-              _isHouse ? 'House Number' : 'Flat Number',
-              hint: _isHouse ? 'e.g. 7-1-45' : 'e.g. 101',
+              inSociety ? 'Flat Number' : 'House / Flat Number',
+              hint: inSociety ? 'e.g. 101' : 'e.g. 7-1-45 or 101',
             ),
             validator: (v) => required(
               v,
-              _isHouse
-                  ? 'Please enter your house number'
-                  : 'Please enter your flat number',
+              inSociety
+                  ? 'Please enter your flat number'
+                  : 'Please enter your house or flat number',
             ),
           ),
         ),
@@ -464,6 +458,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       final existing = widget.existingAddress;
       // A society with its own address gives the street, city and PIN.
       final place = _societyWithAddress;
+      final inSociety = widget.loadSocieties != null && _inSociety;
       final note = _noteController.text.trim();
 
       final address = CustomerAddress(
@@ -494,20 +489,18 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
 
-        isHouse: _isHouse,
-        societyId: _isHouse || _society == _notListed ? null : _society,
-        societyName: _isHouse || _society == _notListed
-            ? null
-            : [
+        // Not in a listed society: saved as a house, with the whole
+        // address typed.
+        isHouse: !inSociety,
+        societyId: inSociety ? _society : null,
+        societyName: inSociety
+            ? [
                 for (final s in _societies)
                   if (s.id == _society) s.name,
-              ].firstOrNull,
-        societyOther:
-            !_isHouse &&
-                (widget.loadSocieties == null || _society == _notListed)
-            ? _typedSocietyController.text.trim()
+              ].firstOrNull
             : null,
-        block: _isHouse ? null : _blockController.text.trim(),
+        societyOther: null,
+        block: inSociety ? _blockController.text.trim() : null,
         flat: _flatController.text.trim(),
         deliveryNote: note.isEmpty ? null : note,
       );
@@ -546,7 +539,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(
         title: Text(
           _isEditing ? 'Edit Delivery Address' : 'Add Delivery Address',

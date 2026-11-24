@@ -3,8 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/sudhamrtam_app.dart';
-import '../../database/customer_profile_database_service.dart';
-import '../../services/account_sync_service.dart';
+import '../../core/widgets/site_layout.dart';
 import '../../models/cart_manager.dart';
 import '../../models/catalog_repository.dart';
 import '../../models/combo_offer.dart';
@@ -17,6 +16,7 @@ import '../milk_bills/milk_bills_screen.dart';
 import '../shop/product_image.dart';
 import '../../models/milk_subscription.dart';
 import '../../models/milk_subscription_manager.dart';
+import '../account/customer_name.dart';
 import 'account_status.dart';
 import 'address_details_card.dart';
 import 'combo_cards.dart';
@@ -51,13 +51,6 @@ OffersLoader? _defaultOffersLoader() =>
     apiBaseUrl.isEmpty ? null : OfferApiClient(baseUrl: apiBaseUrl).fetchOffers;
 
 /// The customer's name from their profile; null without one.
-Future<String?> _savedCustomerName() async {
-  final profile = await CustomerProfileDatabaseService.instance.getProfileById(
-    AccountSyncService.localCustomerId,
-  );
-  final name = profile?.fullName.trim() ?? '';
-  return name.isEmpty ? null : name;
-}
 
 /// "Good morning", "Good afternoon" or "Good evening" at [time].
 String greetingFor(DateTime time) => time.hour >= 4 && time.hour < 12
@@ -95,7 +88,8 @@ class HomeScreen extends StatefulWidget {
     OrderRulesLoader? loadRules,
     OffersLoader? loadOffers,
     DateTime Function()? clock,
-    this.loadCustomerName = _savedCustomerName,
+    this.loadCustomerName = savedCustomerName,
+    this.footer,
   }) : loadRules = loadRules ?? _defaultRulesLoader(),
        loadOffers = loadOffers ?? _defaultOffersLoader(),
        clock = clock ?? DateTime.now;
@@ -124,6 +118,9 @@ class HomeScreen extends StatefulWidget {
 
   /// The customer's name for the greeting; tests replace it.
   final Future<String?> Function() loadCustomerName;
+
+  /// The website's footer, below everything (wide screens only).
+  final Widget? footer;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -249,118 +246,158 @@ class _HomeScreenState extends State<HomeScreen> {
           _combos.refresh(),
         ]);
       },
-      child: ListView(
+      child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Welcome first, with the milk plan as a small button
-          // (owner, 2026-11-17).
-          // Welcome, with the milk plan badge in the corner, then the
-          // banner (owner, 2026-11-17).
-          _Greeting(
-            loadName: widget.loadCustomerName,
-            now: widget.clock,
-            status: AccountStatusCard(
-              plans: widget.milkPlans,
-              onOpen: widget.onOpenMilkPlan,
-              today: widget.clock,
-              compact: true,
+        slivers: [
+          SliverPadding(
+            padding: sitePagePadding(
+              context,
+              top: isWideSite(context) ? 24 : 16,
+              bottom: isWideSite(context) ? 40 : 16,
+            ),
+            sliver: SliverList.list(
+              children: [
+                // Welcome first, with the milk plan as a small button
+                // (owner, 2026-11-17).
+                // Welcome, with the milk plan badge in the corner, then the
+                // banner (owner, 2026-11-17).
+                _Greeting(
+                  loadName: widget.loadCustomerName,
+                  now: widget.clock,
+                  status: AccountStatusCard(
+                    plans: widget.milkPlans,
+                    onOpen: widget.onOpenMilkPlan,
+                    today: widget.clock,
+                    compact: true,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
+                const SizedBox(height: 16),
+                // What the customer should know at once; each only when it
+                // applies.
+                // An address without its map spot or details.
+                const AddressDetailsCard(),
+                // A milk bill to pay.
+                const MilkBillsReminder(unpaidOnly: true),
+                // New messages from Sudhamrtam.
+                const NewMessagesCard(),
+                // The last order: on its way, or just delivered.
+                LastOrderCard(
+                  key: ValueKey('last-order-$_tomorrowTick'),
+                  now: widget.clock,
+                ),
+                // Items left in the cart.
+                if (_cart.totalQuantity > 0) ...[
+                  _CartWaitingCard(
+                    items: _cart.totalQuantity,
+                    subtotal: _cart.subtotal,
+                    onOpen: widget.onOpenCart,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                // Skip tomorrow / extra milk tomorrow (owner decision 2026-11-15).
+                TomorrowMilkCard(
+                  key: ValueKey('tomorrow-$_tomorrowTick'),
+                  client: sudhamrtamMilkTomorrow,
+                  onChanged: () => sudhamrtamMilkSync.refresh(force: true),
+                ),
+                if (_rules != null) ...[
+                  const SizedBox(height: 12),
+                  _DeliveryCard(rules: _rules!, now: widget.clock()),
+                ],
+                // Combo offers (owner decision 2026-11-15).
+                if (_combos.combos.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  ComboCards(
+                    combos: _combos.combos,
+                    cart: _cart,
+                    onOpenCart: widget.onOpenCart,
+                  ),
+                ],
+                if (essentials.isNotEmpty) ...[
+                  const SizedBox(height: 28),
+                  _SectionTitle(
+                    'Daily Essentials',
+                    actionLabel: 'See all',
+                    onAction: () => widget.onOpenShop?.call('Fresh Dairy'),
+                  ),
+                  const SizedBox(height: 12),
+                  if (isWideSite(context))
+                    // A website: the essentials side by side, filling the row.
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: essentials.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            crossAxisSpacing: 20,
+                            mainAxisSpacing: 20,
+                            mainAxisExtent: 290,
+                          ),
+                      itemBuilder: (context, index) =>
+                          _quickAdd(essentials[index]),
+                    )
+                  else
+                    SizedBox(
+                      height: 290,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: essentials.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(width: 12),
+                        itemBuilder: (context, index) =>
+                            _quickAdd(essentials[index]),
+                      ),
+                    ),
+                ],
+                const SizedBox(height: 28),
+                const _SectionTitle('Shop by Category'),
+                const SizedBox(height: 12),
+                _CategoryGrid(
+                  products: products,
+                  onOpen: (category) => widget.onOpenShop?.call(category),
+                ),
+                const SizedBox(height: 24),
+                _MilkPlanCard(
+                  onTap: widget.onOpenMilkPlan,
+                  plans: widget.milkPlans ?? sudhamrtamMilkSubscriptions,
+                ),
+                const SizedBox(height: 24),
+                const Center(
+                  child: Text(
+                    'Purity • Tradition • Wellness',
+                    style: TextStyle(
+                      color: _green,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 14),
-          _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
-          const SizedBox(height: 16),
-          // What the customer should know at once; each only when it
-          // applies.
-          // An address without its map spot or details.
-          const AddressDetailsCard(),
-          // A milk bill to pay.
-          const MilkBillsReminder(unpaidOnly: true),
-          // New messages from Sudhamrtam.
-          const NewMessagesCard(),
-          // The last order: on its way, or just delivered.
-          LastOrderCard(
-            key: ValueKey('last-order-$_tomorrowTick'),
-            now: widget.clock,
-          ),
-          // Items left in the cart.
-          if (_cart.totalQuantity > 0) ...[
-            _CartWaitingCard(
-              items: _cart.totalQuantity,
-              subtotal: _cart.subtotal,
-              onOpen: widget.onOpenCart,
-            ),
-            const SizedBox(height: 12),
-          ],
-          // Skip tomorrow / extra milk tomorrow (owner decision 2026-11-15).
-          TomorrowMilkCard(
-            key: ValueKey('tomorrow-$_tomorrowTick'),
-            client: sudhamrtamMilkTomorrow,
-            onChanged: () => sudhamrtamMilkSync.refresh(force: true),
-          ),
-          if (_rules != null) ...[
-            const SizedBox(height: 12),
-            _DeliveryCard(rules: _rules!, now: widget.clock()),
-          ],
-          // Combo offers (owner decision 2026-11-15).
-          if (_combos.combos.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            ComboCards(
-              combos: _combos.combos,
-              cart: _cart,
-              onOpenCart: widget.onOpenCart,
-            ),
-          ],
-          if (essentials.isNotEmpty) ...[
-            const SizedBox(height: 28),
-            _SectionTitle(
-              'Daily Essentials',
-              actionLabel: 'See all',
-              onAction: () => widget.onOpenShop?.call('Fresh Dairy'),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 290,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: essentials.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  final product = essentials[index];
-                  return _QuickAddCard(
-                    product: product,
-                    quantity: _cart.quantityFor(product.id),
-                    onAdd: () => _add(product),
-                    onIncrease: () => _cart.increaseQuantity(product.id),
-                    onDecrease: () => _cart.decreaseQuantity(product.id),
-                  );
-                },
+          if (widget.footer != null)
+            SliverFillRemaining(
+              // A short page: the footer still sits at the bottom.
+              hasScrollBody: false,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: widget.footer,
               ),
             ),
-          ],
-          const SizedBox(height: 28),
-          const _SectionTitle('Shop by Category'),
-          const SizedBox(height: 12),
-          _CategoryGrid(
-            products: products,
-            onOpen: (category) => widget.onOpenShop?.call(category),
-          ),
-          const SizedBox(height: 24),
-          _MilkPlanCard(
-            onTap: widget.onOpenMilkPlan,
-            plans: widget.milkPlans ?? sudhamrtamMilkSubscriptions,
-          ),
-          const SizedBox(height: 24),
-          const Center(
-            child: Text(
-              'Purity • Tradition • Wellness',
-              style: TextStyle(color: _green, fontWeight: FontWeight.w600),
-            ),
-          ),
         ],
       ),
     );
   }
+
+  Widget _quickAdd(Product product) => _QuickAddCard(
+    product: product,
+    quantity: _cart.quantityFor(product.id),
+    onAdd: () => _add(product),
+    onIncrease: () => _cart.increaseQuantity(product.id),
+    onDecrease: () => _cart.decreaseQuantity(product.id),
+  );
 }
 
 // =====================================================
@@ -776,9 +813,10 @@ class _CategoryGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: categories.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        // A website: every category in one row.
+        crossAxisCount: isWideSite(context) ? 4 : 2,
+        crossAxisSpacing: isWideSite(context) ? 20 : 12,
         mainAxisSpacing: 12,
         // Tall tiles so the product photo is the main thing.
         childAspectRatio: 0.78,

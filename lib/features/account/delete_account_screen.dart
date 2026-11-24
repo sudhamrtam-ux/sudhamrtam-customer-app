@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../core/widgets/site_layout.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/company.dart';
@@ -77,7 +80,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
   @override
   Widget build(BuildContext context) {
     final check = _check;
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(title: const Text('Delete my account')),
       body: SafeArea(
         child: ListView(

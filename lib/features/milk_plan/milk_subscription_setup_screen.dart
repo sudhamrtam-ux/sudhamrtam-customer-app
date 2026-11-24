@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../app/sudhamrtam_app.dart';
 import '../account/address_location_gate.dart';
 import '../../models/milk_subscription.dart';
@@ -569,7 +571,7 @@ class _MilkSubscriptionSetupScreenState
     final totalMl = _drafts.values
         .where((draft) => draft.enabled)
         .fold<int>(0, (sum, draft) => sum + draft.quantityMl);
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(
         title: Text(
           _isEditing ? 'Edit Milk Subscription' : 'Set Up Milk Subscription',

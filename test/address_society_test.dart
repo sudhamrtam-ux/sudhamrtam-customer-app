@@ -199,14 +199,24 @@ void main() {
       // Society, block and flat are needed.
       await tester.tap(find.text('Save Address'));
       await tester.pumpAndSettle();
-      expect(find.text('Please choose your society'), findsOneWidget);
-      expect(find.text('Please enter your block or tower'), findsOneWidget);
-      expect(find.text('Please enter your flat number'), findsOneWidget);
+      expect(
+        find.text('Please choose your society, or "Not in a listed society"'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Please enter your house or flat number'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.textContaining('Society / Apartment').first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Green Towers').last);
       await tester.pumpAndSettle();
+      // In a society: block and flat.
+      await tester.tap(find.text('Save Address'));
+      await tester.pumpAndSettle();
+      expect(find.text('Please enter your block or tower'), findsOneWidget);
+      expect(find.text('Please enter your flat number'), findsOneWidget);
       await type('Block / Tower', 'B');
       await type('Flat Number', '1203');
       await useCurrentLocation(tester);
@@ -359,7 +369,75 @@ void main() {
       },
     );
 
-    testWidgets('an independent house needs only the house number', (
+    testWidgets(
+      'not in a listed society: house or flat number and the whole address',
+      (tester) async {
+        tester.view.physicalSize = const Size(1080, 5000);
+        tester.view.devicePixelRatio = 2;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: AddressFormScreen(
+              account: AccountSyncService.localOnly(),
+              findLocation: fakeFindLocation,
+              mapBuilder: fakeMap,
+              loadAreas: () async => const [
+                DeliveryArea(id: 'nizampet', name: 'Nizampet'),
+              ],
+              loadSocieties: (_) async => const [
+                SocietyChoice(id: 's1', name: 'Green Towers'),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        // The old choices are gone.
+        expect(find.byKey(const Key('houseField')), findsNothing);
+        expect(find.textContaining('Not listed'), findsNothing);
+
+        Future<void> type(String label, String text) =>
+            tester.enterText(find.widgetWithText(TextFormField, label), text);
+        await type('Recipient Name', 'Asha');
+        await type('Mobile Number', '9876543210');
+        await tester.tap(find.byKey(const Key('areaField')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Nizampet').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.textContaining('Society / Apartment').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('noSocietyOption')).last);
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('blockField')), findsNothing);
+        expect(find.byKey(const Key('societyAddress')), findsNothing);
+        await type('House / Flat Number', '7-1-45');
+        await type('Street / Road / Locality', 'Road 4, Nizampet');
+        await type('PIN Code', '500090');
+        await useCurrentLocation(tester);
+        await tester.tap(find.text('Save Address'));
+        await tester.pump();
+
+        List<CustomerAddress>? saved;
+        for (var i = 0; i < 50 && (saved?.isEmpty ?? true); i++) {
+          saved = await tester.runAsync(() async {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            return CustomerAddressDatabaseService.instance
+                .getAddressesByCustomerId(AccountSyncService.localCustomerId);
+          });
+          await tester.pump();
+        }
+        final a = saved!.single;
+        expect(a.isHouse, isTrue);
+        expect([a.societyId, a.societyOther, a.block], [null, null, null]);
+        expect(
+          [a.flat, a.addressLine1, a.city, a.postalCode],
+          ['7-1-45', 'Road 4, Nizampet', 'Hyderabad', '500090'],
+        );
+        expect(a.needsDetails, isFalse);
+      },
+    );
+
+    testWidgets('a society name typed before is kept in the address', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(1080, 5000);
@@ -375,15 +453,26 @@ void main() {
               DeliveryArea(id: 'nizampet', name: 'Nizampet'),
             ],
             loadSocieties: (_) async => const [],
+            existingAddress: address(
+              societyOther: 'Lake View Residency',
+              block: 'C',
+              flat: '402',
+            ),
           ),
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('houseField')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('blockField')), findsNothing);
       expect(
-        find.widgetWithText(TextFormField, 'House Number'),
+        tester
+            .widget<TextFormField>(
+              find.widgetWithText(TextFormField, 'More Address (Optional)'),
+            )
+            .controller!
+            .text,
+        startsWith('Lake View Residency'),
+      );
+      expect(
+        find.widgetWithText(TextFormField, 'House / Flat Number'),
         findsOneWidget,
       );
     });

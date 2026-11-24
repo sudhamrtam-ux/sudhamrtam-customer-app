@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/site_layout.dart';
+
 import '../../app/sudhamrtam_app.dart';
 import 'message_inbox.dart';
 import '../../core/widgets/page_app_bar.dart';
@@ -133,7 +135,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   @override
   Widget build(BuildContext context) {
     final inbox = widget.inbox;
-    return Scaffold(
+    return SiteScaffold(
       appBar: PageAppBar(title: const Text('Messages')),
       body: SafeArea(
         child: ListenableBuilder(
