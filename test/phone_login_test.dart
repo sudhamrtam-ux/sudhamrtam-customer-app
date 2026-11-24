@@ -79,6 +79,29 @@ void main() {
 
     setUp(() => auth = FakePhoneAuth());
 
+    testWidgets('Account lists the policy pages, refunds and contact too', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 4000);
+      tester.view.devicePixelRatio = 2.625;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: AccountScreen(auth: auth)),
+        ),
+      );
+      await tester.pump();
+      for (final title in [
+        'Privacy Policy',
+        'Terms of Use',
+        'Refunds and Cancellations',
+        'Contact us',
+      ]) {
+        await tester.scrollUntilVisible(find.text(title), 200);
+        expect(find.text(title), findsOneWidget);
+      }
+    });
+
     Future<void> openLogin(WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(

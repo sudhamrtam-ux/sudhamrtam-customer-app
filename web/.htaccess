@@ -23,6 +23,13 @@ DirectoryIndex index.html
   # login.php, ...): old links and bookmarks open the website.
   RewriteCond %{HTTP_HOST} ^sudhamrtam\.in$ [NC]
   RewriteRule ^[A-Za-z_]+\.php$ / [L,R=301]
+
+  # Policy pages (2026-11-24, for Cashfree's website review and the
+  # store listings): served by the API, reached at short addresses here.
+  # 302, so a page can later move to this site without old redirects
+  # stuck in browsers.
+  RewriteCond %{HTTP_HOST} ^sudhamrtam\.in$ [NC]
+  RewriteRule ^(privacy|terms|refunds|contact|delete-account)/?$ https://api.sudhamrtam.in/$1 [L,R=302]
 </IfModule>
 
 <IfModule mod_mime.c>

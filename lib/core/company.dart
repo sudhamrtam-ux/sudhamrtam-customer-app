@@ -13,6 +13,10 @@ const sudhamrtamSupportEmails = [
   'sudhamrtam@gmail.com',
 ];
 
-/// Public privacy policy and terms (served by the Sudhamrtam server).
+/// Public policy pages (served by the Sudhamrtam server; sudhamrtam.in
+/// /privacy, /terms, /refunds and /contact forward to them). Refunds
+/// and Contact were added for Cashfree's website review (2026-11-24).
 const sudhamrtamPrivacyUrl = 'https://api.sudhamrtam.in/privacy';
 const sudhamrtamTermsUrl = 'https://api.sudhamrtam.in/terms';
+const sudhamrtamRefundsUrl = 'https://api.sudhamrtam.in/refunds';
+const sudhamrtamContactUrl = 'https://api.sudhamrtam.in/contact';

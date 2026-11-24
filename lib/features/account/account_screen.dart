@@ -65,7 +65,7 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  /// Privacy policy or terms, in the browser.
+  /// A policy page (privacy, terms, refunds, contact), in the browser.
   Future<void> _openPage(BuildContext context, String url) async {
     final opened = await launchUrl(
       Uri.parse(url),
@@ -269,6 +269,20 @@ class AccountScreen extends StatelessWidget {
           title: 'Terms of Use',
           subtitle: 'Orders, milk plans, bills and payments',
           onTap: () => _openPage(context, sudhamrtamTermsUrl),
+        ),
+
+        _buildAccountTile(
+          icon: Icons.currency_rupee,
+          title: 'Refunds and Cancellations',
+          subtitle: 'Cancel before 9 PM; refunds in 5–7 working days',
+          onTap: () => _openPage(context, sudhamrtamRefundsUrl),
+        ),
+
+        _buildAccountTile(
+          icon: Icons.contact_phone_outlined,
+          title: 'Contact us',
+          subtitle: 'Phone, email and address',
+          onTap: () => _openPage(context, sudhamrtamContactUrl),
         ),
 
         // Delete my account: signed in, with the server only.
