@@ -59,6 +59,9 @@ StatusLabel paymentLabel(CustomerOrder order, OrderPaymentStatus? server) {
     if (server.isPaid) {
       return const StatusLabel('Payment made', _green, Icons.verified_outlined);
     }
+    if (server.isPaidByUpi) {
+      return const StatusLabel('Paid by UPI', _green, Icons.verified_outlined);
+    }
     if (server.isAwaitingPayment) {
       return const StatusLabel(
         'Payment pending',

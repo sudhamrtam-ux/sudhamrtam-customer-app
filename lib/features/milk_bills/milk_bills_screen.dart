@@ -72,7 +72,12 @@ String billLitres(int ml) => '${(ml / 1000).toStringAsFixed(2)} L';
 (String, Color) _statusLabel(MilkBill bill) {
   if (bill.isPaid) {
     return (
-      bill.paymentMethod == 'cash' ? 'Paid in cash' : 'Paid online',
+      switch (bill.paymentMethod) {
+        'cash' => 'Paid in cash',
+        // Scanned the bill's UPI QR; recorded by staff (2026-11-24).
+        'upi' => 'Paid by UPI',
+        _ => 'Paid online',
+      },
       _green,
     );
   }

@@ -94,6 +94,9 @@ class OrderPaymentStatus {
   });
 
   bool get isPaid => paymentStatus == 'paid_online';
+
+  /// Paid by UPI at the door (the partner's QR, 2026-11-24).
+  bool get isPaidByUpi => paymentStatus == 'paid_upi';
   bool get isAwaitingPayment => paymentStatus == 'awaiting_online';
   bool get isCashOnDelivery => paymentStatus == 'due_on_delivery';
   bool get isCancelledUnpaid => paymentStatus == 'not_paid';
