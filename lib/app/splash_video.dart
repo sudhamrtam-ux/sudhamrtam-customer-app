@@ -10,6 +10,15 @@ const splashVideoAsset = 'assets/videos/sudhamrtam_splash.mp4';
 /// the same as the video's first frame, so the start looks seamless.
 const splashBackground = Color(0xFFF8E4C2);
 
+/// How the (tall, phone-shaped) animation fits [screen]. Phones and
+/// other tall screens: it fills the screen, cutting a little off the
+/// edges rather than leaving bars. Wide screens (a computer's browser,
+/// a tablet on its side; owner, 2026-11-24, the website): the whole
+/// animation at full height in the middle, on [splashBackground],
+/// instead of blowing it up and showing only a strip of it.
+BoxFit splashFit(Size screen) =>
+    screen.width <= screen.height * 0.75 ? BoxFit.cover : BoxFit.contain;
+
 /// Makes the player for [asset]; tests replace it.
 typedef SplashPlayerFactory = VideoPlayerController Function(String asset);
 
@@ -130,9 +139,7 @@ class _SplashVideoScreenState extends State<SplashVideoScreen> {
         child: SizedBox.expand(
           child: _ready && controller != null
               ? FittedBox(
-                  // Fills the screen; the edges are cut on very
-                  // tall or wide screens rather than leaving bars.
-                  fit: BoxFit.cover,
+                  fit: splashFit(MediaQuery.sizeOf(context)),
                   child: SizedBox(
                     width: controller.value.size.width,
                     height: controller.value.size.height,

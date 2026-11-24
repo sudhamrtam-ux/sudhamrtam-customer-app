@@ -54,4 +54,16 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(done, 1);
   });
+
+  test('fills a phone; shows the whole animation on a wide screen', () {
+    // Phones (tall): fill the screen.
+    expect(splashFit(const Size(412, 915)), BoxFit.cover);
+    expect(splashFit(const Size(360, 640)), BoxFit.cover);
+    // A computer's browser or a tablet on its side: all of it, in the middle.
+    expect(splashFit(const Size(1920, 1000)), BoxFit.contain);
+    expect(splashFit(const Size(1280, 800)), BoxFit.contain);
+    // A square-ish window or a tablet held upright.
+    expect(splashFit(const Size(800, 800)), BoxFit.contain);
+    expect(splashFit(const Size(800, 1280)), BoxFit.cover);
+  });
 }
