@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../models/milk_subscription.dart';
 import '../../models/milk_subscription_manager.dart';
+import '../../models/upcoming_deliveries.dart';
+import '../milk_plan/milk_plan_merge_dialog.dart' show milkName, shiftText;
 import '../../services/milk_bill_api_client.dart';
 import '../milk_plan/vacation_days_screen.dart';
 import 'milk_bills_screen.dart';
@@ -17,6 +19,11 @@ const _pausedText = Color(0xFF607D8B);
 const _pendingText = Color(0xFF8A6D00);
 const _vacationFill = Color(0xFFE3F2FD);
 const _vacationText = Color(0xFF1565C0);
+const _comingFill = Color(0xFFF4F9EE);
+const _comingText = Color(0xFF5B7F33);
+
+/// Months ahead the calendar shows what is coming.
+const _monthsAhead = 2;
 
 String _milkName(String productId) =>
     sudhamrtamSubscriptionProducts.nameOf(productId);
@@ -96,11 +103,29 @@ class _MilkCalendarState extends State<MilkCalendar> {
     return days;
   }
 
-  /// The last month to show: this one, or the last with vacation.
+  /// The last month to show: what is coming two months ahead, or the
+  /// last month with vacation.
   String get _lastMonth {
     final keys = _vacation.keys.toList()..sort();
-    final last = keys.isEmpty ? _thisMonth : keys.last.substring(0, 7);
-    return last.compareTo(_thisMonth) > 0 ? last : _thisMonth;
+    final ahead = _addMonths(_thisMonth, _monthsAhead);
+    final last = keys.isEmpty ? ahead : keys.last.substring(0, 7);
+    return last.compareTo(ahead) > 0 ? last : ahead;
+  }
+
+  /// What the subscriptions bring on each day after today in [month]
+  /// (owner request 2026-11-25: calendar of deliveries).
+  Map<String, List<UpcomingDelivery>> _comingIn(String month) {
+    final parts = month.split('-').map(int.parse).toList();
+    final days = DateTime(parts[0], parts[1] + 1, 0).day;
+    final today = DateTime(_today.year, _today.month, _today.day);
+    final result = <String, List<UpcomingDelivery>>{};
+    for (var d = 1; d <= days; d++) {
+      final date = DateTime(parts[0], parts[1], d);
+      if (!date.isAfter(today)) continue;
+      final coming = upcomingDeliveriesOn(_plans.subscriptions, date);
+      if (coming.isNotEmpty) result[_dateKey(date)] = coming;
+    }
+    return result;
   }
 
   @override
@@ -165,6 +190,7 @@ class _MilkCalendarState extends State<MilkCalendar> {
   Widget build(BuildContext context) {
     final data = _data;
     final vacation = _vacation;
+    final coming = _comingIn(_month);
     final isFuture = _month.compareTo(_thisMonth) > 0;
     final vacationThisMonth = [
       for (final key in vacation.keys)
@@ -212,6 +238,7 @@ class _MilkCalendarState extends State<MilkCalendar> {
               today: _today,
               data: data,
               vacation: vacation,
+              coming: coming,
               onTapDay: (date) => _showDay(context, date),
             ),
             const SizedBox(height: 8),
@@ -235,6 +262,8 @@ class _MilkCalendarState extends State<MilkCalendar> {
                   ),
                 ),
               ),
+            if (coming.isNotEmpty)
+              _ComingTotals(coming: coming, thisMonth: !isFuture),
             if (isFuture)
               const SizedBox.shrink()
             else if (_loading && data == null)
@@ -262,7 +291,8 @@ class _MilkCalendarState extends State<MilkCalendar> {
   void _showDay(BuildContext context, String date) {
     final deliveries = _data?.on(date) ?? const <MilkDelivery>[];
     final away = _vacation[date] ?? const <String>[];
-    if (deliveries.isEmpty && away.isEmpty) return;
+    final coming = _comingIn(date.substring(0, 7))[date] ?? const [];
+    if (deliveries.isEmpty && away.isEmpty && coming.isEmpty) return;
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -290,6 +320,30 @@ class _MilkCalendarState extends State<MilkCalendar> {
                   ),
                 ),
               for (final delivery in deliveries) _DeliveryDetail(delivery),
+              if (coming.isNotEmpty) ...[
+                const Text(
+                  'Coming',
+                  style: TextStyle(
+                    color: _comingText,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                for (final c in coming)
+                  Padding(
+                    key: Key('coming-$date-${c.productId}-${c.shift.name}'),
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '${shiftText(c.shift)} · ${milkName(c.productId)} '
+                      '${sudhamrtamSubscriptionProducts.quantityText(c.productId, c.quantity)}',
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                const Text(
+                  'As your subscriptions are now. To change a day, use '
+                  'Tomorrow on Home or edit the subscription.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
             ],
           ),
         ),
@@ -337,12 +391,14 @@ class _MonthGrid extends StatelessWidget {
     required this.data,
     required this.onTapDay,
     this.vacation = const {},
+    this.coming = const {},
   });
 
   final String month;
   final DateTime today;
   final MilkDeliveryMonth? data;
   final Map<String, List<String>> vacation;
+  final Map<String, List<UpcomingDelivery>> coming;
   final void Function(String date) onTapDay;
 
   @override
@@ -376,6 +432,7 @@ class _MonthGrid extends StatelessWidget {
                       day: day,
                       deliveries: data?.on(date) ?? const [],
                       onVacation: vacation.containsKey(date),
+                      coming: coming[date] ?? const [],
                       isToday: date == todayText,
                       onTap: () => onTapDay(date),
                     );
@@ -396,9 +453,13 @@ class _DayCell extends StatelessWidget {
     required this.isToday,
     required this.onTap,
     this.onVacation = false,
+    this.coming = const [],
   });
 
   static const double height = 64;
+
+  /// What the subscriptions bring that day (days after today).
+  final List<UpcomingDelivery> coming;
 
   final int day;
   final List<MilkDelivery> deliveries;
@@ -420,6 +481,16 @@ class _DayCell extends StatelessWidget {
       fill = _vacationFill;
       lines = const ['Vacation'];
       textColor = _vacationText;
+    } else if (deliveries.isEmpty && coming.isNotEmpty) {
+      fill = _comingFill;
+      final ml = coming
+          .where((c) => !sudhamrtamSubscriptionProducts.isPack(c.productId))
+          .fold(0, (s, c) => s + c.quantity);
+      final packs = coming
+          .where((c) => sudhamrtamSubscriptionProducts.isPack(c.productId))
+          .fold(0, (s, c) => s + c.quantity);
+      lines = ['Coming', if (ml > 0) billLitres(ml) else '$packs pk'];
+      textColor = _comingText;
     } else if (deliveries.isEmpty) {
       fill = null;
       lines = const [];
@@ -453,7 +524,9 @@ class _DayCell extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: deliveries.isEmpty && !onVacation ? null : onTap,
+          onTap: deliveries.isEmpty && !onVacation && coming.isEmpty
+              ? null
+              : onTap,
           child: Container(
             height: height,
             padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
@@ -529,7 +602,60 @@ class _Legend extends StatelessWidget {
         item(_pausedFill, 'Paused'),
         item(_vacationFill, 'Vacation'),
         item(_pendingFill, 'Not marked yet'),
+        item(_comingFill, 'Coming'),
       ],
+    );
+  }
+}
+
+/// What is still coming this month (or in a month ahead), per
+/// product: "Cow Milk 30.00 L · Curd 500 g 14 packs".
+class _ComingTotals extends StatelessWidget {
+  const _ComingTotals({required this.coming, required this.thisMonth});
+
+  final Map<String, List<UpcomingDelivery>> coming;
+  final bool thisMonth;
+
+  @override
+  Widget build(BuildContext context) {
+    final totals = <String, int>{};
+    for (final day in coming.values) {
+      for (final c in day) {
+        totals[c.productId] = (totals[c.productId] ?? 0) + c.quantity;
+      }
+    }
+    return Container(
+      key: const Key('calendarComing'),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: _comingFill,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD7E8C4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${thisMonth ? 'Still coming this month' : 'Coming this month'}'
+            ' (${coming.length} day${coming.length == 1 ? '' : 's'})',
+            style: const TextStyle(
+              color: _comingText,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          for (final e in totals.entries)
+            Text(
+              sudhamrtamSubscriptionProducts.isPack(e.key)
+                  ? '${milkName(e.key)}: ${e.value} packs'
+                  : '${milkName(e.key)}: ${billLitres(e.value)}',
+            ),
+          const Text(
+            'As your subscriptions are now; vacation days left out.',
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+        ],
+      ),
     );
   }
 }

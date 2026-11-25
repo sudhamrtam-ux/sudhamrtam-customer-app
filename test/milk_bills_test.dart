@@ -448,14 +448,14 @@ void main() {
       );
       await open(tester);
       expect(find.text('No milk deliveries this month.'), findsOneWidget);
-      // Nothing after this month.
+      // Two months ahead show what is coming (owner request 2026-11-25).
       expect(
         tester
             .widget<IconButton>(
               find.widgetWithIcon(IconButton, Icons.chevron_right).first,
             )
             .onPressed,
-        isNull,
+        isNotNull,
       );
 
       await tester.tap(find.byTooltip('Previous month'));
@@ -545,7 +545,23 @@ void main() {
       expect(cell(tester, '2026-12-02'), '2 Vacation');
       expect(find.text('Vacation: no milk on 2 Dec.'), findsOneWidget);
       expect(server.requests.length, asked);
-      // No further than the last vacation month.
+      // What is coming shows two months ahead.
+      expect(cell(tester, '2026-12-01'), '1 Coming 1.00 L');
+      expect(find.byKey(const Key('calendarComing')), findsOneWidget);
+      expect(find.textContaining('Cow Milk: 30.00 L'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('day-2026-12-01')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('coming-2026-12-01-cow_milk-morning')),
+        findsOneWidget,
+      );
+      expect(find.text('Morning · Cow Milk 1.00 L'), findsOneWidget);
+      await tester.tapAt(const Offset(200, 50));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Next month'));
+      await tester.pumpAndSettle();
+      expect(find.text('January 2027'), findsOneWidget);
+      // No further than two months ahead.
       expect(
         tester
             .widget<IconButton>(

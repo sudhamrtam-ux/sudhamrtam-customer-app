@@ -96,7 +96,26 @@ class MilkPlanScreen extends StatelessWidget {
   Widget _myPlans(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      _sectionTitle(context, 'My subscriptions'),
+      Row(
+        children: [
+          Expanded(child: _sectionTitle(context, 'My subscriptions')),
+          // Owner request 2026-11-25: what comes on which day.
+          if (sudhamrtamMilkBills != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextButton.icon(
+                key: const Key('openDeliveryCalendar'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MilkBillsScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                label: const Text('Delivery calendar'),
+              ),
+            ),
+        ],
+      ),
       ListenableBuilder(
         listenable: sudhamrtamMilkSync,
         builder: (context, _) {
