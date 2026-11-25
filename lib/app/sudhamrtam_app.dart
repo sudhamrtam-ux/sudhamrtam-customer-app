@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
+import '../core/widgets/page_app_bar.dart';
 import '../features/messages/message_inbox.dart';
 import '../features/messages/messages_screen.dart';
 import '../features/milk_bills/milk_bills_screen.dart';
@@ -17,6 +18,7 @@ import '../services/account_sync_service.dart';
 import '../services/catalog_api_client.dart';
 import '../services/feedback_api_client.dart';
 import '../services/milk_tomorrow_client.dart';
+import '../services/reminder_api_client.dart';
 import '../services/support_api_client.dart';
 import '../services/milk_bill_api_client.dart';
 import '../services/milk_plan_sync_service.dart';
@@ -109,6 +111,10 @@ FeedbackApiClient? sudhamrtamFeedback;
 /// has no server. Set by main().
 MilkTomorrowClient? sudhamrtamMilkTomorrow;
 
+/// The evening reminder switch, or null when this build has no
+/// server. Set by main().
+ReminderApiClient? sudhamrtamReminders;
+
 /// Help & Support queries, or null when this build has no server.
 /// Set by main().
 SupportApiClient? sudhamrtamSupport;
@@ -184,6 +190,12 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
       );
       return;
     }
+    // The 8 PM reminder: Home, where Tomorrow can be changed.
+    if (tap.type == 'tomorrow' && navigator != null) {
+      homeRequests.value++;
+      navigator.popUntil((route) => route.isFirst);
+      return;
+    }
     // A bill is ready or due: open the milk bills.
     if (tap.type == 'bill' && navigator != null) {
       navigator.push(
@@ -204,6 +216,7 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
     // is open; a bill can be opened from it.
     if (arrival.tap.type == 'delivery' ||
         arrival.tap.type == 'bill' ||
+        arrival.tap.type == 'tomorrow' ||
         arrival.tap.type == 'support_reply') {
       sudhamrtamMessengerKey.currentState?.showSnackBar(
         SnackBar(

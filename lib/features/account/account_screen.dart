@@ -12,6 +12,7 @@ import '../../services/api_phone_auth_gateway.dart';
 import '../../services/catalog_api_client.dart' show apiBaseUrl;
 import '../../services/phone_auth_service.dart';
 import 'delete_account_screen.dart';
+import 'evening_reminder_tile.dart';
 import '../feedback/feedback_screen.dart';
 import '../support/help_support_screen.dart';
 import '../milk_bills/milk_bills_screen.dart';
@@ -242,6 +243,25 @@ class AccountScreen extends StatelessWidget {
             onTap: () => _openMilkBills(context),
           ),
         ]),
+
+        // Evening reminder (owner decision 2026-11-25): signed in only.
+        if ((auth ?? sudhamrtamAuth) case final ApiPhoneAuthGateway gateway)
+          if (sudhamrtamReminders case final reminders?)
+            StreamBuilder<AuthUser?>(
+              stream: gateway.authStateChanges(),
+              initialData: gateway.currentUser,
+              builder: (context, snapshot) => snapshot.data == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: _tileGroup(context, [
+                        EveningReminderTile(
+                          key: ValueKey(snapshot.data!.uid),
+                          client: reminders,
+                        ),
+                      ]),
+                    ),
+            ),
 
         const SizedBox(height: 20),
 
