@@ -28,6 +28,11 @@ class PaymentLaunchFailed extends PaymentLaunchResult {
   const PaymentLaunchFailed(this.message);
 }
 
+/// Why online payment is not offered in the Windows app.
+const onlinePaymentNotHere =
+    'Online payment works in the Sudhamrtam phone app and on '
+    'sudhamrtam.in. Please pay there, or choose Cash on Delivery.';
+
 /// Opens a payment provider's payment screen.
 abstract class PaymentLauncher {
   Future<PaymentLaunchResult> launch(PaymentSession session);
@@ -42,12 +47,7 @@ class CashfreePaymentLauncher implements PaymentLauncher {
     if (kIsWeb) return launchWebCheckout(session);
     if (!onlinePaymentWorksHere) {
       // The Windows app has no Cashfree checkout.
-      return Future.value(
-        const PaymentLaunchFailed(
-          'Online payment works in the Sudhamrtam phone app and on '
-          'sudhamrtam.in. Please pay there, or pay the staff in cash.',
-        ),
-      );
+      return Future.value(const PaymentLaunchFailed(onlinePaymentNotHere));
     }
     final completer = Completer<PaymentLaunchResult>();
 

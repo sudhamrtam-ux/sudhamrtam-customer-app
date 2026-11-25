@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -305,6 +307,27 @@ void main() {
       );
       expect(saved!.paymentMethod, OrderPaymentMethod.cashOnDelivery);
     });
+
+    testWidgets(
+      'the Windows app starts no online payment; Cash on Delivery works',
+      (tester) async {
+        // Owner, 2026-11-25: a payment started on Windows left a Cashfree
+        // order open, which held up "Pay by Cash on Delivery instead".
+        debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+        final launcher = FakeLauncher(const PaymentLaunchFinished());
+        await pumpScreen(tester, launcher);
+        await waitFor(tester, find.byKey(const Key('paymentNotPaid')));
+
+        expect(server.calls.where((c) => c.endsWith('/payment')), isEmpty);
+        expect(launcher.sessions, isEmpty);
+        expect(find.textContaining('phone app and on'), findsOneWidget);
+        expect(find.text('Try Again'), findsNothing);
+
+        await tester.tap(find.byKey(const Key('payByCash')));
+        await waitFor(tester, find.byKey(const Key('paymentCod')));
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
 
     testWidgets('a failed payment can be tried again', (tester) async {
       final launcher = FakeLauncher(const PaymentLaunchFailed('Declined'));

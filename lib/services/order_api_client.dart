@@ -86,12 +86,17 @@ class OrderPaymentStatus {
   /// The short order number, e.g. "SUD0000001" (null from older servers).
   final String? orderRef;
 
+  /// The customer may cancel it now: unpaid and before 9 PM the day
+  /// before delivery (server's rule, 2026-11-25).
+  final bool canCancel;
+
   const OrderPaymentStatus({
     required this.paymentMethod,
     required this.paymentStatus,
     required this.orderStatus,
     this.paymentDueAt,
     this.orderRef,
+    this.canCancel = false,
   });
 
   bool get isPaid => paymentStatus == 'paid_online';
@@ -110,6 +115,7 @@ class OrderPaymentStatus {
       orderStatus: order['status'] as String,
       orderRef: order['order_ref'] as String?,
       paymentDueAt: due == null ? null : DateTime.parse(due),
+      canCancel: order['can_cancel'] as bool? ?? false,
     );
   }
 }
@@ -320,6 +326,14 @@ class OrderApiClient {
   /// Asks the server to check the payment with Cashfree.
   Future<OrderPaymentStatus> checkPayment(String orderId) async {
     final response = await _send('POST', 'v1/orders/$orderId/payment/check');
+    return OrderPaymentStatus.fromOrderJson(
+      _paymentJson(response)['order'] as Map<String, dynamic>,
+    );
+  }
+
+  /// The customer cancels an unpaid order (2026-11-25).
+  Future<OrderPaymentStatus> cancelOrder(String orderId) async {
+    final response = await _send('POST', 'v1/orders/$orderId/cancel');
     return OrderPaymentStatus.fromOrderJson(
       _paymentJson(response)['order'] as Map<String, dynamic>,
     );

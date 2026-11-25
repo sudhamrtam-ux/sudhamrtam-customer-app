@@ -276,6 +276,68 @@ void main() {
   });
 
   // Last: it changes the saved statuses.
+  testWidgets('Cancel order: unpaid orders the server allows (2026-11-25)', (
+    tester,
+  ) async {
+    var status = 'pending';
+    final calls = <String>[];
+    Map<String, Object?> json(String n, {required bool cancellable}) => {
+      'id': 'aaaa0000aaaa0000aaaa0000aaaa000$n',
+      'order_ref': 'SUD000000$n',
+      'status': n == '1' ? status : 'pending',
+      'payment_method': 'cash_on_delivery',
+      'payment_status': 'due_on_delivery',
+      'can_cancel': cancellable && status == 'pending',
+    };
+    final api = OrderApiClient(
+      baseUrl: 'http://api.test',
+      token: () => 'tok',
+      httpClient: MockClient((request) async {
+        calls.add('${request.method} ${request.url.path}');
+        if (request.method == 'POST') {
+          status = 'cancelled';
+          return http.Response(
+            jsonEncode({'order': json('1', cancellable: true)}),
+            200,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'orders': [
+              json('1', cancellable: true),
+              json('2', cancellable: false),
+            ],
+          }),
+          200,
+        );
+      }),
+    );
+    const one = 'aaaa0000aaaa0000aaaa0000aaaa0001';
+    await open(
+      tester,
+      api: api,
+      until: find.byKey(const Key('cancel-order-$one')),
+    );
+    await settle(tester);
+    // Only where the server says so.
+    expect(
+      find.byKey(const Key('cancel-order-aaaa0000aaaa0000aaaa0000aaaa0002')),
+      findsNothing,
+    );
+
+    await tester.ensureVisible(find.byKey(const Key('cancel-order-$one')));
+    await tester.tap(find.byKey(const Key('cancel-order-$one')));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancel this order?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('cancel-order-yes')));
+    for (var i = 0; i < 20 && find.text('Cancelled').evaluate().isEmpty; i++) {
+      await settle(tester);
+    }
+    expect(calls, contains('POST /v1/orders/$one/cancel'));
+    expect(find.text('Cancelled'), findsOneWidget);
+    expect(find.byKey(const Key('cancel-order-$one')), findsNothing);
+  });
+
   testWidgets("the server's Cancelled and Not delivered are shown and kept", (
     tester,
   ) async {

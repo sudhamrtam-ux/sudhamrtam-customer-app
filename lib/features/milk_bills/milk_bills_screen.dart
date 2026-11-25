@@ -5,6 +5,7 @@ import '../../core/widgets/site_layout.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../models/milk_subscription_manager.dart';
 import '../../services/milk_bill_api_client.dart';
+import '../../services/order_api_client.dart' show onlinePaymentWorksHere;
 import '../payment/payment_launcher.dart';
 import 'bill_pdf.dart';
 import 'milk_calendar.dart';
@@ -525,6 +526,11 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
 
   Future<void> _pay() async {
     if (_busy) return;
+    // No Cashfree checkout in the Windows app (2026-11-25).
+    if (!onlinePaymentWorksHere) {
+      setState(() => _message = onlinePaymentNotHere);
+      return;
+    }
     setState(() {
       _busy = true;
       _message = null;

@@ -89,6 +89,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Future<void> _pay() async {
     final api = widget.api;
     if (api == null || _busy) return;
+    // The Windows app (2026-11-25) has no Cashfree checkout: starting a
+    // payment would leave a Cashfree order open, which then holds up
+    // "Pay by Cash on Delivery instead" until Cashfree closes it.
+    if (!onlinePaymentWorksHere) {
+      _show(_Phase.notPaid, onlinePaymentNotHere);
+      return;
+    }
     _busy = true;
     _show(_Phase.starting);
 
@@ -355,8 +362,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
               'Pay by ${_time(payBy)}, or the order is cancelled.',
           ].join('\n\n'),
           actions: [
-            _primary('Try Again', _pay),
-            const SizedBox(height: 12),
+            if (onlinePaymentWorksHere) ...[
+              _primary('Try Again', _pay),
+              const SizedBox(height: 12),
+            ],
             OutlinedButton(
               key: const Key('payByCash'),
               onPressed: _switchToCashOnDelivery,

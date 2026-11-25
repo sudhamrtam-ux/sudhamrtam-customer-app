@@ -668,7 +668,51 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     );
   }
 
-  /// "View order details" and "Get help with this order".
+  /// Asks, then cancels the order on the server (owner decision
+  /// 2026-11-25: unpaid orders, before 9 PM the day before delivery).
+  Future<void> _cancel(CustomerOrder order) async {
+    final api = widget.api;
+    if (api == null) return;
+    final ref = _payments[order.id]?.orderRef;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel this order?'),
+        content: Text(
+          '${ref ?? 'This order'} will not be delivered. Nothing has been '
+          'paid, so there is nothing to refund.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep order'),
+          ),
+          FilledButton(
+            key: const Key('cancel-order-yes'),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cancel order'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await api.cancelOrder(order.id);
+      messenger.showSnackBar(
+        SnackBar(content: Text('${ref ?? 'The order'} is cancelled.')),
+      );
+    } on PaymentRejectedException catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    } on OrderApiException catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    }
+    await _loadPayments();
+  }
+
+  /// "View order details" and "Get help with this order", and
+  /// "Cancel order" while the server allows it.
   List<Widget> _actions(CustomerOrder order) {
     final style = OutlinedButton.styleFrom(
       minimumSize: const Size.fromHeight(42),
@@ -693,6 +737,15 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               : 'Get help with this order',
         ),
       ),
+      if (_payments[order.id]?.canCancel ?? false)
+        OutlinedButton(
+          key: Key('cancel-order-${order.id}'),
+          onPressed: () => _cancel(order),
+          style: style.copyWith(
+            foregroundColor: WidgetStatePropertyAll(Colors.red.shade700),
+          ),
+          child: const Text('Cancel order'),
+        ),
     ];
   }
 
