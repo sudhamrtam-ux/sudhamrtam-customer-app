@@ -142,8 +142,10 @@ void main() {
       expect(rows.single, containsPair('quantity_ml', 1500));
 
       await insertSchedule(db, 750, 'evening');
+      // Since v22 (packs, owner request 2026-11-25) the database takes
+      // 1 to 100000; the milk rule is the app's and the server's.
       await expectLater(
-        insertSchedule(db, 1250, 'earlyMorning'),
+        insertSchedule(db, 0, 'earlyMorning'),
         throwsA(isA<DatabaseException>()),
       );
       expect(await db.query('milk_shift_schedules'), hasLength(2));

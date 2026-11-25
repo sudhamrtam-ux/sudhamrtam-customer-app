@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'milk_plan_merge.dart';
 import 'milk_quantity.dart';
 import 'milk_subscription.dart';
+import 'subscription_products.dart';
 import '../database/milk_subscription_repository.dart';
 import '../services/milk_plan_api_client.dart';
 
@@ -33,6 +34,25 @@ class DuplicateMilkPlans {
 ///   mirroring never loses them.
 /// - Changes and syncs run one at a time.
 class MilkSubscriptionManager extends ChangeNotifier {
+  MilkSubscriptionManager({this.products});
+
+  /// Each product's quantities, for merging deliveries (owner request
+  /// 2026-11-25); null: milk rules only.
+  final SubscriptionProducts? products;
+
+  /// The largest quantity of [productId] and which quantities a
+  /// delivery may have after adding two together.
+  ({int maximum, bool Function(int) allowed}) _rulesFor(String productId) {
+    final offer = products?.offerFor(productId);
+    if (offer == null || !offer.isPack) {
+      return (maximum: maximumQuantityMl, allowed: isAllowedMilkMl);
+    }
+    return (
+      maximum: offer.quantities.last,
+      allowed: (q) => offer.quantities.contains(q),
+    );
+  }
+
   final List<MilkSubscription> _subscriptions = [];
   final MilkSubscriptionRepository _repository = MilkSubscriptionRepository();
   bool _isWriting = false;
@@ -148,8 +168,15 @@ class MilkSubscriptionManager extends ChangeNotifier {
   /// How a new plan fits with the existing plans for its milk:
   /// shifts already delivered by a plan are added to that plan;
   /// the other shifts form the new plan.
-  MilkPlanChanges checkNewPlan(MilkSubscription incoming) =>
-      planNewSubscription(plansFor(incoming.productId), incoming);
+  MilkPlanChanges checkNewPlan(MilkSubscription incoming) {
+    final rules = _rulesFor(incoming.productId);
+    return planNewSubscription(
+      plansFor(incoming.productId),
+      incoming,
+      maximumMl: rules.maximum,
+      allowed: rules.allowed,
+    );
+  }
 
   /// Saves a new plan (with any merged deliveries) in one step.
   Future<bool> saveNewPlan(MilkPlanChanges changes) async {
@@ -170,7 +197,12 @@ class MilkSubscriptionManager extends ChangeNotifier {
 
     final groups = <DuplicateMilkPlans>[];
     for (final entry in byProduct.entries) {
-      final changes = combineSharedShifts(entry.value);
+      final rules = _rulesFor(entry.key);
+      final changes = combineSharedShifts(
+        entry.value,
+        maximumMl: rules.maximum,
+        allowed: rules.allowed,
+      );
       if (changes == null) continue;
       final involved = {
         for (final outcome in changes.shifts) ...[
@@ -352,15 +384,23 @@ class MilkSubscriptionManager extends ChangeNotifier {
   static const int minimumQuantityMl = minimumMilkMl;
   static const int maximumQuantityMl = maximumMilkMl;
 
-  /// 0.5 L to 10 L; 750 ml packets too, but no x.25 L.
-  bool _isValidQuantityMl(int quantityMl) => isAllowedMilkMl(quantityMl);
+  /// Milk: 0.5 L to 10 L; 750 ml packets too, but no x.25 L. Other
+  /// products (owner request 2026-11-25): the server checks their
+  /// quantities; here only a sane range.
+  bool _isValidQuantityMl(int quantityMl, String productId) =>
+      _isMilk(productId)
+      ? isAllowedMilkMl(quantityMl)
+      : quantityMl >= 1 && quantityMl <= 100000;
+
+  static bool _isMilk(String productId) =>
+      productId == 'buffalo_milk' || productId == 'cow_milk';
 
   // ============================================================
   // VALIDATE A SINGLE SHIFT
   // ============================================================
 
-  bool _isValidShiftSchedule(MilkShiftSchedule schedule) {
-    if (!_isValidQuantityMl(schedule.quantityMl)) {
+  bool _isValidShiftSchedule(MilkShiftSchedule schedule, String productId) {
+    if (!_isValidQuantityMl(schedule.quantityMl, productId)) {
       return false;
     }
 
@@ -430,7 +470,10 @@ class MilkSubscriptionManager extends ChangeNotifier {
   // VALIDATE ALL SHIFTS
   // ============================================================
 
-  bool _isValidShiftSchedules(List<MilkShiftSchedule> schedules) {
+  bool _isValidShiftSchedules(
+    List<MilkShiftSchedule> schedules,
+    String productId,
+  ) {
     // At least one shift is required.
     if (schedules.isEmpty) {
       return false;
@@ -449,7 +492,7 @@ class MilkSubscriptionManager extends ChangeNotifier {
     }
 
     for (final schedule in schedules) {
-      if (!_isValidShiftSchedule(schedule)) {
+      if (!_isValidShiftSchedule(schedule, productId)) {
         return false;
       }
     }
@@ -489,14 +532,16 @@ class MilkSubscriptionManager extends ChangeNotifier {
   // ============================================================
 
   bool _isValidSubscription(MilkSubscription subscription) {
-    // Milk shifts apply only to Buffalo and Cow Milk.
+    // Any subscription product (owner request 2026-11-25).
     if (subscription.shiftSchedules.isNotEmpty) {
-      if (subscription.productId != 'buffalo_milk' &&
-          subscription.productId != 'cow_milk') {
+      if (!RegExp(r'^[a-z0-9_]{1,64}$').hasMatch(subscription.productId)) {
         return false;
       }
 
-      return _isValidShiftSchedules(subscription.shiftSchedules);
+      return _isValidShiftSchedules(
+        subscription.shiftSchedules,
+        subscription.productId,
+      );
     }
 
     // Continue supporting the existing UI.

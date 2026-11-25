@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/sudhamrtam_app.dart';
 import '../../models/milk_plan_merge.dart';
 import '../../models/milk_quantity.dart';
 import '../../models/milk_subscription.dart';
@@ -8,6 +9,10 @@ const _green = Color(0xFF82B440);
 
 /// "1 L", "1.5 L", "0.5 L".
 String litresText(int ml) => milkLitresText(ml);
+
+/// [quantity] of [productId]: "1.50 L", or packs "2 × 500 g".
+String quantityTextFor(String productId, int quantity) =>
+    sudhamrtamSubscriptionProducts.quantityText(productId, quantity);
 
 String shiftText(MilkDeliveryShift shift) => switch (shift) {
   MilkDeliveryShift.earlyMorning => 'Early morning',
@@ -44,15 +49,18 @@ String deliveryDaysText(MilkShiftSchedule schedule) {
   }
 }
 
+/// The product's name ("Cow Milk", "Curd").
 String milkName(String productId) =>
-    productId == 'buffalo_milk' ? 'Buffalo Milk' : 'Cow Milk';
+    sudhamrtamSubscriptionProducts.nameOf(productId);
 
 /// One line per shift explaining what happens to it.
 List<String> mergeLines(MilkPlanChanges changes) => [
-  for (final outcome in changes.shifts) _line(outcome),
+  for (final outcome in changes.shifts) _line(outcome, changes.productId),
 ];
 
-String _line(ShiftMergeOutcome outcome) {
+String _line(ShiftMergeOutcome outcome, String productId) {
+  String litresText(int q) => quantityTextFor(productId, q);
+  final pack = sudhamrtamSubscriptionProducts.isPack(productId);
   final shift = shiftText(outcome.shift);
   final days = deliveryDaysText(outcome.schedule);
   final otherDays = outcome.otherSchedule == null
@@ -71,12 +79,12 @@ String _line(ShiftMergeOutcome outcome) {
     case ShiftMergeKind.overLimit:
       return '$shift: ${litresText(outcome.existingMl)} + '
           '${litresText(outcome.addedMl)} is more than the '
-          '${litresText(maximumShiftQuantityMl)} limit per delivery.';
+          '${litresText(pack ? sudhamrtamSubscriptionProducts.offerFor(productId)!.quantities.last : maximumShiftQuantityMl)} limit per delivery.';
     case ShiftMergeKind.unpackable:
       return '$shift: ${litresText(outcome.existingMl)} + '
           '${litresText(outcome.addedMl)} makes '
-          '${litresText(outcome.existingMl + outcome.addedMl)}, which we '
-          'cannot pack (we deliver 1 L, 500 ml and 750 ml packets).';
+          '${litresText(outcome.existingMl + outcome.addedMl)}, which '
+          '${pack ? 'is not a quantity we offer' : 'we cannot pack (we deliver 1 L, 500 ml and 750 ml packets)'}.';
     case ShiftMergeKind.differentStatus:
       return '$shift: one subscription is paused and the other is active.';
   }

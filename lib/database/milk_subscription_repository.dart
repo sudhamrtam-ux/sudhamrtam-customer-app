@@ -232,19 +232,23 @@ class MilkSubscriptionRepository {
     if (subscription.id.isEmpty) {
       throw ArgumentError('Subscription ID must not be empty.');
     }
-    if (subscription.productId != 'buffalo_milk' &&
-        subscription.productId != 'cow_milk') {
-      throw ArgumentError('Only Cow Milk and Buffalo Milk are supported.');
+    if (!RegExp(r'^[a-z0-9_]{1,64}$').hasMatch(subscription.productId)) {
+      throw ArgumentError('Unknown product.');
     }
+    final milk =
+        subscription.productId == 'buffalo_milk' ||
+        subscription.productId == 'cow_milk';
     final schedules = subscription.shiftSchedules;
-    if (schedules.isEmpty || schedules.length > 2) {
-      throw ArgumentError('Provide one or two delivery shift schedules.');
+    if (schedules.isEmpty || schedules.length > 3) {
+      throw ArgumentError('Provide one to three delivery shift schedules.');
     }
     if (schedules.map((s) => s.shift).toSet().length != schedules.length) {
       throw ArgumentError('Morning and Evening shifts must be unique.');
     }
     for (final schedule in schedules) {
-      if (!isAllowedMilkMl(schedule.quantityMl)) {
+      if (milk
+          ? !isAllowedMilkMl(schedule.quantityMl)
+          : schedule.quantityMl < 1 || schedule.quantityMl > 100000) {
         throw ArgumentError(
           'Shift quantity must be 0.5–10 L: whole litres plus 0.5 or '
           '0.75 L.',

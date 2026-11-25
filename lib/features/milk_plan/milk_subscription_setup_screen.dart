@@ -7,7 +7,7 @@ import '../account/address_location_gate.dart';
 import '../../models/milk_subscription.dart';
 import '../../services/milk_plan_api_client.dart';
 import '../../models/milk_plan_merge.dart';
-import '../../models/milk_quantity.dart';
+import '../../models/subscription_products.dart';
 import 'milk_plan_merge_dialog.dart';
 import '../../core/widgets/page_app_bar.dart';
 
@@ -21,6 +21,11 @@ class _ShiftDraft {
   final Set<DateTime> randomDates;
   DateTime startDate;
   DateTime? endDate;
+
+  /// A running plan's quantity and frequency: still allowed after the
+  /// owner changes the product's settings.
+  int? originalQuantity;
+  MilkDeliveryFrequency? originalFrequency;
 
   _ShiftDraft({
     this.enabled = false,
@@ -36,14 +41,18 @@ class _ShiftDraft {
 
   factory _ShiftDraft.fromSchedule(MilkShiftSchedule schedule) {
     return _ShiftDraft(
-      enabled: true,
-      quantityMl: schedule.quantityMl,
-      frequency: schedule.frequency,
-      weekdays: schedule.selectedWeekdays.toSet(),
-      randomDates: schedule.selectedRandomDates.map(DateUtils.dateOnly).toSet(),
-      startDate: DateUtils.dateOnly(schedule.startDate),
-      endDate: schedule.endDate,
-    );
+        enabled: true,
+        quantityMl: schedule.quantityMl,
+        frequency: schedule.frequency,
+        weekdays: schedule.selectedWeekdays.toSet(),
+        randomDates: schedule.selectedRandomDates
+            .map(DateUtils.dateOnly)
+            .toSet(),
+        startDate: DateUtils.dateOnly(schedule.startDate),
+        endDate: schedule.endDate,
+      )
+      ..originalQuantity = schedule.quantityMl
+      ..originalFrequency = schedule.frequency;
   }
 
   MilkShiftSchedule toSchedule(MilkDeliveryShift shift) {
@@ -69,7 +78,10 @@ class _ShiftDraft {
 }
 
 class MilkSubscriptionSetupScreen extends StatefulWidget {
-  final String productName;
+  /// The product to subscribe to (owner request 2026-11-25: any
+  /// subscription product). Older callers name a milk instead.
+  final String? productId;
+  final String? productName;
   final MilkSubscription? existingSubscription;
 
   /// Before a new plan: the milk's address must be on the map.
@@ -77,7 +89,8 @@ class MilkSubscriptionSetupScreen extends StatefulWidget {
 
   const MilkSubscriptionSetupScreen({
     super.key,
-    required this.productName,
+    this.productId,
+    this.productName,
     this.existingSubscription,
     this.checkAddress = checkMilkAddressLocation,
   });
@@ -94,6 +107,15 @@ class _MilkSubscriptionSetupScreenState
   late _ShiftDraft _evening;
   bool _isSaving = false;
 
+  /// Try for 7 days (owner request 2026-11-25): a new subscription
+  /// that stops by itself after a week.
+  bool _trial = false;
+
+  /// The product and its settings.
+  late final SubscriptionOffer _offer;
+
+  bool get _isMilk => !_offer.isPack;
+
   /// Each shift's draft, in delivery order.
   Map<MilkDeliveryShift, _ShiftDraft> get _drafts => {
     MilkDeliveryShift.earlyMorning: _earlyMorning,
@@ -103,12 +125,66 @@ class _MilkSubscriptionSetupScreenState
 
   bool get _isEditing => widget.existingSubscription != null;
 
+  /// The shifts to show: the product's, plus any a running plan has.
+  List<MilkDeliveryShift> get _shifts => [
+    for (final shift in MilkDeliveryShift.values)
+      if (_offer.shifts.contains(shift) ||
+          widget.existingSubscription?.scheduleFor(shift) != null)
+        shift,
+  ];
+
+  static SubscriptionOffer _resolveOffer(MilkSubscriptionSetupScreen w) {
+    final id =
+        w.productId ??
+        w.existingSubscription?.productId ??
+        (w.productName == 'Buffalo Milk' ? 'buffalo_milk' : 'cow_milk');
+    return sudhamrtamSubscriptionProducts.offerFor(id) ??
+        SubscriptionOffer(
+          productId: id,
+          name: sudhamrtamSubscriptionProducts.nameOf(id),
+          unitLabel: '',
+          measure: SubscriptionMeasure.pack,
+          quantities: const [1],
+          shifts: MilkDeliveryShift.values,
+          weekdays: const [1, 2, 3, 4, 5, 6, 7],
+        );
+  }
+
+  /// A new draft for this product: its smallest quantity (milk: 0.5 L,
+  /// or 1 L in the morning), on the days it comes.
+  _ShiftDraft _newDraft({bool enabled = false, int? quantity}) {
+    final first = _offer.quantities.first;
+    return _ShiftDraft(
+      enabled: enabled,
+      quantityMl: quantity != null && _offer.quantities.contains(quantity)
+          ? quantity
+          : first,
+      frequency: _offer.comesEveryDay
+          ? MilkDeliveryFrequency.daily
+          : MilkDeliveryFrequency.selectedDays,
+      weekdays: _offer.comesEveryDay ? null : _offer.weekdays.toSet(),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    _earlyMorning = _ShiftDraft();
-    _morning = _ShiftDraft(enabled: true, quantityMl: 1000);
-    _evening = _ShiftDraft();
+    _offer = _resolveOffer(widget);
+    // Milk starts with 1 L in the morning, as before; other products
+    // with their first delivery time.
+    final firstShift = _offer.shifts.contains(MilkDeliveryShift.morning)
+        ? MilkDeliveryShift.morning
+        : (_offer.shifts.isEmpty
+              ? MilkDeliveryShift.morning
+              : _offer.shifts.first);
+    _earlyMorning = _newDraft(
+      enabled: firstShift == MilkDeliveryShift.earlyMorning,
+    );
+    _morning = _newDraft(
+      enabled: firstShift == MilkDeliveryShift.morning,
+      quantity: 1000,
+    );
+    _evening = _newDraft(enabled: firstShift == MilkDeliveryShift.evening);
 
     final existing = widget.existingSubscription;
     if (existing == null) return;
@@ -118,15 +194,15 @@ class _MilkSubscriptionSetupScreenState
         MilkDeliveryShift.earlyMorning,
       );
       _earlyMorning = earlySchedule == null
-          ? _ShiftDraft()
+          ? _newDraft()
           : _ShiftDraft.fromSchedule(earlySchedule);
       final morningSchedule = existing.scheduleFor(MilkDeliveryShift.morning);
       final eveningSchedule = existing.scheduleFor(MilkDeliveryShift.evening);
       _morning = morningSchedule == null
-          ? _ShiftDraft()
+          ? _newDraft()
           : _ShiftDraft.fromSchedule(morningSchedule);
       _evening = eveningSchedule == null
-          ? _ShiftDraft()
+          ? _newDraft()
           : _ShiftDraft.fromSchedule(eveningSchedule);
     } else {
       // Migration of plans created before morning/evening support.
@@ -142,20 +218,72 @@ class _MilkSubscriptionSetupScreenState
         startDate: DateUtils.dateOnly(existing.startDate),
         endDate: existing.endDate,
       );
-      _evening = _ShiftDraft();
+      _evening = _newDraft();
     }
   }
 
-  String _quantityLabel(int ml) => milkLitresText(ml);
+  String _quantityLabel(int quantity) => _offer.quantityText(quantity);
+
+  /// The quantities [draft] may have: the product's, plus what the
+  /// running plan already has.
+  List<int> _quantitiesFor(_ShiftDraft draft) {
+    final all = {
+      ..._offer.quantities,
+      if (draft.originalQuantity != null) draft.originalQuantity!,
+    }.toList()..sort();
+    return all;
+  }
+
+  int? _nextQuantity(_ShiftDraft draft) {
+    for (final q in _quantitiesFor(draft)) {
+      if (q > draft.quantityMl) return q;
+    }
+    return null;
+  }
+
+  int? _previousQuantity(_ShiftDraft draft) {
+    int? previous;
+    for (final q in _quantitiesFor(draft)) {
+      if (q >= draft.quantityMl) break;
+      previous = q;
+    }
+    return previous;
+  }
+
+  /// The frequencies [draft] may use: on some days only, a product
+  /// comes on selected or random days (a running plan keeps its own).
+  List<MilkDeliveryFrequency> _frequenciesFor(_ShiftDraft draft) => [
+    for (final f in MilkDeliveryFrequency.values)
+      if (_offer.comesEveryDay ||
+          f == MilkDeliveryFrequency.selectedDays ||
+          f == MilkDeliveryFrequency.randomDays ||
+          f == draft.originalFrequency)
+        f,
+  ];
+
+  bool _dayAllowed(DateTime day) => _offer.weekdays.contains(day.weekday);
+
+  /// "Mon, Wed and Fri".
+  String get _offerDaysText {
+    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final days = [for (final d in _offer.weekdays) names[d - 1]];
+    if (days.length == 1) return days.single;
+    return '${days.sublist(0, days.length - 1).join(', ')} and ${days.last}';
+  }
 
   Future<void> _pickDate(_ShiftDraft draft) async {
     final today = DateUtils.dateOnly(DateTime.now());
+    var initial = today;
+    while (!_offer.comesEveryDay && !_dayAllowed(initial)) {
+      initial = initial.add(const Duration(days: 1));
+    }
     final picked = await showDatePicker(
       context: context,
-      initialDate: today,
+      initialDate: initial,
       firstDate: today,
       lastDate: today.add(const Duration(days: 365)),
-      helpText: 'Select Milk Delivery Date',
+      selectableDayPredicate: _offer.comesEveryDay ? null : _dayAllowed,
+      helpText: _isMilk ? 'Select Milk Delivery Date' : 'Select Delivery Date',
     );
     if (!mounted || picked == null) return;
     setState(() => draft.randomDates.add(DateUtils.dateOnly(picked)));
@@ -169,7 +297,7 @@ class _MilkSubscriptionSetupScreenState
       initialDate: draft.startDate.isBefore(today) ? today : draft.startDate,
       firstDate: today,
       lastDate: today.add(const Duration(days: 90)),
-      helpText: 'Milk starts on',
+      helpText: _isMilk ? 'Milk starts on' : 'Starts on',
     );
     if (!mounted || picked == null) return;
     setState(() => draft.startDate = DateUtils.dateOnly(picked));
@@ -182,10 +310,29 @@ class _MilkSubscriptionSetupScreenState
 
   bool _validateDraft(_ShiftDraft draft, String shiftName) {
     if (!draft.enabled) return true;
-    if (!isAllowedMilkMl(draft.quantityMl)) {
+    if (!_quantitiesFor(draft).contains(draft.quantityMl)) {
       _showError(
-        '$shiftName quantity must be between 0.5 L and 10 L '
-        '(whole litres plus 0.5 or 0.75 L).',
+        _isMilk && isMilkProductId(_offer.productId)
+            ? '$shiftName quantity must be between 0.5 L and 10 L '
+                  '(whole litres plus 0.5 or 0.75 L).'
+            : 'Choose a $shiftName quantity offered for ${_offer.name}.',
+      );
+      return false;
+    }
+    if (!_frequenciesFor(draft).contains(draft.frequency)) {
+      _showError('${_offer.name} comes on $_offerDaysText only.');
+      return false;
+    }
+    if (draft.frequency == MilkDeliveryFrequency.selectedDays &&
+        draft.originalFrequency != MilkDeliveryFrequency.selectedDays &&
+        draft.weekdays.any((d) => !_offer.weekdays.contains(d))) {
+      _showError('${_offer.name} comes on $_offerDaysText only.');
+      return false;
+    }
+    if (_trial && draft.frequency == MilkDeliveryFrequency.randomDays) {
+      _showError(
+        'Try for 7 days works with daily, alternate or selected days. '
+        'Choose one of those for $shiftName.',
       );
       return false;
     }
@@ -215,6 +362,10 @@ class _MilkSubscriptionSetupScreenState
   Future<void> _saveMilkSubscription() async {
     if (_isSaving) return;
 
+    // Shifts the product does not have are never sent.
+    for (final shift in MilkDeliveryShift.values) {
+      if (!_shifts.contains(shift)) _drafts[shift]!.enabled = false;
+    }
     if (!_drafts.values.any((draft) => draft.enabled)) {
       _showError('Choose at least one delivery time.');
       return;
@@ -238,13 +389,19 @@ class _MilkSubscriptionSetupScreenState
 
     try {
       final existing = widget.existingSubscription;
-      final productId =
-          existing?.productId ??
-          (widget.productName == 'Buffalo Milk' ? 'buffalo_milk' : 'cow_milk');
+      final productId = existing?.productId ?? _offer.productId;
 
       final schedules = <MilkShiftSchedule>[
         for (final MapEntry(key: shift, value: draft) in _drafts.entries)
-          if (draft.enabled) draft.toSchedule(shift),
+          if (draft.enabled)
+            // A trial week: the 7th day is the last.
+            _trial && existing == null
+                ? draft
+                      .toSchedule(shift)
+                      .copyWith(
+                        endDate: draft.startDate.add(const Duration(days: 6)),
+                      )
+                : draft.toSchedule(shift),
       ];
 
       // Maintain the legacy fields while the remaining screens migrate.
@@ -319,12 +476,18 @@ class _MilkSubscriptionSetupScreenState
 
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
+      final what = _isMilk
+          ? 'Milk subscription'
+          : '${_offer.name} subscription';
       messenger.showSnackBar(
         SnackBar(
           content: Text(
             existing != null
-                ? 'Milk subscription updated successfully!'
-                : 'Milk subscription saved successfully!',
+                ? '$what updated successfully!'
+                : _trial
+                ? '$what saved: 7 days to try. Keep it going any time '
+                      'from Subscriptions.'
+                : '$what saved successfully!',
           ),
         ),
       );
@@ -358,7 +521,7 @@ class _MilkSubscriptionSetupScreenState
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute<void>(
             builder: (context) => MilkSubscriptionSetupScreen(
-              productName: widget.productName,
+              productId: plan.productId,
               existingSubscription: plan,
             ),
           ),
@@ -411,7 +574,7 @@ class _MilkSubscriptionSetupScreenState
               ),
               subtitle: Text(
                 [
-                  if (shift == MilkDeliveryShift.earlyMorning)
+                  if (shift == MilkDeliveryShift.earlyMorning && _isMilk)
                     'Last evening\'s milk, kept cold overnight.',
                   draft.enabled ? 'Enabled' : 'Not selected',
                 ].join('\n'),
@@ -440,11 +603,9 @@ class _MilkSubscriptionSetupScreenState
                 children: [
                   IconButton.filledTonal(
                     key: Key('$title-less'),
-                    onPressed: previousMilkMl(draft.quantityMl) != null
+                    onPressed: _previousQuantity(draft) != null
                         ? () => setState(
-                            () => draft.quantityMl = previousMilkMl(
-                              draft.quantityMl,
-                            )!,
+                            () => draft.quantityMl = _previousQuantity(draft)!,
                           )
                         : null,
                     icon: const Icon(Icons.remove),
@@ -461,11 +622,9 @@ class _MilkSubscriptionSetupScreenState
                   ),
                   IconButton.filledTonal(
                     key: Key('$title-more'),
-                    onPressed: nextMilkMl(draft.quantityMl) != null
+                    onPressed: _nextQuantity(draft) != null
                         ? () => setState(
-                            () => draft.quantityMl = nextMilkMl(
-                              draft.quantityMl,
-                            )!,
+                            () => draft.quantityMl = _nextQuantity(draft)!,
                           )
                         : null,
                     icon: const Icon(Icons.add),
@@ -482,23 +641,17 @@ class _MilkSubscriptionSetupScreenState
                 key: ValueKey('$title-${draft.frequency.name}'),
                 initialValue: draft.frequency,
                 decoration: const InputDecoration(border: OutlineInputBorder()),
-                items: const [
-                  DropdownMenuItem(
-                    value: MilkDeliveryFrequency.daily,
-                    child: Text('Daily Delivery'),
-                  ),
-                  DropdownMenuItem(
-                    value: MilkDeliveryFrequency.alternateDays,
-                    child: Text('Alternate Days'),
-                  ),
-                  DropdownMenuItem(
-                    value: MilkDeliveryFrequency.selectedDays,
-                    child: Text('Selected Days'),
-                  ),
-                  DropdownMenuItem(
-                    value: MilkDeliveryFrequency.randomDays,
-                    child: Text('Random Days'),
-                  ),
+                items: [
+                  for (final f in _frequenciesFor(draft))
+                    DropdownMenuItem(
+                      value: f,
+                      child: Text(switch (f) {
+                        MilkDeliveryFrequency.daily => 'Daily Delivery',
+                        MilkDeliveryFrequency.alternateDays => 'Alternate Days',
+                        MilkDeliveryFrequency.selectedDays => 'Selected Days',
+                        MilkDeliveryFrequency.randomDays => 'Random Days',
+                      }),
+                    ),
                 ],
                 onChanged: (value) {
                   if (value != null) {
@@ -506,6 +659,15 @@ class _MilkSubscriptionSetupScreenState
                   }
                 },
               ),
+              if (!_offer.comesEveryDay)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    '${_offer.name} comes on $_offerDaysText.',
+                    key: Key('offer-days-${shift.name}'),
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                ),
               if (draft.frequency == MilkDeliveryFrequency.selectedDays) ...[
                 const SizedBox(height: 18),
                 const Text('Choose weekdays'),
@@ -515,7 +677,14 @@ class _MilkSubscriptionSetupScreenState
                   runSpacing: 8,
                   children: List.generate(7, (index) {
                     final day = index + 1;
+                    if (!_offer.weekdays.contains(day) &&
+                        !(draft.originalFrequency ==
+                                MilkDeliveryFrequency.selectedDays &&
+                            draft.weekdays.contains(day))) {
+                      return const SizedBox.shrink();
+                    }
                     return FilterChip(
+                      key: Key('day-${shift.name}-$day'),
                       label: Text(weekdays[index]),
                       selected: draft.weekdays.contains(day),
                       selectedColor: const Color(0xFFE5F0D7),
@@ -535,6 +704,17 @@ class _MilkSubscriptionSetupScreenState
                   key: Key('$title-start'),
                   start: draft.startDate,
                   onChange: () => _pickStart(draft),
+                ),
+              // A running plan that ends (a trial week, or a set end):
+              // the customer keeps it going here.
+              if (_isEditing &&
+                  draft.endDate != null &&
+                  draft.frequency != MilkDeliveryFrequency.randomDays)
+                _EndDateRow(
+                  key: Key('$title-end'),
+                  end: draft.endDate!,
+                  productEnds: _offer.endsOn,
+                  onKeepGoing: () => setState(() => draft.endDate = null),
                 ),
               if (draft.frequency == MilkDeliveryFrequency.randomDays) ...[
                 const SizedBox(height: 18),
@@ -570,13 +750,23 @@ class _MilkSubscriptionSetupScreenState
 
   @override
   Widget build(BuildContext context) {
-    final totalMl = _drafts.values
-        .where((draft) => draft.enabled)
-        .fold<int>(0, (sum, draft) => sum + draft.quantityMl);
+    final totalMl = [
+      for (final shift in _shifts)
+        if (_drafts[shift]!.enabled) _drafts[shift]!.quantityMl,
+    ].fold<int>(0, (sum, q) => sum + q);
+    final shiftNames = _shifts.map(shiftText).toList();
+    final shiftsHint = shiftNames.length == 1
+        ? '${shiftNames.single} delivery.'
+        : 'Choose ${shiftNames.sublist(0, shiftNames.length - 1).join(', ')}'
+              ' or ${shiftNames.last}, or more than one.';
     return SiteScaffold(
       appBar: PageAppBar(
         title: Text(
-          _isEditing ? 'Edit Milk Subscription' : 'Set Up Milk Subscription',
+          _isMilk
+              ? (_isEditing
+                    ? 'Edit Milk Subscription'
+                    : 'Set Up Milk Subscription')
+              : (_isEditing ? 'Edit Subscription' : 'Set Up Subscription'),
         ),
       ),
       body: SafeArea(
@@ -591,22 +781,35 @@ class _MilkSubscriptionSetupScreenState
               ),
               child: Column(
                 children: [
-                  const Icon(
-                    Icons.water_drop_outlined,
+                  Icon(
+                    _isMilk
+                        ? Icons.water_drop_outlined
+                        : Icons.shopping_basket_outlined,
                     size: 56,
                     color: _brandGreen,
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    widget.productName,
+                    _offer.isPack && _offer.unitLabel.isNotEmpty
+                        ? '${_offer.name} · ${_offer.unitLabel}'
+                        : _offer.name,
+                    key: const Key('setup-product'),
+                    textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Choose Early morning, Morning, Evening, or more than one.',
-                    textAlign: TextAlign.center,
-                  ),
+                  Text(shiftsHint, textAlign: TextAlign.center),
+                  if (_offer.endsOn != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_offer.name} subscriptions end on '
+                      '${MaterialLocalizations.of(context).formatMediumDate(_offer.endsOn!)}.',
+                      key: const Key('setup-product-ends'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Color(0xFFB26A00)),
+                    ),
+                  ],
                   if (_isEditing) ...[
                     const SizedBox(height: 12),
                     const Chip(label: Text('Editing Existing Subscription')),
@@ -615,8 +818,32 @@ class _MilkSubscriptionSetupScreenState
               ),
             ),
             const SizedBox(height: 24),
-            for (final MapEntry(key: shift, value: draft) in _drafts.entries)
-              _shiftCard(shift, draft),
+            if (!_isEditing)
+              Card(
+                margin: const EdgeInsets.only(bottom: 18),
+                color: const Color(0xFFFFF8E1),
+                child: SwitchListTile(
+                  key: const Key('try-7-days'),
+                  secondary: const Icon(
+                    Icons.local_offer_outlined,
+                    color: Color(0xFFB26A00),
+                  ),
+                  title: const Text(
+                    'Try for 7 days',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    _trial
+                        ? 'Deliveries stop by themselves after 7 days. Liked '
+                              'it? Tap "Keep it going" in Subscriptions.'
+                        : 'Not sure yet? Get one week, then decide.',
+                  ),
+                  value: _trial,
+                  activeThumbColor: const Color(0xFFB26A00),
+                  onChanged: (on) => setState(() => _trial = on),
+                ),
+              ),
+            for (final shift in _shifts) _shiftCard(shift, _drafts[shift]!),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -632,7 +859,7 @@ class _MilkSubscriptionSetupScreenState
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _quantityLabel(totalMl),
+                    totalMl == 0 ? '-' : _quantityLabel(totalMl),
                     style: const TextStyle(
                       fontSize: 22,
                       color: _brandGreen,
@@ -656,7 +883,11 @@ class _MilkSubscriptionSetupScreenState
               label: Text(
                 _isSaving
                     ? 'Saving...'
-                    : (_isEditing ? 'Save Changes' : 'Save Milk Subscription'),
+                    : (_isEditing
+                          ? 'Save Changes'
+                          : _isMilk
+                          ? 'Save Milk Subscription'
+                          : 'Save Subscription'),
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: _brandGreen,
@@ -708,7 +939,7 @@ class _StartDateRow extends StatelessWidget {
                 Text(label),
                 if (!started)
                   const Text(
-                    'Choose a later day to start milk later. '
+                    'Choose a later day to start later. '
                     'Lists already fixed are not changed.',
                     style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),
@@ -717,6 +948,59 @@ class _StartDateRow extends StatelessWidget {
           ),
           if (!started)
             TextButton(onPressed: onChange, child: const Text('Change')),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Ends on Sat, 14 Nov 2026 [Keep it going]": a trial week or a set
+/// end. Keep it going removes the end (not past a product's own end).
+class _EndDateRow extends StatelessWidget {
+  const _EndDateRow({
+    super.key,
+    required this.end,
+    required this.productEnds,
+    required this.onKeepGoing,
+  });
+
+  final DateTime end;
+  final DateTime? productEnds;
+  final VoidCallback onKeepGoing;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = MaterialLocalizations.of(context).formatFullDate(end);
+    final fixed = productEnds != null && !end.isBefore(productEnds!);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        children: [
+          const Icon(Icons.event_busy_outlined),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Last delivery',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(label),
+                if (fixed)
+                  const Text(
+                    'This product is no longer offered after that day.',
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+              ],
+            ),
+          ),
+          if (!fixed)
+            TextButton(
+              key: const Key('keep-going'),
+              onPressed: onKeepGoing,
+              child: const Text('Keep it going'),
+            ),
         ],
       ),
     );

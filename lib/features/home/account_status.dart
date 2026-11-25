@@ -36,7 +36,7 @@ class AccountStatus {
 }
 
 String _milk(String productId) =>
-    productId == 'buffalo_milk' ? 'Buffalo Milk' : 'Cow Milk';
+    sudhamrtamSubscriptionProducts.nameOf(productId);
 
 String _date(DateTime d) {
   const months = [

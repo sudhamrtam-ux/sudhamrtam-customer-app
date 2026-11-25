@@ -8,7 +8,7 @@ import '../milk_bills/milk_bills_screen.dart';
 import '../../models/milk_subscription.dart';
 import '../../models/milk_subscription_manager.dart';
 import '../../models/milk_plan_merge.dart';
-import '../../models/milk_quantity.dart';
+import '../../models/subscription_products.dart';
 import 'milk_plan_merge_dialog.dart';
 import 'milk_subscription_setup_screen.dart';
 import 'vacation_days_screen.dart';
@@ -31,37 +31,66 @@ class MilkPlanScreen extends StatelessWidget {
     ),
   );
 
-  /// Buffalo and cow milk, side by side.
+  /// What can be subscribed to (owner request 2026-11-25: the owner's
+  /// subscription products), two side by side.
   Widget _startPlan(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       _sectionTitle(context, 'Start a new subscription'),
-      IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: _MilkProductCard(
-                name: 'Buffalo Milk',
-                description: 'Rich and creamy',
-                icon: Icons.water_drop,
-                onTap: () => openMilkPlanSetup(context, 'Buffalo Milk'),
+      ListenableBuilder(
+        listenable: sudhamrtamSubscriptionProducts,
+        builder: (context, _) {
+          final offers = sudhamrtamSubscriptionProducts.offered;
+          final rows = <Widget>[];
+          for (var i = 0; i < offers.length; i += 2) {
+            if (i > 0) rows.add(const SizedBox(height: 12));
+            rows.add(
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: _offerCard(context, offers[i])),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: i + 1 < offers.length
+                          ? _offerCard(context, offers[i + 1])
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _MilkProductCard(
-                name: 'Cow Milk',
-                description: 'Fresh and wholesome',
-                icon: Icons.water_drop_outlined,
-                onTap: () => openMilkPlanSetup(context, 'Cow Milk'),
-              ),
-            ),
-          ],
-        ),
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: rows,
+          );
+        },
       ),
     ],
   );
+
+  Widget _offerCard(BuildContext context, SubscriptionOffer offer) =>
+      _MilkProductCard(
+        name: offer.name,
+        description: switch (offer.productId) {
+          'buffalo_milk' => 'Rich and creamy',
+          'cow_milk' => 'Fresh and wholesome',
+          _ =>
+            offer.isPack
+                ? '${offer.unitLabel} packs'
+                : 'From ${offer.quantityText(offer.quantities.first)}',
+        },
+        icon: switch (offer.productId) {
+          'buffalo_milk' => Icons.water_drop,
+          'cow_milk' => Icons.water_drop_outlined,
+          _ =>
+            offer.isPack
+                ? Icons.shopping_basket_outlined
+                : Icons.local_drink_outlined,
+        },
+        onTap: () => openMilkPlanSetup(context, offer.productId),
+      );
 
   /// The customer's plans, one card per milk.
   Widget _myPlans(BuildContext context) => Column(
@@ -121,7 +150,7 @@ class MilkPlanScreen extends StatelessWidget {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'Choose Buffalo Milk or Cow Milk to start one.',
+                          'Choose a product above to start one.',
                           style: TextStyle(color: Colors.black54),
                         ),
                       ],
@@ -140,8 +169,13 @@ class MilkPlanScreen extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: DuplicatePlansBanner(group: group),
                 ),
-              // One card per milk, with every shift in it.
-              for (final productId in const ['buffalo_milk', 'cow_milk'])
+              // One card per product, with every shift in it: in the
+              // owner's order, then any others.
+              for (final productId in {
+                for (final o in sudhamrtamSubscriptionProducts.offered)
+                  o.productId,
+                for (final plan in subscriptions) plan.productId,
+              })
                 if (sudhamrtamMilkSubscriptions.plansFor(productId).isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -387,18 +421,7 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
   // PRODUCT NAME
   // ==========================================================
 
-  String get _productName {
-    switch (subscription.productId) {
-      case 'buffalo_milk':
-        return 'Buffalo Milk';
-
-      case 'cow_milk':
-        return 'Cow Milk';
-
-      default:
-        return subscription.productId;
-    }
-  }
+  String get _productName => milkName(subscription.productId);
 
   // ==========================================================
   // DELIVERY FREQUENCY NAME
@@ -470,11 +493,65 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => MilkSubscriptionSetupScreen(
-          productName: _productName,
+          productId: subscription.productId,
           existingSubscription: subscription,
         ),
       ),
     );
+  }
+
+  /// The last delivery day of a plan that ends (a trial week or a set
+  /// end), from today on; null when it goes on.
+  DateTime? get _endsOn {
+    final today = DateUtils.dateOnly(DateTime.now());
+    DateTime? last;
+    for (final s in subscription.shiftSchedules) {
+      if (s.frequency == MilkDeliveryFrequency.randomDays) return null;
+      final end = s.endDate;
+      if (end == null) return null;
+      if (last == null || end.isAfter(last)) last = end;
+    }
+    return last == null || last.isBefore(today) ? null : last;
+  }
+
+  /// Removes the end, so deliveries go on (owner request 2026-11-25:
+  /// after Try for 7 days). A product that ends keeps its own end.
+  Future<void> _keepGoing() async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+    try {
+      final ok = await sudhamrtamMilkSubscriptions.updateSubscription(
+        subscription.copyWith(
+          shiftSchedules: [
+            for (final s in subscription.shiftSchedules)
+              s.copyWith(clearEndDate: true),
+          ],
+        ),
+      );
+      _showMessage(
+        ok
+            ? 'Done: $_productName keeps coming.'
+            : 'Unable to change this subscription. Please try again.',
+      );
+    } catch (error) {
+      _showMessage(
+        error is MilkPlanSyncException
+            ? error.message
+            : 'Unable to change this subscription. Please try again.',
+      );
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  /// Not when the product itself ends on that day.
+  bool get _canKeepGoing {
+    final offer = sudhamrtamSubscriptionProducts.offerFor(
+      subscription.productId,
+    );
+    final productEnds = offer?.endsOn;
+    final end = _endsOn;
+    return end != null && (productEnds == null || end.isBefore(productEnds));
   }
 
   // ==========================================================
@@ -486,7 +563,7 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Cancel Milk Subscription?'),
+          title: Text('Cancel $_productName Subscription?'),
           content: Text(
             'Are you sure you want to cancel your '
             '$_productName subscription?\n\n'
@@ -649,12 +726,53 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
           ),
           const SizedBox(height: 8),
         ],
+        if (!isCancelled && _endsOn != null) ...[
+          Container(
+            key: Key('endsNote_${subscription.id}'),
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.event_busy_outlined,
+                  color: Color(0xFFB26A00),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Last delivery ${planDateText(_endsOn!)}',
+                    style: const TextStyle(
+                      color: Color(0xFF8A5A00),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (_canKeepGoing)
+                  TextButton(
+                    key: Key('keepGoing_${subscription.id}'),
+                    onPressed: _isProcessing ? null : _keepGoing,
+                    child: const Text('Keep it going'),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (subscription.shiftSchedules.isNotEmpty) ...[
           for (final shift in MilkDeliveryShift.values)
             for (final schedule in subscription.shiftSchedules.where(
               (item) => item.shift == shift,
             )) ...[
-              _ShiftScheduleSummary(schedule: schedule, paused: !isActive),
+              _ShiftScheduleSummary(
+                schedule: schedule,
+                productId: subscription.productId,
+                paused: !isActive,
+              ),
               const SizedBox(height: 8),
             ],
         ] else ...[
@@ -830,13 +948,18 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
 // SHIFT SCHEDULE DISPLAY
 // ============================================================
 
-String _formatLitres(int millilitres) => milkLitresText(millilitres);
-
 class _ShiftScheduleSummary extends StatelessWidget {
   final MilkShiftSchedule schedule;
+  final String productId;
   final bool paused;
 
-  const _ShiftScheduleSummary({required this.schedule, this.paused = false});
+  const _ShiftScheduleSummary({
+    required this.schedule,
+    required this.productId,
+    this.paused = false,
+  });
+
+  String _formatLitres(int quantity) => quantityTextFor(productId, quantity);
 
   String get _frequencyLabel {
     switch (schedule.frequency) {
@@ -1126,7 +1249,11 @@ class _DuplicatePlansBannerState extends State<DuplicatePlansBanner> {
     final summaries = [
       for (final plan in group.plans)
         plan.shiftSchedules
-            .map((s) => '${shiftText(s.shift)} ${litresText(s.quantityMl)}')
+            .map(
+              (s) =>
+                  '${shiftText(s.shift)} '
+                  '${quantityTextFor(group.productId, s.quantityMl)}',
+            )
             .join(' + '),
     ];
 
@@ -1234,7 +1361,13 @@ class MilkProductCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.water_drop, color: brandGreen, size: 30),
+                Icon(
+                  sudhamrtamSubscriptionProducts.isPack(productId)
+                      ? Icons.shopping_basket_outlined
+                      : Icons.water_drop,
+                  color: brandGreen,
+                  size: 30,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -1319,6 +1452,8 @@ String milkTotalText(List<MilkSubscription> plans) {
   if (active.isEmpty) return 'All deliveries are paused';
 
   final total = active.fold<int>(0, (sum, s) => sum + s.quantityMl);
+  final productId = plans.first.productId;
+  String litresText(int q) => quantityTextFor(productId, q);
   if (active.length == 1) {
     return 'Total: ${litresText(total)} ${deliveryDaysText(active.single)}$note';
   }
@@ -1418,7 +1553,8 @@ class _CancelledPlans extends StatelessWidget {
                 plan.shiftSchedules
                     .map(
                       (s) =>
-                          '${shiftText(s.shift)} ${litresText(s.quantityMl)} '
+                          '${shiftText(s.shift)} '
+                          '${quantityTextFor(plan.productId, s.quantityMl)} '
                           '${deliveryDaysText(s)}',
                     )
                     .join(', '),
@@ -1433,9 +1569,10 @@ class _CancelledPlans extends StatelessWidget {
   }
 }
 
-/// Opens the setup for a new plan. With a server, milk plans belong
-/// to the account, so the customer signs in first.
-Future<void> openMilkPlanSetup(BuildContext context, String productName) async {
+/// Opens the setup for a new subscription to [productId]. With a
+/// server, subscriptions belong to the account, so the customer signs
+/// in first.
+Future<void> openMilkPlanSetup(BuildContext context, String productId) async {
   final auth = sudhamrtamAuth;
   if (sudhamrtamMilkSync.isAvailable &&
       auth != null &&
@@ -1448,8 +1585,7 @@ Future<void> openMilkPlanSetup(BuildContext context, String productName) async {
   if (!context.mounted) return;
   await Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (context) =>
-          MilkSubscriptionSetupScreen(productName: productName),
+      builder: (context) => MilkSubscriptionSetupScreen(productId: productId),
     ),
   );
 }

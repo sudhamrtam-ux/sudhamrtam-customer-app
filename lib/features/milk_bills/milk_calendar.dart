@@ -19,7 +19,7 @@ const _vacationFill = Color(0xFFE3F2FD);
 const _vacationText = Color(0xFF1565C0);
 
 String _milkName(String productId) =>
-    productId == 'buffalo_milk' ? 'Buffalo Milk' : 'Cow Milk';
+    sudhamrtamSubscriptionProducts.nameOf(productId);
 
 /// "2026-11-15" for [d].
 String _dateKey(DateTime d) =>

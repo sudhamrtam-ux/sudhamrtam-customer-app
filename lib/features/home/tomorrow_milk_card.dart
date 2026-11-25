@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/sudhamrtam_app.dart';
 import '../../models/milk_quantity.dart';
 import '../../services/milk_tomorrow_client.dart';
 
@@ -222,8 +223,19 @@ class _TomorrowMilkCardState extends State<TomorrowMilkCard> {
   }
 
   Widget _shiftRow(MilkTomorrowClient client, String date, TomorrowShift s) {
-    final less = previousMilkMl(s.quantityMl);
-    final more = nextMilkMl(s.quantityMl);
+    // Packs (owner request 2026-11-25): the product's quantities.
+    final offer = sudhamrtamSubscriptionProducts.offerFor(s.productId);
+    final packs = offer != null && offer.isPack
+        ? ({...offer.quantities, s.usualMl}.toList()..sort())
+        : null;
+    final less = packs == null
+        ? previousMilkMl(s.quantityMl)
+        : packs.where((q) => q < s.quantityMl).lastOrNull;
+    final more = packs == null
+        ? nextMilkMl(s.quantityMl)
+        : packs.where((q) => q > s.quantityMl).firstOrNull;
+    String amount(int q) =>
+        packs == null ? milkLitresText(q) : offer!.quantityText(q);
     final canChange = s.open && !_busy;
     void set(int? ml) => _run(
       () => client.setQuantity(
@@ -247,7 +259,7 @@ class _TomorrowMilkCardState extends State<TomorrowMilkCard> {
                   !s.open
                       ? 'Changes closed'
                       : s.changed
-                      ? 'Usually ${milkLitresText(s.usualMl)} · '
+                      ? 'Usually ${amount(s.usualMl)} · '
                             '${closesText(s.closesAt, widget.now())}'
                       : 'Change ${closesText(s.closesAt, widget.now())}',
                   style: const TextStyle(color: Colors.black54, fontSize: 12),
@@ -277,7 +289,7 @@ class _TomorrowMilkCardState extends State<TomorrowMilkCard> {
           SizedBox(
             width: 64,
             child: Text(
-              milkLitresText(s.quantityMl),
+              amount(s.quantityMl),
               key: Key('tomorrowQty-${s.planId}-${s.shift}'),
               textAlign: TextAlign.center,
               style: TextStyle(

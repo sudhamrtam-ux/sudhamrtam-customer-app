@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 class TomorrowShift {
   const TomorrowShift({
     required this.planId,
+    this.productId = '',
     required this.productName,
     required this.shift,
     required this.usualMl,
@@ -17,6 +18,7 @@ class TomorrowShift {
 
   factory TomorrowShift.fromJson(Map<String, dynamic> json) => TomorrowShift(
     planId: json['plan_id'] as String,
+    productId: json['product_id'] as String? ?? '',
     productName: json['product_name'] as String,
     shift: json['shift'] as String,
     usualMl: json['usual_ml'] as int,
@@ -27,6 +29,7 @@ class TomorrowShift {
   );
 
   final String planId;
+  final String productId;
   final String productName;
 
   /// early_morning, morning or evening.

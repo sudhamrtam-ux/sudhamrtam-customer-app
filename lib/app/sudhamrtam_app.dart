@@ -12,6 +12,7 @@ import '../models/cart_manager.dart';
 import '../models/catalog_repository.dart';
 import '../models/combo_offer.dart';
 import '../models/milk_subscription_manager.dart';
+import '../models/subscription_products.dart';
 import '../services/account_sync_service.dart';
 import '../services/catalog_api_client.dart';
 import '../services/feedback_api_client.dart';
@@ -43,6 +44,14 @@ final ComboRepository sudhamrtamCombos = ComboRepository(
       ? null
       : ComboApiClient(baseUrl: apiBaseUrl).fetchCombos,
 );
+
+/// What customers can subscribe to (owner request 2026-11-25): the
+/// two milks until the server's list arrives, and without a server.
+final SubscriptionProducts sudhamrtamSubscriptionProducts =
+    SubscriptionProducts(
+      load: apiBaseUrl.isEmpty ? null : subscriptionProductsLoader(apiBaseUrl),
+      productName: (id) => sudhamrtamCatalog.productById(id)?.name,
+    );
 
 /// Products from the catalog; combo lines from the combos.
 final CartManager sudhamrtamCart = CartManager(
@@ -85,6 +94,7 @@ Future<void> initializeCatalogAndCart() async {
 
   unawaited(sudhamrtamCatalog.refresh());
   unawaited(sudhamrtamCombos.refresh());
+  unawaited(sudhamrtamSubscriptionProducts.refresh());
 }
 
 /// Monthly milk bills, or null when this build has no server.
@@ -119,7 +129,7 @@ final sudhamrtamMessengerKey = GlobalKey<ScaffoldMessengerState>();
 ProfilePhoto? sudhamrtamProfilePhoto;
 
 final MilkSubscriptionManager sudhamrtamMilkSubscriptions =
-    MilkSubscriptionManager();
+    MilkSubscriptionManager(products: sudhamrtamSubscriptionProducts);
 
 /// Keeps milk plans in step with the signed-in account. Local-only
 /// until main() sets it up for a build with a server.

@@ -117,7 +117,7 @@ void main() {
       await old.close();
 
       final db = await MilkDatabaseService.instance.database;
-      expect(await db.getVersion(), 21);
+      expect(await db.getVersion(), MilkDatabaseService.databaseVersion);
       expect(
         await OrderDatabaseService.instance.getOrderById(_order.id),
         isNotNull,

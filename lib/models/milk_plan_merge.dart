@@ -114,6 +114,7 @@ MilkPlanChanges planNewSubscription(
   List<MilkSubscription> existing,
   MilkSubscription incoming, {
   int maximumMl = maximumShiftQuantityMl,
+  bool Function(int quantity) allowed = isAllowedMilkMl,
 }) {
   final outcomes = <ShiftMergeOutcome>[];
   final updated = <String, MilkSubscription>{};
@@ -147,7 +148,7 @@ MilkPlanChanges planNewSubscription(
         ? ShiftMergeKind.differentSchedule
         : current.quantityMl + added.quantityMl > maximumMl
         ? ShiftMergeKind.overLimit
-        : !isAllowedMilkMl(current.quantityMl + added.quantityMl)
+        : !allowed(current.quantityMl + added.quantityMl)
         ? ShiftMergeKind.unpackable
         : ShiftMergeKind.addQuantity;
 
@@ -192,6 +193,7 @@ MilkPlanChanges planNewSubscription(
 MilkPlanChanges? combineSharedShifts(
   List<MilkSubscription> plans, {
   int maximumMl = maximumShiftQuantityMl,
+  bool Function(int quantity) allowed = isAllowedMilkMl,
 }) {
   final outcomes = <ShiftMergeOutcome>[];
   final working = {for (final plan in plans) plan.id: plan};
@@ -215,7 +217,7 @@ MilkPlanChanges? combineSharedShifts(
           ? ShiftMergeKind.differentSchedule
           : schedule.quantityMl + otherSchedule.quantityMl > maximumMl
           ? ShiftMergeKind.overLimit
-          : !isAllowedMilkMl(schedule.quantityMl + otherSchedule.quantityMl)
+          : !allowed(schedule.quantityMl + otherSchedule.quantityMl)
           ? ShiftMergeKind.unpackable
           : ShiftMergeKind.addQuantity;
 

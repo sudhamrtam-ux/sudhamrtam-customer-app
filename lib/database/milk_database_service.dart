@@ -25,12 +25,15 @@ import 'package:sqflite/sqflite.dart';
 /// Version 19: A delivery note on addresses.
 /// Version 20: The delivery date a customer chose for an order.
 /// Version 21: Short order numbers from the server (SUD0000001).
+/// Version 22: Any subscription product, in ml or whole packs (owner
+/// request 2026-11-25): the milk-only checks are gone; the server
+/// checks each product's quantities.
 class MilkDatabaseService {
   MilkDatabaseService._();
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 21;
+  static const int databaseVersion = 22;
   static const String orderRefsTable = 'order_refs';
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
@@ -119,12 +122,7 @@ class MilkDatabaseService {
       CREATE TABLE $subscriptionsTable (
         id TEXT PRIMARY KEY,
         product_id TEXT NOT NULL
-          CHECK (
-            product_id IN (
-              'buffalo_milk',
-              'cow_milk'
-            )
-          ),
+          CHECK (length(product_id) > 0),
         status TEXT NOT NULL DEFAULT 'active'
           CHECK (
             status IN (
@@ -264,6 +262,60 @@ class MilkDatabaseService {
     if (oldVersion < 21) {
       await _createOrderRefsTable(db);
     }
+
+    if (oldVersion < 22) {
+      await _allowAnySubscriptionProduct(db);
+    }
+  }
+
+  /// Version 22: subscriptions of any product (no milk-only product
+  /// CHECK) and quantities in packs (schedules 1 to 100000). SQLite
+  /// cannot change a CHECK, so both tables are rebuilt and every row
+  /// copied as it is. The schedules are kept aside first, so dropping
+  /// the old plans table cascades nothing.
+  Future<void> _allowAnySubscriptionProduct(Database db) async {
+    final plans = await db.rawQuery(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [subscriptionsTable],
+    );
+    final plansSql = plans.isEmpty ? '' : plans.single['sql'] as String? ?? '';
+    if (!plansSql.contains("'buffalo_milk'")) {
+      // Already without the product list: only the schedules.
+      await _rebuildSchedulesTable(db, 'v22');
+      return;
+    }
+
+    const backup = '${schedulesTable}_v22_rows';
+    await db.execute('DROP TABLE IF EXISTS $backup');
+    await db.execute('CREATE TABLE $backup AS SELECT * FROM $schedulesTable');
+    await db.execute('DROP TABLE $schedulesTable');
+
+    const rebuilt = '${subscriptionsTable}_v22';
+    await db.execute('DROP TABLE IF EXISTS $rebuilt');
+    final createSql = plansSql
+        .replaceFirst(
+          RegExp(r'CREATE TABLE\s+"?' + subscriptionsTable + r'"?'),
+          'CREATE TABLE $rebuilt',
+        )
+        .replaceFirst(
+          RegExp(r"CHECK\s*\(\s*product_id\s+IN\s*\([^)]*\)\s*\)"),
+          'CHECK (length(product_id) > 0)',
+        );
+    await db.execute(createSql);
+    await db.execute('INSERT INTO $rebuilt SELECT * FROM $subscriptionsTable');
+    await db.execute('DROP TABLE $subscriptionsTable');
+    await db.execute('ALTER TABLE $rebuilt RENAME TO $subscriptionsTable');
+
+    await _createSchedulesTable(db);
+    await db.execute('''
+      INSERT INTO $schedulesTable (id, subscription_id, shift, quantity_ml,
+        frequency, selected_weekdays, selected_random_dates,
+        start_date, end_date)
+      SELECT id, subscription_id, shift, quantity_ml, frequency,
+        selected_weekdays, selected_random_dates, start_date, end_date
+      FROM $backup
+    ''');
+    await db.execute('DROP TABLE $backup');
   }
 
   /// Version 21: the server's short number per order ("SUD0000001"),
@@ -397,10 +449,8 @@ class MilkDatabaseService {
           ),
         quantity_ml INTEGER NOT NULL
           CHECK (
-            quantity_ml >= 500
-            AND quantity_ml <= 10000
-            AND quantity_ml % 250 = 0
-            AND quantity_ml % 1000 != 250
+            quantity_ml >= 1
+            AND quantity_ml <= 100000
           ),
         frequency TEXT NOT NULL
           CHECK (
@@ -451,7 +501,7 @@ class MilkDatabaseService {
     }
     // Already has today's checks (made earlier in this upgrade).
     final sql = existing.single['sql'] as String? ?? '';
-    if (sql.contains('% 1000 != 250')) return;
+    if (sql.contains('quantity_ml <= 100000')) return;
     final rebuilt = '${schedulesTable}_$suffix';
     await db.execute('DROP TABLE IF EXISTS $rebuilt');
     await _createSchedulesTable(db, name: rebuilt);
