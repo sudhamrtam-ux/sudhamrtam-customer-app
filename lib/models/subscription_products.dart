@@ -25,7 +25,22 @@ class SubscriptionOffer {
     required this.weekdays,
     this.offered = true,
     this.endsOn,
+    this.saveBp = 0,
   });
+
+  /// Subscribe & save (owner decision 2026-11-25): off the shop price,
+  /// in basis points (10% = 1000); 0 = none.
+  final int saveBp;
+
+  /// "10%", "12.5%".
+  String get savePercent =>
+      '${saveBp % 100 == 0 ? saveBp ~/ 100 : (saveBp / 100).toStringAsFixed(1)}%';
+
+  /// The subscription price for a shop price, rounded to the paisa as
+  /// the bill does.
+  int savedPricePaise(int shopPricePaise) => saveBp > 0
+      ? (shopPricePaise * (10000 - saveBp) / 10000).round()
+      : shopPricePaise;
 
   final String productId;
   final String name;
@@ -73,6 +88,7 @@ class SubscriptionOffer {
       weekdays: List.unmodifiable((json['weekdays'] as List).cast<int>()),
       offered: json['offered'] as bool? ?? true,
       endsOn: ends == null ? null : DateTime.parse(ends),
+      saveBp: json['save_bp'] as int? ?? 0,
     );
   }
 }

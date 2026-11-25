@@ -30,6 +30,7 @@ const _curdJson = {
   'offered': true,
   'ends_on': null,
   'sort_order': 3,
+  'save_bp': 1000,
 };
 
 final _curd = SubscriptionOffer.fromJson(_curdJson);
@@ -89,6 +90,11 @@ void main() {
   test('the server list: words per measure, stopped ones kept', () async {
     expect(_curd.isPack, isTrue);
     expect(_curd.quantityText(2), '2 × 500 g');
+    expect(_curd.savePercent, '10%');
+    expect(_curd.savedPricePaise(12000), 10800);
+    // Rounded to the paisa, like the bill.
+    expect(_curd.savedPricePaise(9999), 8999);
+    expect(builtInSubscriptionOffers.first.saveBp, 0);
     expect(builtInSubscriptionOffers.first.quantityText(1500), '1.50 L');
     expect(builtInSubscriptionOffers.first.quantities, isNot(contains(1250)));
 
@@ -230,6 +236,11 @@ void main() {
 
     expect(find.text('Set Up Subscription'), findsOneWidget);
     expect(find.text('Curd · 500 g'), findsOneWidget);
+    // Subscribe & save: the shop's ₹120, 10% off (step 6c).
+    expect(
+      find.text('₹108 a pack when you subscribe (₹120 in the shop) · Save 10%'),
+      findsOneWidget,
+    );
     // Only the delivery time the owner offers.
     expect(find.byKey(const Key('shift-morning')), findsOneWidget);
     expect(find.byKey(const Key('shift-evening')), findsNothing);
@@ -274,6 +285,8 @@ void main() {
     );
     await tester.pump();
     expect(find.byKey(const Key('startPlan-Curd')), findsOneWidget);
+    // Curd and Paneer (made from Curd) both save 10%.
+    expect(find.text('Save 10% on subscription'), findsNWidgets(2));
     expect(find.byKey(const Key('startPlan-Paneer')), findsOneWidget);
     expect(find.byKey(const Key('milkCard_curd')), findsOneWidget);
     expect(find.text('2 × 500 g'), findsWidgets);

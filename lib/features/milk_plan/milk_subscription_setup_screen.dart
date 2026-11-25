@@ -224,6 +224,23 @@ class _MilkSubscriptionSetupScreenState
 
   String _quantityLabel(int quantity) => _offer.quantityText(quantity);
 
+  /// Subscribe & save (owner decision 2026-11-25): "₹108 a pack when
+  /// you subscribe (₹120 in the shop) · Save 10%". Null without a
+  /// saving or a known price.
+  String? _priceLine() {
+    if (_offer.saveBp <= 0) return null;
+    final product = sudhamrtamCatalog.productById(_offer.productId);
+    if (product == null || product.price <= 0) return null;
+    final shop = (product.price * 100).round();
+    final saved = _offer.savedPricePaise(shop);
+    String rupees(int paise) => paise % 100 == 0
+        ? '₹${paise ~/ 100}'
+        : '₹${(paise / 100).toStringAsFixed(2)}';
+    final per = _offer.isPack ? 'a pack' : 'a litre';
+    return '${rupees(saved)} $per when you subscribe '
+        '(${rupees(shop)} in the shop) · Save ${_offer.savePercent}';
+  }
+
   /// The quantities [draft] may have: the product's, plus what the
   /// running plan already has.
   List<int> _quantitiesFor(_ShiftDraft draft) {
@@ -799,6 +816,19 @@ class _MilkSubscriptionSetupScreenState
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
+                  if (_priceLine() case final price?) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      price,
+                      key: const Key('setup-price'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: _brandGreen,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 6),
                   Text(shiftsHint, textAlign: TextAlign.center),
                   if (_offer.endsOn != null) ...[
                     const SizedBox(height: 8),

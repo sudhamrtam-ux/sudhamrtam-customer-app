@@ -73,14 +73,16 @@ class MilkPlanScreen extends StatelessWidget {
   Widget _offerCard(BuildContext context, SubscriptionOffer offer) =>
       _MilkProductCard(
         name: offer.name,
-        description: switch (offer.productId) {
-          'buffalo_milk' => 'Rich and creamy',
-          'cow_milk' => 'Fresh and wholesome',
-          _ =>
-            offer.isPack
-                ? '${offer.unitLabel} packs'
-                : 'From ${offer.quantityText(offer.quantities.first)}',
-        },
+        description: offer.saveBp > 0
+            ? 'Save ${offer.savePercent} on subscription'
+            : switch (offer.productId) {
+                'buffalo_milk' => 'Rich and creamy',
+                'cow_milk' => 'Fresh and wholesome',
+                _ =>
+                  offer.isPack
+                      ? '${offer.unitLabel} packs'
+                      : 'From ${offer.quantityText(offer.quantities.first)}',
+              },
         icon: switch (offer.productId) {
           'buffalo_milk' => Icons.water_drop,
           'cow_milk' => Icons.water_drop_outlined,
