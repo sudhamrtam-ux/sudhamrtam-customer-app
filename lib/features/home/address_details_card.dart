@@ -194,7 +194,7 @@ class _AddressDetailsCardState extends State<AddressDetailsCard> {
               _needsLocation
                   ? 'Your ${address.label} address is not marked on the map '
                         'yet. Mark it so our delivery partner can reach you. '
-                        'New orders and milk plans need it.'
+                        'New orders and subscriptions need it.'
                   : 'Please add your society, block/tower and flat number '
                         'to your ${address.label} address. Our delivery '
                         'partners deliver one building at a time.',

@@ -112,7 +112,7 @@ class SiteHeader extends StatelessWidget {
             const SizedBox(width: 40),
             link('Home', 0),
             link('Shop', 1),
-            link('Milk Plans', 2),
+            link('Subscriptions', 2),
             const Spacer(),
             const MessagesBell(),
             const SizedBox(width: 4),

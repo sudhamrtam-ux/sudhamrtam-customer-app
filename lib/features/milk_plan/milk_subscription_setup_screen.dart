@@ -277,9 +277,9 @@ class _MilkSubscriptionSetupScreenState
         if (shared.isNotEmpty) {
           final names = shared.map(shiftText).join(' and ');
           _showError(
-            'Another ${milkName(productId)} plan already has your '
+            'Another ${milkName(productId)} subscription already has your '
             '${names.toLowerCase()} delivery. Change the quantity in that '
-            'plan instead.',
+            'subscription instead.',
           );
           return;
         }
@@ -312,7 +312,7 @@ class _MilkSubscriptionSetupScreenState
       if (!mounted) return;
       if (!saved) {
         _showError(
-          'Subscription was not saved. Please check your plan and retry.',
+          'Subscription was not saved. Please check your subscription and retry.',
         );
         return;
       }
@@ -374,14 +374,16 @@ class _MilkSubscriptionSetupScreenState
         }
         if (!mounted) return;
         if (!saved) {
-          _showError('Your plan was not updated. Please try again.');
+          _showError('Your subscription was not updated. Please try again.');
           return;
         }
         final messenger = ScaffoldMessenger.of(context);
         Navigator.of(context).pop();
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Added to your ${milkName(changes.productId)} plan.'),
+            content: Text(
+              'Added to your ${milkName(changes.productId)} subscription.',
+            ),
           ),
         );
     }
@@ -607,7 +609,7 @@ class _MilkSubscriptionSetupScreenState
                   ),
                   if (_isEditing) ...[
                     const SizedBox(height: 12),
-                    const Chip(label: Text('Editing Existing Plan')),
+                    const Chip(label: Text('Editing Existing Subscription')),
                   ],
                 ],
               ),

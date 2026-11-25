@@ -71,7 +71,10 @@ void main() {
       // Even after "Not now" on the society card.
       await show(tester, [home()], dismissed: true, log: log);
       expect(find.text('Mark your home on the map'), findsOneWidget);
-      expect(find.textContaining('New orders and milk plans'), findsOneWidget);
+      expect(
+        find.textContaining('New orders and subscriptions'),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('addressDetailsLater')), findsNothing);
 
       await tester.tap(find.text('Add location'));
@@ -91,7 +94,7 @@ void main() {
     });
   });
 
-  group('new milk plans', () {
+  group('new subscriptions', () {
     Future<bool?> check(
       WidgetTester tester,
       List<CustomerAddress> addresses, {
@@ -141,7 +144,9 @@ void main() {
       expect(find.text('Add address'), findsOneWidget);
     });
 
-    testWidgets('the plan is not saved until the check passes', (tester) async {
+    testWidgets('the subscription is not saved until the check passes', (
+      tester,
+    ) async {
       final directory = (await tester.runAsync(
         () => Directory.systemTemp.createTemp('sudhamrtam_plan_map_'),
       ))!;

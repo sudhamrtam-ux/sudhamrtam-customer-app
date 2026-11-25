@@ -78,7 +78,8 @@ class FakeServer {
       return _json({'customer': customer});
     }
     if (path == '/v1/me' && request.method == 'PATCH') {
-      if (body.containsKey('full_name')) fullName = body['full_name'] as String?;
+      if (body.containsKey('full_name'))
+        fullName = body['full_name'] as String?;
       if (body.containsKey('email')) {
         final value = body['email'] as String?;
         email = (value == null || value.isEmpty) ? null : value;
@@ -89,7 +90,8 @@ class FakeServer {
       return _json({'addresses': addresses.values.toList()});
     }
 
-    final match = RegExp(r'^/v1/addresses/([^/]+)(/default)?$').firstMatch(path);
+    final match = RegExp(r'^/v1/addresses/([^/]+)(/default)?$')
+        .firstMatch(path);
     final id = match?.group(1);
     if (id == null) return _json({}, 404);
 
@@ -239,23 +241,26 @@ void main() {
     expect((await profiles.getProfileById(local))?.phoneNumber, '9876543210');
   });
 
-  test('first sign-in uploads the phone data, then mirrors the server', () async {
-    await savePhoneProfile('Asha', email: 'asha@example.com');
-    await addresses.saveAddress(phoneAddress('phone_1', isDefault: true));
-    server.addAddress('server_1');
+  test(
+    'first sign-in uploads the phone data, then mirrors the server',
+    () async {
+      await savePhoneProfile('Asha', email: 'asha@example.com');
+      await addresses.saveAddress(phoneAddress('phone_1', isDefault: true));
+      server.addAddress('server_1');
 
-    auth.signIn();
-    await sync.syncNow();
+      auth.signIn();
+      await sync.syncNow();
 
-    expect(sync.lastSyncError, isNull);
-    expect(server.fullName, 'Asha');
-    expect(server.email, 'asha@example.com');
-    expect(server.addresses.keys, containsAll(['server_1', 'phone_1']));
-    expect(await phoneAddressIds(), containsAll(['server_1', 'phone_1']));
+      expect(sync.lastSyncError, isNull);
+      expect(server.fullName, 'Asha');
+      expect(server.email, 'asha@example.com');
+      expect(server.addresses.keys, containsAll(['server_1', 'phone_1']));
+      expect(await phoneAddressIds(), containsAll(['server_1', 'phone_1']));
 
-    final profile = await profiles.getProfileById(local);
-    expect(profile?.phoneNumber, '9999900001');
-  });
+      final profile = await profiles.getProfileById(local);
+      expect(profile?.phoneNumber, '9999900001');
+    },
+  );
 
   test('the server profile wins over the phone', () async {
     await savePhoneProfile('Phone name');

@@ -81,7 +81,7 @@ void main() {
     },
   );
 
-  test('a cancelled plan keeps when it was cancelled', () async {
+  test('a cancelled subscription keeps when it was cancelled', () async {
     final repo = MilkSubscriptionRepository();
     final plan = MilkSubscription(
       id: 'p1',
@@ -134,15 +134,17 @@ void main() {
     }
   }
 
-  test('v11 to the latest keeps milk plans and allows early morning', () async {
-    final path = '${directory.path}${Platform.pathSeparator}milk.db';
-    // A v11 phone: the schedules table allows only morning and evening.
-    final old = await databaseFactoryFfi.openDatabase(
-      path,
-      options: OpenDatabaseOptions(
-        version: 11,
-        onCreate: (db, _) async {
-          await db.execute('''
+  test(
+    'v11 to the latest keeps subscriptions and allows early morning',
+    () async {
+      final path = '${directory.path}${Platform.pathSeparator}milk.db';
+      // A v11 phone: the schedules table allows only morning and evening.
+      final old = await databaseFactoryFfi.openDatabase(
+        path,
+        options: OpenDatabaseOptions(
+          version: 11,
+          onCreate: (db, _) async {
+            await db.execute('''
             CREATE TABLE milk_subscriptions (
               id TEXT PRIMARY KEY, product_id TEXT NOT NULL,
               quantity INTEGER NOT NULL, frequency TEXT NOT NULL,
@@ -151,7 +153,7 @@ void main() {
               start_date TEXT NOT NULL, end_date TEXT,
               status TEXT NOT NULL DEFAULT 'active',
               created_at TEXT NOT NULL)''');
-          await db.execute('''
+            await db.execute('''
             CREATE TABLE milk_shift_schedules (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               subscription_id TEXT NOT NULL,
@@ -165,84 +167,85 @@ void main() {
               FOREIGN KEY (subscription_id) REFERENCES milk_subscriptions(id)
                 ON DELETE CASCADE,
               UNIQUE (subscription_id, shift))''');
-          await db.execute('''
+            await db.execute('''
             CREATE INDEX idx_milk_shift_subscription
             ON milk_shift_schedules(subscription_id)''');
-        },
-      ),
-    );
-    await old.insert('milk_subscriptions', {
-      'id': 'p1',
-      'product_id': 'buffalo_milk',
-      'quantity': 1,
-      'frequency': 'daily',
-      'start_date': '2026-11-08T00:00:00.000',
-      'created_at': '2026-11-08T00:00:00.000',
-    });
-    await old.insert('milk_shift_schedules', {
-      'subscription_id': 'p1',
-      'shift': 'evening',
-      'quantity_ml': 1500,
-      'frequency': 'daily',
-      'start_date': '2026-11-08T00:00:00.000',
-    });
-    await expectLater(
-      old.insert('milk_shift_schedules', {
+          },
+        ),
+      );
+      await old.insert('milk_subscriptions', {
+        'id': 'p1',
+        'product_id': 'buffalo_milk',
+        'quantity': 1,
+        'frequency': 'daily',
+        'start_date': '2026-11-08T00:00:00.000',
+        'created_at': '2026-11-08T00:00:00.000',
+      });
+      await old.insert('milk_shift_schedules', {
+        'subscription_id': 'p1',
+        'shift': 'evening',
+        'quantity_ml': 1500,
+        'frequency': 'daily',
+        'start_date': '2026-11-08T00:00:00.000',
+      });
+      await expectLater(
+        old.insert('milk_shift_schedules', {
+          'subscription_id': 'p1',
+          'shift': 'earlyMorning',
+          'quantity_ml': 500,
+          'frequency': 'daily',
+          'start_date': '2026-11-08T00:00:00.000',
+        }),
+        throwsA(isA<DatabaseException>()),
+      );
+      await old.close();
+
+      final db = await MilkDatabaseService.instance.database;
+      expect(await db.getVersion(), MilkDatabaseService.databaseVersion);
+      // v13: the cancel date column, empty for old plans.
+      expect(
+        (await db.query('milk_subscriptions')).single,
+        containsPair('cancelled_at', null),
+      );
+      final rows = await db.query('milk_shift_schedules');
+      expect(rows.single, containsPair('shift', 'evening'));
+      expect(rows.single, containsPair('quantity_ml', 1500));
+
+      await db.insert('milk_shift_schedules', {
         'subscription_id': 'p1',
         'shift': 'earlyMorning',
         'quantity_ml': 500,
         'frequency': 'daily',
         'start_date': '2026-11-08T00:00:00.000',
-      }),
-      throwsA(isA<DatabaseException>()),
-    );
-    await old.close();
-
-    final db = await MilkDatabaseService.instance.database;
-    expect(await db.getVersion(), MilkDatabaseService.databaseVersion);
-    // v13: the cancel date column, empty for old plans.
-    expect(
-      (await db.query('milk_subscriptions')).single,
-      containsPair('cancelled_at', null),
-    );
-    final rows = await db.query('milk_shift_schedules');
-    expect(rows.single, containsPair('shift', 'evening'));
-    expect(rows.single, containsPair('quantity_ml', 1500));
-
-    await db.insert('milk_shift_schedules', {
-      'subscription_id': 'p1',
-      'shift': 'earlyMorning',
-      'quantity_ml': 500,
-      'frequency': 'daily',
-      'start_date': '2026-11-08T00:00:00.000',
-    });
-    // Still one schedule per shift, and only known shifts.
-    await expectLater(
-      db.insert('milk_shift_schedules', {
-        'subscription_id': 'p1',
-        'shift': 'earlyMorning',
-        'quantity_ml': 500,
-        'frequency': 'daily',
-        'start_date': '2026-11-08T00:00:00.000',
-      }),
-      throwsA(isA<DatabaseException>()),
-    );
-    await expectLater(
-      db.insert('milk_shift_schedules', {
-        'subscription_id': 'p1',
-        'shift': 'midnight',
-        'quantity_ml': 500,
-        'frequency': 'daily',
-        'start_date': '2026-11-08T00:00:00.000',
-      }),
-      throwsA(isA<DatabaseException>()),
-    );
-    final indexes = await db.rawQuery(
-      "SELECT name FROM sqlite_master WHERE type = 'index' "
-      "AND name = 'idx_milk_shift_subscription'",
-    );
-    expect(indexes, hasLength(1));
-  });
+      });
+      // Still one schedule per shift, and only known shifts.
+      await expectLater(
+        db.insert('milk_shift_schedules', {
+          'subscription_id': 'p1',
+          'shift': 'earlyMorning',
+          'quantity_ml': 500,
+          'frequency': 'daily',
+          'start_date': '2026-11-08T00:00:00.000',
+        }),
+        throwsA(isA<DatabaseException>()),
+      );
+      await expectLater(
+        db.insert('milk_shift_schedules', {
+          'subscription_id': 'p1',
+          'shift': 'midnight',
+          'quantity_ml': 500,
+          'frequency': 'daily',
+          'start_date': '2026-11-08T00:00:00.000',
+        }),
+        throwsA(isA<DatabaseException>()),
+      );
+      final indexes = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type = 'index' "
+        "AND name = 'idx_milk_shift_subscription'",
+      );
+      expect(indexes, hasLength(1));
+    },
+  );
 
   testWidgets('early morning: closes at 9 PM the evening before', (
     tester,

@@ -42,7 +42,7 @@ void main() {
     AccountStatus of(List<MilkSubscription> plans) =>
         accountStatusFor(plans, today);
 
-    test('inactive without an open plan', () {
+    test('inactive without an open subscription', () {
       expect(of([]).state, AccountState.inactive);
       final s = of([plan('a', 'cow_milk', cancelled)]);
       expect((s.state, s.label), (AccountState.inactive, 'Inactive'));
@@ -112,7 +112,7 @@ void main() {
     });
   });
 
-  testWidgets('the card on Home shows the status and opens Milk Plan', (
+  testWidgets('the card on Home shows the status and opens Subscription', (
     tester,
   ) async {
     final manager = MilkSubscriptionManager();

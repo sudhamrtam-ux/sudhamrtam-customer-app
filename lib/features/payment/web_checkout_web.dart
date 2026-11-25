@@ -85,5 +85,4 @@ Future<PaymentLaunchResult> launchWebCheckout(PaymentSession session) async {
 }
 
 bool _isSet(JSAny? value) =>
-    value != null &&
-    !(value.isA<JSBoolean>() && !(value as JSBoolean).toDart);
+    value != null && !(value.isA<JSBoolean>() && !(value as JSBoolean).toDart);

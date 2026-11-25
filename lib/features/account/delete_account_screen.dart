@@ -145,7 +145,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
         const _Point(
           icon: Icons.delete_outline,
           text:
-              'Erased: your name, email, photo, addresses, milk plans, '
+              'Erased: your name, email, photo, addresses, subscriptions, '
               'queries and feedback. You are signed out everywhere.',
         ),
         const _Point(

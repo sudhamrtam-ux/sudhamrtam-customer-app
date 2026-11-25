@@ -78,7 +78,7 @@ void main() {
     expect(find.text('Checkout Recovery Required'), findsOneWidget);
 
     expect(find.text('Shop'), findsNothing);
-    expect(find.text('Milk Plan'), findsNothing);
+    expect(find.text('Subscription'), findsNothing);
     expect(find.text('Cart'), findsNothing);
     expect(find.text('Account'), findsNothing);
   });

@@ -192,7 +192,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'We are happy to help with orders, milk plans, bills and '
+            'We are happy to help with orders, subscriptions, bills and '
             'deliveries.',
             style: TextStyle(color: Colors.black54),
           ),

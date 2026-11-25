@@ -265,7 +265,7 @@ void main() {
     });
   });
 
-  group('reminder on the Milk Plan tab', () {
+  group('reminder on the Subscription tab', () {
     testWidgets('shows nothing when signed out or with no bills', (
       tester,
     ) async {

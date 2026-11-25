@@ -935,7 +935,9 @@ class _MilkPlanCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            hasPlan ? 'Your Milk Plan' : 'Set up a Milk Plan',
+                            hasPlan
+                                ? 'Your Subscriptions'
+                                : 'Set up a Subscription',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: _ink,

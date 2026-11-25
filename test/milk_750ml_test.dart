@@ -58,7 +58,7 @@ void main() {
       expect(litresText(750), '0.75 L');
     });
 
-    test('adding plans that make x.25 L is not merged', () {
+    test('adding subscriptions that make x.25 L is not merged', () {
       final changes = planNewSubscription([plan('a', 750)], plan('new', 500));
       expect(changes.isPossible, isFalse);
       expect(changes.shifts.single.kind, ShiftMergeKind.unpackable);
@@ -99,7 +99,7 @@ void main() {
           'start_date': start.toIso8601String(),
         });
 
-    test('v16 to v17 keeps plans and allows 750 ml', () async {
+    test('v16 to v17 keeps subscriptions and allows 750 ml', () async {
       // Build today's database, then put back the v16 schedules
       // table (500 ml steps only), as on a phone before this update.
       await MilkDatabaseService.instance.database;

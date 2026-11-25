@@ -210,7 +210,7 @@ class _TomorrowMilkCardState extends State<TomorrowMilkCard> {
             const Padding(
               padding: EdgeInsets.only(bottom: 6),
               child: Text(
-                'No milk tomorrow on this plan.',
+                'No milk tomorrow on this subscription.',
                 style: TextStyle(color: Colors.black54),
               ),
             )

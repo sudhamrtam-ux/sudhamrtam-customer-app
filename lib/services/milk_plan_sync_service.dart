@@ -102,15 +102,15 @@ class MilkPlanSyncService extends ChangeNotifier {
       final leftOut = await manager.syncWithServer();
       message = leftOut == 0
           ? null
-          : 'Your account already had a plan for the same milk and shift, '
+          : 'Your account already had a subscription for the same milk and shift, '
                 'so $leftOut ${leftOut == 1 ? 'delivery' : 'deliveries'} '
                 'from this phone ${leftOut == 1 ? 'was' : 'were'} not added. '
-                'Edit your plan if you need more milk.';
+                'Edit your subscription if you need more milk.';
     } on MilkPlanSyncException catch (error) {
       message = error.message;
       if (error.unauthorized) await auth?.signOut();
     } catch (error) {
-      message = 'Your milk plans could not be updated: $error';
+      message = 'Your subscriptions could not be updated: $error';
     }
     notifyListeners();
   }

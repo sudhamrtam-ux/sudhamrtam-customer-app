@@ -254,7 +254,7 @@ void main() {
     });
   }
 
-  testWidgets('a computer: milk plans in two columns', (tester) async {
+  testWidgets('a computer: subscriptions in two columns', (tester) async {
     await pumpShell(tester, const Size(1440, 900));
     await tester.tap(find.byKey(const Key('site-nav-2')));
     await tester.pumpAndSettle();
@@ -263,7 +263,7 @@ void main() {
     expect(find.byKey(const Key('startPlan-Cow Milk')), findsOneWidget);
     expect(find.byKey(const Key('deliveryOptions')), findsOneWidget);
     // One page, one heading: no second bar.
-    expect(find.text('Milk Plan'), findsNothing);
+    expect(find.text('Subscription'), findsNothing);
     await closeShell(tester);
   });
 

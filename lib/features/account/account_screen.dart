@@ -299,7 +299,7 @@ class AccountScreen extends StatelessWidget {
           _buildAccountTile(
             icon: Icons.description_outlined,
             title: 'Terms of Use',
-            subtitle: 'Orders, milk plans, bills and payments',
+            subtitle: 'Orders, subscriptions, bills and payments',
             onTap: () => _openPage(context, sudhamrtamTermsUrl),
           ),
 

@@ -200,19 +200,20 @@ class MilkPlanApiClient implements MilkPlanRemote {
     }
     if (status == 401) {
       throw const MilkPlanSyncException(
-        'Please sign in again to change your milk plan.',
+        'Please sign in again to change your subscription.',
         unauthorized: true,
       );
     }
     final code = json?['error'] as String?;
     if (status >= 400 && status < 500 && code != null) {
       throw MilkPlanSyncException(
-        json?['message'] as String? ?? 'Sudhamrtam could not save this plan.',
+        json?['message'] as String? ??
+            'Sudhamrtam could not save this subscription.',
         code: code,
       );
     }
     throw MilkPlanSyncException(
-      'Sudhamrtam could not save your milk plan right now (error $status). '
+      'Sudhamrtam could not save your subscription right now (error $status). '
       'Please try again.',
     );
   }
@@ -225,7 +226,7 @@ class MilkPlanApiClient implements MilkPlanRemote {
     final token = _token();
     if (token == null) {
       throw const MilkPlanSyncException(
-        'Please sign in to change your milk plan.',
+        'Please sign in to change your subscription.',
         unauthorized: true,
       );
     }
@@ -243,12 +244,12 @@ class MilkPlanApiClient implements MilkPlanRemote {
       ).timeout(timeout);
     } on TimeoutException {
       throw const MilkPlanSyncException(
-        'Sudhamrtam did not respond. Your milk plan was not changed; '
+        'Sudhamrtam did not respond. Your subscription was not changed; '
         'please try again.',
       );
     } catch (_) {
       throw const MilkPlanSyncException(
-        'No internet connection. Your milk plan was not changed; '
+        'No internet connection. Your subscription was not changed; '
         'please try again.',
       );
     }

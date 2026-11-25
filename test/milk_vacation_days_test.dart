@@ -53,7 +53,7 @@ void main() {
       );
     });
 
-    test('the plan knows its days', () {
+    test('the subscription knows its days', () {
       final p = plan('a', vacation: [nov(10), nov(11), nov(15)]);
       expect(p.vacationDaysFrom(today), [nov(11), nov(15)]);
       expect(p.isVacationDay(today), isTrue);
@@ -276,21 +276,24 @@ void main() {
       );
     });
 
-    test('v17 to v18 keeps plans and adds empty vacation days', () async {
-      await MilkSubscriptionRepository().saveSubscription(plan('a'));
-      await MilkDatabaseService.instance.close();
-      final old = await databaseFactoryFfi.openDatabase(path);
-      await old.execute(
-        'ALTER TABLE milk_subscriptions DROP COLUMN vacation_dates',
-      );
-      await old.setVersion(17);
-      await old.close();
+    test(
+      'v17 to v18 keeps subscriptions and adds empty vacation days',
+      () async {
+        await MilkSubscriptionRepository().saveSubscription(plan('a'));
+        await MilkDatabaseService.instance.close();
+        final old = await databaseFactoryFfi.openDatabase(path);
+        await old.execute(
+          'ALTER TABLE milk_subscriptions DROP COLUMN vacation_dates',
+        );
+        await old.setVersion(17);
+        await old.close();
 
-      final db = await MilkDatabaseService.instance.database;
-      expect(await db.getVersion(), MilkDatabaseService.databaseVersion);
-      final loaded = await MilkSubscriptionRepository().loadSubscriptions();
-      expect(loaded.single.id, 'a');
-      expect(loaded.single.vacationDates, isEmpty);
-    });
+        final db = await MilkDatabaseService.instance.database;
+        expect(await db.getVersion(), MilkDatabaseService.databaseVersion);
+        final loaded = await MilkSubscriptionRepository().loadSubscriptions();
+        expect(loaded.single.id, 'a');
+        expect(loaded.single.vacationDates, isEmpty);
+      },
+    );
   });
 }

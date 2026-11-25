@@ -63,7 +63,7 @@ AccountStatus accountStatusFor(List<MilkSubscription> plans, DateTime today) {
     return const AccountStatus(
       AccountState.inactive,
       'Inactive',
-      'No milk plan yet. Start one for fresh milk at your door.',
+      'No subscription yet. Start one for fresh milk at your door.',
     );
   }
   final waiting = [
@@ -78,7 +78,7 @@ AccountStatus accountStatusFor(List<MilkSubscription> plans, DateTime today) {
     return const AccountStatus(
       AccountState.waiting,
       'Waiting for approval',
-      'Sudhamrtam will check your new milk plan. Milk starts once it '
+      'Sudhamrtam will check your new subscription. Milk starts once it '
           'is approved.',
     );
   }
@@ -143,7 +143,7 @@ AccountStatus accountStatusFor(List<MilkSubscription> plans, DateTime today) {
   return const AccountStatus(
     AccountState.paused,
     'Paused',
-    'No milk is coming. Tap to resume in Milk Plan.',
+    'No milk is coming. Tap to resume in Subscriptions.',
   );
 }
 
@@ -192,7 +192,7 @@ class AccountStatusCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Milk plan',
+                        'Subscription',
                         style: TextStyle(
                           fontSize: 11,
                           color: status.color,
@@ -246,7 +246,7 @@ class AccountStatusCard extends StatelessWidget {
                       Icon(status.icon, color: status.color, size: 18),
                       const SizedBox(width: 6),
                       Text(
-                        'Milk plan: ',
+                        'Subscription: ',
                         style: TextStyle(
                           color: status.color,
                           fontWeight: FontWeight.w500,

@@ -61,7 +61,7 @@ String _line(ShiftMergeOutcome outcome) {
 
   switch (outcome.kind) {
     case ShiftMergeKind.newPlan:
-      return '$shift: ${litresText(outcome.addedMl)} $days, as a separate plan';
+      return '$shift: ${litresText(outcome.addedMl)} $days, as a separate subscription';
     case ShiftMergeKind.addQuantity:
       return '$shift: ${litresText(outcome.existingMl)} → '
           '${litresText(outcome.resultMl)} $days';
@@ -78,7 +78,7 @@ String _line(ShiftMergeOutcome outcome) {
           '${litresText(outcome.existingMl + outcome.addedMl)}, which we '
           'cannot pack (we deliver 1 L, 500 ml and 750 ml packets).';
     case ShiftMergeKind.differentStatus:
-      return '$shift: one plan is paused and the other is active.';
+      return '$shift: one subscription is paused and the other is active.';
   }
 }
 
@@ -111,7 +111,7 @@ Future<AddToPlanChoice> showAddToPlanDialog(
           children: [
             Text(
               changes.isPossible
-                  ? 'Each shift has one $name plan, so this is added to '
+                  ? 'Each shift has one $name subscription, so this is added to '
                         'your existing delivery:'
                   : 'This cannot be added to your existing delivery:',
             ),
@@ -129,8 +129,8 @@ Future<AddToPlanChoice> showAddToPlanDialog(
               changes.isPossible
                   ? 'The new quantity starts with your next delivery.'
                         '${pausedShifts.isEmpty ? '' : ' Your ${pausedShifts.join(' and ')} '
-                                  'plan is paused and stays paused until you resume it.'}'
-                  : 'You can edit that plan to change its quantity or '
+                                  'subscription is paused and stays paused until you resume it.'}'
+                  : 'You can edit that subscription to change its quantity or '
                         'delivery days.',
               style: const TextStyle(color: Colors.black54),
             ),
@@ -148,7 +148,11 @@ Future<AddToPlanChoice> showAddToPlanDialog(
           onPressed: () => Navigator.of(context).pop(
             changes.isPossible ? AddToPlanChoice.add : AddToPlanChoice.edit,
           ),
-          child: Text(changes.isPossible ? 'Add to my plan' : 'Edit my plan'),
+          child: Text(
+            changes.isPossible
+                ? 'Add to my subscription'
+                : 'Edit my subscription',
+          ),
         ),
       ],
     ),

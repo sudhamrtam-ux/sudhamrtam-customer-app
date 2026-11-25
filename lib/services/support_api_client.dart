@@ -31,7 +31,7 @@ class SupportException implements Exception {
 /// What a query can be about, in the order shown.
 const supportTopics = <String, String>{
   'order': 'An order',
-  'milk_plan': 'Milk plan',
+  'milk_plan': 'Subscription',
   'bill': 'Milk bill',
   'delivery': 'Delivery',
   'payment': 'Payment',

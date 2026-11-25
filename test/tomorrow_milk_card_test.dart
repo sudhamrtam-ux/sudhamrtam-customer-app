@@ -112,11 +112,13 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('skip tomorrow and undo; plans refreshed', (tester) async {
+  testWidgets('skip tomorrow and undo; subscriptions refreshed', (
+    tester,
+  ) async {
     await pump(tester);
     await tester.tap(find.byKey(const Key('tomorrowSkip-a1')));
     await tester.pumpAndSettle();
-    expect(find.text('No milk tomorrow on this plan.'), findsOneWidget);
+    expect(find.text('No milk tomorrow on this subscription.'), findsOneWidget);
     expect(find.text('Undo skip'), findsOneWidget);
     expect(refreshed, 1);
     await tester.tap(find.byKey(const Key('tomorrowSkip-a1')));

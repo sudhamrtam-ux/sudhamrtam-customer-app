@@ -352,11 +352,7 @@ class _MapLocationBodyState extends State<_MapLocationBody> {
               child: SizedBox(
                 key: const Key('mapPinView'),
                 height: 260,
-                child: mapBuilder(
-                  context,
-                  pin,
-                  enabled ? _move : (_) {},
-                ),
+                child: mapBuilder(context, pin, enabled ? _move : (_) {}),
               ),
             ),
             if (pin == null)

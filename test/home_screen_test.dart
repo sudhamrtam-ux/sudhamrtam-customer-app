@@ -174,7 +174,7 @@ void main() {
     await finish(tester);
   });
 
-  testWidgets('shortcuts open the shop, a category and the milk plan', (
+  testWidgets('shortcuts open the shop, a category and the subscription', (
     tester,
   ) async {
     final opened = <String?>[];

@@ -807,9 +807,12 @@ Future<Uint8List> buildBillPdf(
                             ),
                           ]),
                           pw.SizedBox(width: 10),
-                          box('Milk plan', [
+                          box('Subscription', [
                             if (plans.isEmpty)
-                              pw.Text('No milk plan this month.', style: small)
+                              pw.Text(
+                                'No subscription this month.',
+                                style: small,
+                              )
                             else
                               for (final p in plans)
                                 kv(
@@ -826,7 +829,7 @@ Future<Uint8List> buildBillPdf(
                                   : billPdfLongDate(startDates.first),
                               width: 70,
                             ),
-                            kv('Plan status', planStatus, width: 70),
+                            kv('Subscription status', planStatus, width: 70),
                           ]),
                         ],
                       ),

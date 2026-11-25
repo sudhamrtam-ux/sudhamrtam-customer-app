@@ -66,8 +66,8 @@ const m = MilkDeliveryShift.morning;
 const e = MilkDeliveryShift.evening;
 
 void main() {
-  group('a new plan: one plan per milk and shift', () {
-    test('same shift and days: added to the existing plan', () {
+  group('a new subscription: one subscription per milk and shift', () {
+    test('same shift and days: added to the existing subscription', () {
       final changes = planNewSubscription([
         plan('a', [morning(1000)]),
       ], plan('new', [morning(500)]));
@@ -80,7 +80,7 @@ void main() {
       expect(changes.saves.single.shiftSchedules.single.startDate, start);
     });
 
-    test('another shift stays a separate plan', () {
+    test('another shift stays a separate subscription', () {
       final changes = planNewSubscription([
         plan('a', [morning(1000)]),
       ], plan('new', [evening(500)]));
@@ -90,18 +90,21 @@ void main() {
       expect(shifts(changes.saves.single), [(e, 500)]);
     });
 
-    test('morning + evening: morning merges, evening is a new plan', () {
-      final changes = planNewSubscription([
-        plan('a', [morning(1000)]),
-      ], plan('new', [morning(500), evening(500)]));
+    test(
+      'morning + evening: morning merges, evening is a new subscription',
+      () {
+        final changes = planNewSubscription([
+          plan('a', [morning(1000)]),
+        ], plan('new', [morning(500), evening(500)]));
 
-      expect(changes.saves.map((p) => d(p.id, shifts(p))), [
-        d('a', [(m, 1500)]),
-        d('new', [(e, 500)]),
-      ]);
-    });
+        expect(changes.saves.map((p) => d(p.id, shifts(p))), [
+          d('a', [(m, 1500)]),
+          d('new', [(e, 500)]),
+        ]);
+      },
+    );
 
-    test('each shift merges into the plan that delivers it', () {
+    test('each shift merges into the subscription that delivers it', () {
       final changes = planNewSubscription([
         plan('a', [morning(1000)]),
         plan('b', [evening(1000)]),
@@ -137,8 +140,8 @@ void main() {
     });
   });
 
-  group('existing plans sharing a shift', () {
-    test('the shared shift merges; the other shift keeps its plan', () {
+  group('existing subscriptions sharing a shift', () {
+    test('the shared shift merges; the other shift keeps its subscription', () {
       final changes = combineSharedShifts([
         plan('a', [morning(1000)]),
         plan('b', [morning(500), evening(500)]),
@@ -152,7 +155,7 @@ void main() {
       expect(changes.cancelIds, isEmpty);
     });
 
-    test('a plan left without shifts is cancelled', () {
+    test('a subscription left without shifts is cancelled', () {
       final changes = combineSharedShifts([
         plan('a', [morning(1000)]),
         plan('b', [morning(500)]),
@@ -164,7 +167,7 @@ void main() {
       expect(changes.cancelIds, ['b']);
     });
 
-    test('separate morning and evening plans are fine', () {
+    test('separate morning and evening subscriptions are fine', () {
       expect(
         combineSharedShifts([
           plan('a', [morning(1000)]),
@@ -174,15 +177,18 @@ void main() {
       );
     });
 
-    test('a paused and an active plan are not merged automatically', () {
-      final changes = combineSharedShifts([
-        plan('a', [morning(1000)]),
-        plan('b', [morning(500)], status: MilkSubscriptionStatus.paused),
-      ])!;
+    test(
+      'a paused and an active subscription are not merged automatically',
+      () {
+        final changes = combineSharedShifts([
+          plan('a', [morning(1000)]),
+          plan('b', [morning(500)], status: MilkSubscriptionStatus.paused),
+        ])!;
 
-      expect(changes.isPossible, isFalse);
-      expect(changes.shifts.single.kind, ShiftMergeKind.differentStatus);
-    });
+        expect(changes.isPossible, isFalse);
+        expect(changes.shifts.single.kind, ShiftMergeKind.differentStatus);
+      },
+    );
   });
 
   group('same delivery days', () {
@@ -265,23 +271,35 @@ void main() {
       return manager;
     }
 
-    test('a second plan for the same milk and shift is refused', () async {
-      final manager = MilkSubscriptionManager();
-      expect(await manager.addSubscription(plan('a', [morning(1000)])), isTrue);
+    test(
+      'a second subscription for the same milk and shift is refused',
+      () async {
+        final manager = MilkSubscriptionManager();
+        expect(
+          await manager.addSubscription(plan('a', [morning(1000)])),
+          isTrue,
+        );
 
-      expect(await manager.addSubscription(plan('b', [morning(500)])), isFalse);
-      // Another shift, or another milk, is a separate plan.
-      expect(await manager.addSubscription(plan('c', [evening(500)])), isTrue);
-      expect(
-        await manager.addSubscription(
-          plan('d', [morning(500)], productId: 'buffalo_milk'),
-        ),
-        isTrue,
-      );
-      expect(manager.subscriptionCount, 3);
-    });
+        expect(
+          await manager.addSubscription(plan('b', [morning(500)])),
+          isFalse,
+        );
+        // Another shift, or another milk, is a separate plan.
+        expect(
+          await manager.addSubscription(plan('c', [evening(500)])),
+          isTrue,
+        );
+        expect(
+          await manager.addSubscription(
+            plan('d', [morning(500)], productId: 'buffalo_milk'),
+          ),
+          isTrue,
+        );
+        expect(manager.subscriptionCount, 3);
+      },
+    );
 
-    test('a mixed new plan is saved in one step', () async {
+    test('a mixed new subscription is saved in one step', () async {
       final manager = MilkSubscriptionManager();
       await manager.addSubscription(plan('a', [morning(1000)]));
 
@@ -295,7 +313,7 @@ void main() {
       expect(manager.plansFor('cow_milk'), hasLength(2));
     });
 
-    test('an edit cannot add a shift another plan delivers', () async {
+    test('an edit cannot add a shift another subscription delivers', () async {
       final manager = MilkSubscriptionManager();
       await manager.addSubscription(plan('a', [morning(1000)]));
       await manager.addSubscription(plan('b', [evening(500)]));
@@ -331,7 +349,7 @@ void main() {
       expect(b.status, MilkSubscriptionStatus.active);
     });
 
-    test('a plan with nothing left is cancelled', () async {
+    test('a subscription with nothing left is cancelled', () async {
       final manager = await loaded([
         plan('a', [morning(1000)]),
         plan('b', [morning(500)]),
@@ -342,7 +360,7 @@ void main() {
       expect((await reload('b')).status, MilkSubscriptionStatus.cancelled);
     });
 
-    test('plans that cannot merge are left unchanged', () async {
+    test('subscriptions that cannot merge are left unchanged', () async {
       final manager = await loaded([
         plan('a', [morning(1000)]),
         plan('b', [
@@ -355,7 +373,7 @@ void main() {
       expect((await reload('b')).status, MilkSubscriptionStatus.active);
     });
 
-    test('plans come back after the app restarts', () async {
+    test('subscriptions come back after the app restarts', () async {
       final before = MilkSubscriptionManager();
       await before.addSubscription(
         plan('a', [morning(1000)], productId: 'buffalo_milk'),
@@ -425,7 +443,9 @@ void main() {
       }
     }
 
-    testWidgets('a second morning Cow Milk plan asks to merge', (tester) async {
+    testWidgets('a second morning Cow Subscription asks to merge', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(1080, 6000);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
@@ -477,7 +497,9 @@ void main() {
       expect(shifts(plans.single), [(m, 2000)]);
     });
 
-    testWidgets('the plan list offers to merge shared shifts', (tester) async {
+    testWidgets('the subscription list offers to merge shared shifts', (
+      tester,
+    ) async {
       final plans = [
         plan('a', [morning(1000)]),
         plan('b', [morning(500), evening(500)]),
@@ -495,7 +517,7 @@ void main() {
       );
 
       expect(
-        find.text('Two Cow Milk plans deliver in the same shift'),
+        find.text('Two Cow Milk subscriptions deliver in the same shift'),
         findsOneWidget,
       );
       expect(
@@ -539,7 +561,9 @@ void main() {
       );
     });
 
-    testWidgets('morning and evening plans share one card', (tester) async {
+    testWidgets('morning and evening subscriptions share one card', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(1080, 4000);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);

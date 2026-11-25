@@ -189,7 +189,7 @@ class _CustomerShellState extends State<CustomerShell> {
           ),
           const NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),
-            label: 'Milk Plan',
+            label: 'Subscriptions',
           ),
           NavigationDestination(
             // Shows how many items are in the cart.

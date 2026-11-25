@@ -40,10 +40,7 @@ void main() {
     tester,
   ) async {
     await pump(tester, 'curd');
-    expect(
-      tester.widget<Image>(find.byType(Image)).image,
-      isA<AssetImage>(),
-    );
+    expect(tester.widget<Image>(find.byType(Image)).image, isA<AssetImage>());
 
     productPhotoUrls = {
       'curd': 'https://api.test/v1/products/curd/photo?v=2',

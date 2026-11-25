@@ -35,7 +35,7 @@ class MilkPlanScreen extends StatelessWidget {
   Widget _startPlan(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      _sectionTitle(context, 'Start a new plan'),
+      _sectionTitle(context, 'Start a new subscription'),
       IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -67,7 +67,7 @@ class MilkPlanScreen extends StatelessWidget {
   Widget _myPlans(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      _sectionTitle(context, 'My milk plans'),
+      _sectionTitle(context, 'My subscriptions'),
       ListenableBuilder(
         listenable: sudhamrtamMilkSync,
         builder: (context, _) {
@@ -116,7 +116,7 @@ class MilkPlanScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'No milk plans yet',
+                          'No subscriptions yet',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                         SizedBox(height: 2),
@@ -211,7 +211,7 @@ class MilkPlanScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Milk Plans',
+          'Subscriptions',
           style: Theme.of(context).textTheme.headlineSmall
               ?.copyWith(fontWeight: FontWeight.bold),
         ),
@@ -498,7 +498,7 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
               onPressed: () {
                 Navigator.of(dialogContext).pop(false);
               },
-              child: const Text('Keep Plan'),
+              child: const Text('Keep Subscription'),
             ),
             TextButton(
               onPressed: () {
@@ -585,7 +585,7 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Text(
-              'Waiting for approval · Sudhamrtam will check your plan. '
+              'Waiting for approval · Sudhamrtam will check your subscription. '
               'Milk starts once it is approved.',
               style: TextStyle(
                 color: Color(0xFF6A1B9A),
@@ -754,7 +754,7 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
                       ? null
                       : () => _editSubscription(context),
                   icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const FittedBox(child: Text('Edit plan')),
+                  label: const FittedBox(child: Text('Edit subscription')),
                   style: FilledButton.styleFrom(
                     backgroundColor: brandGreen,
                     foregroundColor: Colors.white,
@@ -995,7 +995,7 @@ class _MilkProductCard extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            'Start plan',
+                            'Start subscription',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -1113,7 +1113,7 @@ class _DuplicatePlansBannerState extends State<DuplicatePlansBanner> {
         content: Text(
           ok
               ? 'Merged your ${milkName(widget.group.productId)} deliveries.'
-              : failure ?? 'The plans could not be combined. Please try again.',
+              : failure ?? 'The subscriptions could not be combined. Please try again.',
         ),
       ),
     );
@@ -1137,13 +1137,13 @@ class _DuplicatePlansBannerState extends State<DuplicatePlansBanner> {
 
     final detail = group.canCombine
         ? [
-            'Merge the $shared deliveries? Each shift keeps one plan.',
+            'Merge the $shared deliveries? Each shift keeps one subscription.',
             ...mergeLines(group.changes),
           ].join('\n')
         : [
             ...mergeLines(group.changes),
             'Please edit or cancel one of them, so each shift has one '
-                '$name plan.',
+                '$name subscription.',
           ].join('\n');
 
     return Container(
@@ -1159,8 +1159,8 @@ class _DuplicatePlansBannerState extends State<DuplicatePlansBanner> {
         children: [
           Text(
             group.plans.length == 2
-                ? 'Two $name plans deliver in the same shift'
-                : '${group.plans.length} $name plans deliver in the same shift',
+                ? 'Two $name subscriptions deliver in the same shift'
+                : '${group.plans.length} $name subscriptions deliver in the same shift',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 4),
@@ -1403,7 +1403,7 @@ class _CancelledPlans extends StatelessWidget {
       key: const Key('cancelledPlans'),
       tilePadding: EdgeInsets.zero,
       title: Text(
-        'Cancelled plans (${plans.length})',
+        'Cancelled subscriptions (${plans.length})',
         style: const TextStyle(color: Colors.black54),
       ),
       children: [

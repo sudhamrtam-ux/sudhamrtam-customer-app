@@ -89,7 +89,7 @@ class FakeServer implements MilkPlanRemote {
       for (final s in p.shiftSchedules) {
         if (!seen.add('${p.productId}:${s.shift.name}')) {
           throw const MilkPlanSyncException(
-            'Another plan already delivers this milk in this shift.',
+            'Another subscription already delivers this milk in this shift.',
             code: 'SHIFT_ALREADY_PLANNED',
           );
         }
@@ -143,7 +143,7 @@ Future<void> eventually(bool Function() done) async {
 
 void main() {
   group('server format', () {
-    test('a plan survives the trip to the server and back', () {
+    test('a subscription survives the trip to the server and back', () {
       final original = MilkSubscription(
         id: 'p1',
         productId: 'cow_milk',
@@ -251,7 +251,7 @@ void main() {
       expect(rejected.rejectReason, 'We do not deliver there yet.');
     });
 
-    test('a cancelled plan from the server keeps its cancel date', () {
+    test('a cancelled subscription from the server keeps its cancel date', () {
       final back = MilkPlanApiClient.planFromJson({
         ...MilkPlanApiClient.planToJson(
           plan('p3', [morning(500)], status: MilkSubscriptionStatus.cancelled),
@@ -389,54 +389,62 @@ void main() {
       expect(summary(manager.subscriptions), ['x active morning:1000']);
     });
 
-    test('phone-only plans are uploaded; the account wins per shift', () async {
-      // On the phone (made before signing in), oldest first.
-      final repository = MilkSubscriptionRepository();
-      await repository.saveSubscription(plan('p1', [morning(1000)]));
-      await repository.saveSubscription(plan('p2', [morning(500)]));
-      await repository.saveSubscription(
-        plan('p3', [evening(500)], productId: 'cow_milk'),
-      );
-      await repository.saveSubscription(
-        plan('gone', [evening(1000)], status: MilkSubscriptionStatus.cancelled),
-      );
-      // The account already has a Cow Milk evening plan.
-      server.plans['s1'] = plan('s1', [evening(1000)], productId: 'cow_milk');
+    test(
+      'phone-only subscriptions are uploaded; the account wins per shift',
+      () async {
+        // On the phone (made before signing in), oldest first.
+        final repository = MilkSubscriptionRepository();
+        await repository.saveSubscription(plan('p1', [morning(1000)]));
+        await repository.saveSubscription(plan('p2', [morning(500)]));
+        await repository.saveSubscription(
+          plan('p3', [evening(500)], productId: 'cow_milk'),
+        );
+        await repository.saveSubscription(
+          plan('gone', [
+            evening(1000),
+          ], status: MilkSubscriptionStatus.cancelled),
+        );
+        // The account already has a Cow Milk evening plan.
+        server.plans['s1'] = plan('s1', [evening(1000)], productId: 'cow_milk');
 
-      final manager = MilkSubscriptionManager();
-      await manager.restoreSavedSubscriptions();
-      manager.remote = server;
+        final manager = MilkSubscriptionManager();
+        await manager.restoreSavedSubscriptions();
+        manager.remote = server;
 
-      final leftOut = await manager.syncWithServer();
+        final leftOut = await manager.syncWithServer();
 
-      // p2 duplicates p1's morning; p3 duplicates the account's
-      // evening: both left out, quantities never added.
-      expect(leftOut, 2);
-      expect(summary(server.plans.values), [
-        's1 active evening:1000',
-        'p1 active morning:1000',
-      ]);
-      expect(await onPhone(), unorderedEquals(summary(server.plans.values)));
-    });
+        // p2 duplicates p1's morning; p3 duplicates the account's
+        // evening: both left out, quantities never added.
+        expect(leftOut, 2);
+        expect(summary(server.plans.values), [
+          's1 active evening:1000',
+          'p1 active morning:1000',
+        ]);
+        expect(await onPhone(), unorderedEquals(summary(server.plans.values)));
+      },
+    );
 
-    test('plans made offline are uploaded before the next change', () async {
-      final repository = MilkSubscriptionRepository();
-      await repository.saveSubscription(plan('offline', [morning(1000)]));
+    test(
+      'subscriptions made offline are uploaded before the next change',
+      () async {
+        final repository = MilkSubscriptionRepository();
+        await repository.saveSubscription(plan('offline', [morning(1000)]));
 
-      final manager = MilkSubscriptionManager();
-      await manager.restoreSavedSubscriptions();
-      manager.remote = server; // signed in, not synced yet
+        final manager = MilkSubscriptionManager();
+        await manager.restoreSavedSubscriptions();
+        manager.remote = server; // signed in, not synced yet
 
-      await manager.addSubscription(plan('new', [evening(500)]));
+        await manager.addSubscription(plan('new', [evening(500)]));
 
-      expect(server.calls.first, 'fetch');
-      expect(summary(server.plans.values), [
-        'offline active morning:1000',
-        'new active evening:500',
-      ]);
-    });
+        expect(server.calls.first, 'fetch');
+        expect(summary(server.plans.values), [
+          'offline active morning:1000',
+          'new active evening:500',
+        ]);
+      },
+    );
 
-    test('loading saved plans after a mirror does not fail', () async {
+    test('loading saved subscriptions after a mirror does not fail', () async {
       server.plans['s'] = plan('s', [morning(1000)]);
       final manager = MilkSubscriptionManager()..remote = server;
       await manager.syncWithServer();
@@ -445,7 +453,7 @@ void main() {
       expect(summary(manager.subscriptions), ['s active morning:1000']);
     });
 
-    test('sign-out removes the plans from the phone only', () async {
+    test('sign-out removes the subscriptions from the phone only', () async {
       final auth = FakeAuth();
       final manager = MilkSubscriptionManager();
       final sync = MilkPlanSyncService(
@@ -468,7 +476,7 @@ void main() {
       sync.dispose();
     });
 
-    test('a phone that was never signed in keeps its plans', () async {
+    test('a phone that was never signed in keeps its subscriptions', () async {
       final auth = FakeAuth();
       final manager = MilkSubscriptionManager();
       await manager.addSubscription(plan('a', [morning(1000)]));
@@ -526,7 +534,7 @@ void main() {
       sync.dispose();
     });
 
-    test('the sync explains plans that were left out', () async {
+    test('the sync explains subscriptions that were left out', () async {
       final repository = MilkSubscriptionRepository();
       await repository.saveSubscription(plan('p', [morning(500)]));
       server.plans['s'] = plan('s', [morning(1000)]);
