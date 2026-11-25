@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/combo_offer.dart';
@@ -136,7 +137,10 @@ class OrderRules {
 
   double get minimumOrderRupees => minimumOrderPaise / 100;
 
-  bool get offersOnlinePayment => paymentMethods.contains('online');
+  /// Cashfree's checkout works on phones and the website, not in the
+  /// Windows app (2026-11-25): there it is Cash on Delivery.
+  bool get offersOnlinePayment =>
+      paymentMethods.contains('online') && onlinePaymentWorksHere;
 
   /// The delivery date for an order placed at [now] (India time):
   /// tomorrow before the cut-off, otherwise the day after.
@@ -451,3 +455,10 @@ class OrderApiClient {
     );
   }
 }
+
+/// Whether this device can open Cashfree's checkout: phones and the
+/// website, not the Windows desktop app.
+bool get onlinePaymentWorksHere =>
+    kIsWeb ||
+    defaultTargetPlatform == TargetPlatform.android ||
+    defaultTargetPlatform == TargetPlatform.iOS;

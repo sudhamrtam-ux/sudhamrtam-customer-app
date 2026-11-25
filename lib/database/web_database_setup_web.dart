@@ -5,6 +5,6 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 /// (IndexedDB) by `sqflite_common_ffi_web`. It needs
 /// `web/sqlite3.wasm` and `web/sqflite_sw.js`
 /// (`dart run sqflite_common_ffi_web:setup`).
-void useWebDatabaseIfNeeded() {
+Future<void> useWebDatabaseIfNeeded() async {
   databaseFactory = databaseFactoryFfiWeb;
 }

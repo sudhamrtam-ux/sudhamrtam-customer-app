@@ -40,6 +40,15 @@ class CashfreePaymentLauncher implements PaymentLauncher {
   @override
   Future<PaymentLaunchResult> launch(PaymentSession session) {
     if (kIsWeb) return launchWebCheckout(session);
+    if (!onlinePaymentWorksHere) {
+      // The Windows app has no Cashfree checkout.
+      return Future.value(
+        const PaymentLaunchFailed(
+          'Online payment works in the Sudhamrtam phone app and on '
+          'sudhamrtam.in. Please pay there, or pay the staff in cash.',
+        ),
+      );
+    }
     final completer = Completer<PaymentLaunchResult>();
 
     try {

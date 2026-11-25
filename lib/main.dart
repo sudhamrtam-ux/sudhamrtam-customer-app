@@ -31,8 +31,9 @@ import 'services/support_api_client.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // The website keeps the app's SQLite database in the browser.
-  useWebDatabaseIfNeeded();
+  // The website keeps the app's SQLite database in the browser; the
+  // Windows app in its own folder.
+  await useWebDatabaseIfNeeded();
 
   // The opening animation (owner, 2026-11-17) plays first, while the
   // app gets ready below; the app opens when both are done.
@@ -111,9 +112,13 @@ Future<void> main() async {
     }
 
     // Phone notifications (Firebase): optional; the app works
-    // without them. Not on the website.
+    // without them. Phones only: not the website or Windows.
     final auth = sudhamrtamAuth;
-    if (auth is ApiPhoneAuthGateway && !kIsWeb) {
+    final phone =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+    if (auth is ApiPhoneAuthGateway && phone) {
       try {
         final push = PushNotifications(
           platform: await FirebasePushPlatform.start(),
