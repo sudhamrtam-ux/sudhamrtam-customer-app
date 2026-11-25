@@ -33,9 +33,24 @@ class MilkBillMilk {
     required this.productName,
     required this.quantityMl,
     required this.amountPaise,
+    this.measure = 'litre',
+    this.unitLabel,
   });
 
+  /// 'pack': [quantityMl] counts packs of [unitLabel] (step 5).
+  final String measure;
+  final String? unitLabel;
+
+  bool get isPack => measure == 'pack';
+
+  /// "1.50 L" or "2 × 500 g".
+  String get amountText => isPack
+      ? '$quantityMl × ${unitLabel ?? 'pack'}'
+      : '${(quantityMl / 1000).toStringAsFixed(2)} L';
+
   factory MilkBillMilk.fromJson(Map<String, dynamic> json) => MilkBillMilk(
+    measure: json['measure'] as String? ?? 'litre',
+    unitLabel: json['unit_label'] as String?,
     productName: json['product_name'] as String,
     quantityMl: json['quantity_ml'] as int,
     amountPaise: json['amount_paise'] as int,
@@ -58,9 +73,24 @@ class MilkBillLine {
     required this.quantityMl,
     required this.unitPricePaise,
     required this.amountPaise,
+    this.measure = 'litre',
+    this.unitLabel,
   });
 
+  /// 'pack': [quantityMl] counts packs of [unitLabel] (step 5).
+  final String measure;
+  final String? unitLabel;
+
+  bool get isPack => measure == 'pack';
+
+  /// "1.50 L" or "2 × 500 g".
+  String get amountText => isPack
+      ? '$quantityMl × ${unitLabel ?? 'pack'}'
+      : '${(quantityMl / 1000).toStringAsFixed(2)} L';
+
   factory MilkBillLine.fromJson(Map<String, dynamic> json) => MilkBillLine(
+    measure: json['measure'] as String? ?? 'litre',
+    unitLabel: json['unit_label'] as String?,
     deliveryDate: json['delivery_date'] as String,
     shift: json['shift'] as String,
     productName: json['product_name'] as String,
@@ -203,10 +233,25 @@ class MilkDeliveryItem {
     required this.quantityMl,
     required this.unitPricePaise,
     required this.amountPaise,
+    this.measure = 'litre',
+    this.unitLabel,
   });
+
+  /// 'pack': [quantityMl] counts packs of [unitLabel] (step 5).
+  final String measure;
+  final String? unitLabel;
+
+  bool get isPack => measure == 'pack';
+
+  /// "1.50 L" or "2 × 500 g".
+  String get amountText => isPack
+      ? '$quantityMl × ${unitLabel ?? 'pack'}'
+      : '${(quantityMl / 1000).toStringAsFixed(2)} L';
 
   factory MilkDeliveryItem.fromJson(Map<String, dynamic> json) =>
       MilkDeliveryItem(
+        measure: json['measure'] as String? ?? 'litre',
+        unitLabel: json['unit_label'] as String?,
         productName: json['name'] as String,
         quantityMl: json['quantity_ml'] as int,
         unitPricePaise: json['unit_price_paise'] as int?,
@@ -240,7 +285,13 @@ class MilkDelivery {
   bool get isMissed => outcome == 'not_delivered';
   bool get isPaused => outcome == 'paused';
 
-  int get quantityMl => items.fold(0, (sum, i) => sum + i.quantityMl);
+  /// Litres products only, in ml.
+  int get quantityMl =>
+      items.fold(0, (sum, i) => sum + (i.isPack ? 0 : i.quantityMl));
+
+  /// Packs of pack products.
+  int get packs =>
+      items.fold(0, (sum, i) => sum + (i.isPack ? i.quantityMl : 0));
   int get amountPaise => items.fold(0, (sum, i) => sum + i.amountPaise);
 
   factory MilkDelivery.fromJson(Map<String, dynamic> json) => MilkDelivery(
@@ -297,7 +348,7 @@ class MilkDeliveryMonth {
     for (final d in deliveries)
       if (d.isDelivered)
         for (final i in d.items)
-          if (i.unitPricePaise != null) i.unitPricePaise!,
+          if (i.unitPricePaise != null && !i.isPack) i.unitPricePaise!,
   };
 
   factory MilkDeliveryMonth.fromJson(Map<String, dynamic> json) {

@@ -425,8 +425,10 @@ class _DayCell extends StatelessWidget {
       lines = const [];
     } else if (delivered.isNotEmpty) {
       fill = missed ? _missedFill : _deliveredFill;
+      final ml = delivered.fold(0, (s, d) => s + d.quantityMl);
+      final packs = delivered.fold(0, (s, d) => s + d.packs);
       lines = [
-        billLitres(delivered.fold(0, (s, d) => s + d.quantityMl)),
+        ml > 0 ? billLitres(ml) : '$packs pk',
         billRupees(delivered.fold(0, (s, d) => s + d.amountPaise)),
       ];
       textColor = _green;
@@ -553,6 +555,15 @@ class _MonthTotals extends StatelessWidget {
     }
 
     final rates = data.rates.toList()..sort();
+    final packTotals = <String, int>{};
+    for (final d in data.deliveries) {
+      if (!d.isDelivered) continue;
+      for (final i in d.items) {
+        if (!i.isPack) continue;
+        final name = '${i.productName} ${i.unitLabel ?? ''}'.trim();
+        packTotals[name] = (packTotals[name] ?? 0) + i.quantityMl;
+      }
+    }
     final counts = [
       '${data.deliveredCount} delivered',
       if (data.missedCount > 0) '${data.missedCount} missed',
@@ -590,6 +601,8 @@ class _MonthTotals extends StatelessWidget {
           Text(counts, style: const TextStyle(color: Colors.black54)),
           const SizedBox(height: 6),
           row('Total litres', billLitres(data.deliveredMl)),
+          // Pack products (owner request 2026-11-25), by name.
+          for (final e in packTotals.entries) row(e.key, '${e.value} packs'),
           if (rates.isNotEmpty)
             row('Rate', '${rates.map(billRupees).join(', ')} per litre'),
           row(
@@ -649,9 +662,10 @@ class _DeliveryDetail extends StatelessWidget {
           for (final item in delivery.items)
             Text(
               [
-                '${item.productName} ${billLitres(item.quantityMl)}',
+                '${item.productName} ${item.amountText}',
                 if (item.unitPricePaise != null)
-                  '× ${billRupees(item.unitPricePaise!)}/L',
+                  '× ${billRupees(item.unitPricePaise!)}'
+                      '${item.isPack ? '/pack' : '/L'}',
                 if (delivery.isDelivered) '= ${billRupees(item.amountPaise)}',
               ].join(' '),
             ),

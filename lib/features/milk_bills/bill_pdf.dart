@@ -150,6 +150,7 @@ class BillPdfDay {
     this.date,
     this.text, {
     this.ml = 0,
+    this.packs = 0,
     this.missed = false,
     this.paused = false,
   });
@@ -157,6 +158,11 @@ class BillPdfDay {
   final String date;
   final String text;
   final int ml;
+
+  /// Packs of pack products that day (subscriptions step 5).
+  final int packs;
+
+  bool get delivered => ml > 0 || packs > 0;
   final bool missed;
   final bool paused;
 }
@@ -170,9 +176,11 @@ List<BillPdfDay> billPdfDays(Map<String, dynamic> print) {
   final m = int.parse(month.substring(5, 7));
   final days = DateTime.utc(year, m + 1, 0).day;
   final billed = <String, int>{};
+  final packsOn = <String, int>{};
   for (final line in (bill['lines'] as List).cast<Map<String, dynamic>>()) {
     final date = line['delivery_date'] as String;
-    billed[date] = (billed[date] ?? 0) + (line['quantity_ml'] as int);
+    final into = line['measure'] == 'pack' ? packsOn : billed;
+    into[date] = (into[date] ?? 0) + (line['quantity_ml'] as int);
   }
   final deliveries = (print['deliveries'] as List? ?? const [])
       .cast<Map<String, dynamic>>();
@@ -186,7 +194,15 @@ List<BillPdfDay> billPdfDays(Map<String, dynamic> print) {
           return BillPdfDay(date, '-');
         }
         final ml = billed[date];
-        if (ml != null) return BillPdfDay(date, billPdfLitres(ml), ml: ml);
+        final packs = packsOn[date];
+        if (ml != null || packs != null) {
+          return BillPdfDay(
+            date,
+            ml != null ? billPdfLitres(ml) : '$packs pk',
+            ml: ml ?? 0,
+            packs: packs ?? 0,
+          );
+        }
         final that = deliveries.where((x) => x['date'] == date);
         if (that.any((x) => x['outcome'] == 'not_delivered')) {
           return BillPdfDay(date, 'Not delivered', missed: true);
@@ -234,7 +250,8 @@ Future<Uint8List> buildBillPdf(
   final lastDay = DateTime.utc(year, m + 1, 0).day;
   final days = billPdfDays(print);
   final totalMl = days.fold<int>(0, (s, d) => s + d.ml);
-  final deliveredDays = days.where((d) => d.ml > 0).length;
+  final totalPacks = days.fold<int>(0, (s, d) => s + d.packs);
+  final deliveredDays = days.where((d) => d.delivered).length;
   final missedDays = days.where((d) => d.missed).length;
   final pausedDays = days.where((d) => d.paused).length;
 
@@ -275,8 +292,12 @@ Future<Uint8List> buildBillPdf(
       gstRate > 0
           ? 'Monthly delivery${hsnOf(milk['product_id'])} · GST ${(gstRate / 100).toStringAsFixed(gstRate % 100 == 0 ? 0 : 2)}%'
           : 'Monthly delivery${hsnOf(milk['product_id'])}',
-      '${billPdfLitres(milk['quantity_ml'] as int)} L',
-      rates.length == 1 ? '${billPdfAmount(rates.first)} / L' : 'As per date',
+      milk['measure'] == 'pack'
+          ? '${milk['quantity_ml']} × ${milk['unit_label'] ?? 'pack'}'
+          : '${billPdfLitres(milk['quantity_ml'] as int)} L',
+      rates.length == 1
+          ? '${billPdfAmount(rates.first)} / ${milk['measure'] == 'pack' ? 'pack' : 'L'}'
+          : 'As per date',
       milk['amount_paise'] as int,
     ));
   }
@@ -387,8 +408,12 @@ Future<Uint8List> buildBillPdf(
   }
   pw.Widget dayCell(BillPdfDay? d) {
     if (d == null) return pw.Container(height: 26);
-    final (bg, fg, text) = d.ml > 0
-        ? (_pale, _deep, '${billPdfLitres(d.ml)} L')
+    final (bg, fg, text) = d.delivered
+        ? (
+            _pale,
+            _deep,
+            d.ml > 0 ? '${billPdfLitres(d.ml)} L' : '${d.packs} pk',
+          )
         : d.missed
         ? (_paleRed, _red, 'Missed')
         : d.paused
@@ -418,7 +443,7 @@ Future<Uint8List> buildBillPdf(
               style: pw.TextStyle(
                 fontSize: 7.5,
                 color: fg,
-                fontWeight: d.ml > 0 ? pw.FontWeight.bold : null,
+                fontWeight: d.delivered ? pw.FontWeight.bold : null,
               ),
             ),
           ),
@@ -818,7 +843,7 @@ Future<Uint8List> buildBillPdf(
                                 kv(
                                   _shiftLabel(p['shift'] as String),
                                   '${p['product_name'] ?? 'Milk'} · '
-                                  '${_litresText(p['quantity_ml'] as int)} · '
+                                  '${p['measure'] == 'pack' ? '${p['quantity_ml']} × ${p['unit_label'] ?? 'pack'}' : _litresText(p['quantity_ml'] as int)} · '
                                   '${_frequencyLabel(p)}',
                                   width: 70,
                                 ),
@@ -847,6 +872,7 @@ Future<Uint8List> buildBillPdf(
                       pw.Text(
                         'Delivered $deliveredDays day(s) · '
                         '${billPdfLitres(totalMl)} L'
+                        '${totalPacks > 0 ? ' + $totalPacks pack(s)' : ''}'
                         '${missedDays > 0 ? '   ·   Missed $missedDays' : ''}'
                         '${pausedDays > 0 ? '   ·   Paused $pausedDays' : ''}',
                         style: small,

@@ -426,8 +426,7 @@ class _BillCard extends StatelessWidget {
             children: [
               Text(
                 [
-                  for (final m in bill.milk)
-                    '${m.productName} ${billLitres(m.quantityMl)}',
+                  for (final m in bill.milk) '${m.productName} ${m.amountText}',
                   if (bill.items.isNotEmpty)
                     '${bill.items.length} extra item(s)',
                 ].join(', '),
@@ -661,7 +660,7 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
             const SizedBox(height: 12),
             for (final m in bill.milk)
               Text(
-                '${m.productName}: ${billLitres(m.quantityMl)} · '
+                '${m.productName}: ${m.amountText} · '
                 '${billRupees(m.amountPaise)}',
               ),
             if (bill.items.isNotEmpty)
@@ -742,8 +741,9 @@ class _MilkBillScreenState extends State<MilkBillScreen> {
                       child: Text(
                         '${billDateLabel(line.deliveryDate)} · '
                         '${billShiftLabel(line.shift)}\n'
-                        '${line.productName} ${billLitres(line.quantityMl)} at '
-                        '${billRupees(line.unitPricePaise)} per litre',
+                        '${line.productName} ${line.amountText} at '
+                        '${billRupees(line.unitPricePaise)} '
+                        '${line.isPack ? 'per pack' : 'per litre'}',
                       ),
                     ),
                     const SizedBox(width: 8),
