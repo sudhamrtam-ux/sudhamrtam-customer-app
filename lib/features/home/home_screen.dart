@@ -59,18 +59,13 @@ String greetingFor(DateTime time) => time.hour >= 4 && time.hour < 12
     ? 'Good afternoon'
     : 'Good evening';
 
-/// "Good morning, Asha 😊" (owner, 2026-11-17): the first name only,
-/// skipping initials ("V. Naga Raju" → "Naga").
+/// "Good morning, Asha Rani 😊": the whole name as saved (owner,
+/// 2026-11-25: the first word alone cut names like "Nagar aju" short).
 String greetingLine(DateTime time, String? name) {
-  final words = [
-    for (final w in (name ?? '').trim().split(RegExp(r'\s+')))
-      if (w.replaceAll('.', '').isNotEmpty) w.replaceAll('.', ''),
-  ];
-  final first =
-      words.where((w) => w.length > 1).firstOrNull ?? words.firstOrNull ?? '';
-  return first.isEmpty
+  final full = (name ?? '').trim().split(RegExp(r'\s+')).join(' ');
+  return full.isEmpty
       ? '${greetingFor(time)} 😊'
-      : '${greetingFor(time)}, $first 😊';
+      : '${greetingFor(time)}, $full 😊';
 }
 
 /// Home tab: shortcuts into the shop, today's delivery cut-off,
@@ -1037,6 +1032,9 @@ class _GreetingState extends State<_Greeting> {
         Text(
           greetingLine(widget.now(), _name),
           key: const Key('homeGreeting'),
+          // A long name stays on one line.
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: _darkGreen,
             fontSize: 17,

@@ -113,10 +113,10 @@ void main() {
     await finish(tester);
   });
 
-  test('the greeting follows the time of day, with the first name', () {
+  test('the greeting follows the time of day, with the whole name', () {
     expect(
       greetingLine(DateTime(2026, 11, 17, 7), 'Asha Rani'),
-      'Good morning, Asha 😊',
+      'Good morning, Asha Rani 😊',
     );
     expect(greetingLine(DateTime(2026, 11, 17, 13), null), 'Good afternoon 😊');
     expect(greetingLine(DateTime(2026, 11, 17, 19), '  '), 'Good evening 😊');
@@ -124,14 +124,14 @@ void main() {
       greetingLine(DateTime(2026, 11, 17, 2), 'Bala'),
       'Good evening, Bala 😊',
     );
-    // Initials are skipped.
+    // The name as saved, extra spaces taken out (owner, 2026-11-25).
     expect(
-      greetingLine(DateTime(2026, 11, 17, 9), 'V Naga Raju'),
-      'Good morning, Naga 😊',
+      greetingLine(DateTime(2026, 11, 17, 9), ' Nagar  aju V '),
+      'Good morning, Nagar aju V 😊',
     );
     expect(
       greetingLine(DateTime(2026, 11, 17, 9), 'K. Ravi'),
-      'Good morning, Ravi 😊',
+      'Good morning, K. Ravi 😊',
     );
     expect(greetingLine(DateTime(2026, 11, 17, 9), 'V'), 'Good morning, V 😊');
   });
