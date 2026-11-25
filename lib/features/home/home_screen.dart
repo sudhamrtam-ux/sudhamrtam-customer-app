@@ -20,6 +20,7 @@ import '../account/customer_name.dart';
 import 'account_status.dart';
 import 'address_details_card.dart';
 import 'combo_cards.dart';
+import 'even_row.dart';
 import 'glance_cards.dart';
 import 'offer_ticker.dart';
 import 'tomorrow_milk_card.dart';
@@ -266,18 +267,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     compact: true,
                   ),
                 ),
-                // Tomorrow in one line, under the badge (owner request
-                // 2026-11-25: less scrolling, offers seen at once).
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: TomorrowMilkCard(
-                    key: ValueKey('tomorrow-$_tomorrowTick'),
-                    client: sudhamrtamMilkTomorrow,
-                    onChanged: () => sudhamrtamMilkSync.refresh(force: true),
-                    compact: true,
-                  ),
-                ),
-                // Festive and combo offers next (owner decision 2026-11-15).
+                // Festive and combo offers first (owner decision 2026-11-15
+                // and request 2026-11-25).
                 if (_combos.combos.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   ComboCards(
@@ -286,7 +277,29 @@ class _HomeScreenState extends State<HomeScreen> {
                     onOpenCart: widget.onOpenCart,
                   ),
                 ],
-                const SizedBox(height: 4),
+                const SizedBox(height: 12),
+                // Tomorrow, the last order and the cut-off: one line on a
+                // wide screen (owner request 2026-11-25), one under the
+                // other on a phone.
+                _AtAGlance(
+                  wide: isWideSite(context),
+                  children: [
+                    TomorrowMilkCard(
+                      key: ValueKey('tomorrow-$_tomorrowTick'),
+                      client: sudhamrtamMilkTomorrow,
+                      onChanged: () => sudhamrtamMilkSync.refresh(force: true),
+                      compact: true,
+                    ),
+                    LastOrderCard(
+                      key: ValueKey('last-order-$_tomorrowTick'),
+                      now: widget.clock,
+                      gap: 0,
+                    ),
+                    if (_rules != null)
+                      _DeliveryCard(rules: _rules!, now: widget.clock()),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 // What the customer should know at once; each only when it
                 // applies.
                 // An address without its map spot or details.
@@ -295,11 +308,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 const MilkBillsReminder(unpaidOnly: true),
                 // New messages from Sudhamrtam.
                 const NewMessagesCard(),
-                // The last order: on its way, or just delivered.
-                LastOrderCard(
-                  key: ValueKey('last-order-$_tomorrowTick'),
-                  now: widget.clock,
-                ),
                 // Items left in the cart.
                 if (_cart.totalQuantity > 0) ...[
                   _CartWaitingCard(
@@ -309,11 +317,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                if (_rules != null) ...[
-                  const SizedBox(height: 8),
-                  _DeliveryCard(rules: _rules!, now: widget.clock()),
-                ],
-                const SizedBox(height: 12),
                 _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
                 if (essentials.isNotEmpty) ...[
                   const SizedBox(height: 20),
@@ -502,6 +505,23 @@ class _HeroCard extends StatelessWidget {
   }
 }
 
+/// Short cards side by side in equal widths on a wide screen, else one
+/// under the other; a card with nothing to say takes no room.
+class _AtAGlance extends StatelessWidget {
+  const _AtAGlance({required this.wide, required this.children});
+
+  final bool wide;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => wide
+      ? EvenRow(spacing: 16, children: children)
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [for (final child in children) GapBelow(child: child)],
+        );
+}
+
 // =====================================================
 // DELIVERY CUT-OFF
 // =====================================================
@@ -589,6 +609,7 @@ class _DeliveryCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(

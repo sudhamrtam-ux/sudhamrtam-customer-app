@@ -27,7 +27,11 @@ class GlanceCard extends StatelessWidget {
     required this.onTap,
     this.iconColor = _darkGreen,
     this.iconBackground = _paleGreen,
+    this.gap = 12,
   });
+
+  /// Space below the card; 0 in a row of cards.
+  final double gap;
 
   final IconData icon;
   final String title;
@@ -39,7 +43,7 @@ class GlanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: gap),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -72,6 +76,7 @@ class GlanceCard extends StatelessWidget {
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -203,7 +208,11 @@ class LastOrderCard extends StatefulWidget {
     required this.now,
     this.loadLatest = _latestOrder,
     this.lookup = _serverStatus,
+    this.gap = 12,
   });
+
+  /// Space below the card; 0 in a row of cards.
+  final double gap;
 
   final DateTime Function() now;
   final Future<CustomerOrder?> Function() loadLatest;
@@ -250,6 +259,7 @@ class _LastOrderCardState extends State<LastOrderCard> {
     final items = order.totalQuantity;
     return GlanceCard(
       key: const Key('homeLastOrder'),
+      gap: widget.gap,
       icon: said.icon,
       iconColor: said.color,
       iconBackground: said.color.withValues(alpha: 0.10),

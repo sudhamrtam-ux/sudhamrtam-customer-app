@@ -192,11 +192,11 @@ class _TomorrowMilkCardState extends State<TomorrowMilkCard> {
       key: const Key('tomorrowStrip'),
       color: const Color(0xFFF3F8EA),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         side: const BorderSide(color: Color(0xFFDDE8CC)),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         onTap: _openFull,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
@@ -206,6 +206,7 @@ class _TomorrowMilkCardState extends State<TomorrowMilkCard> {
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
