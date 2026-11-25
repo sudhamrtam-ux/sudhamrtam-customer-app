@@ -135,6 +135,42 @@ void main() {
     expect(calls.where((c) => c.startsWith('PUT')), isEmpty);
   });
 
+  testWidgets('Home: one line, Change opens the full card', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TomorrowMilkCard(
+            client: client(),
+            now: () => now,
+            onChanged: () async => refreshed++,
+            compact: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tomorrowStrip')), findsOneWidget);
+    expect(find.text('Tomorrow · Sun, 8 Nov'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('tomorrowSummary'))).data,
+      'Buffalo Milk 1.00 L + 0.50 L',
+    );
+    // The controls are not on Home itself.
+    expect(find.byKey(const Key('tomorrowMore-a1-morning')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('tomorrowChange')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tomorrowMore-a1-morning')));
+    await tester.pumpAndSettle();
+    // Closing the sheet: the line shows the change.
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const Key('tomorrowSummary'))).data,
+      'Buffalo Milk 1.50 L + 0.50 L',
+    );
+  });
+
   testWidgets('no milk tomorrow: nothing shown', (tester) async {
     shifts = [];
     await pump(tester);

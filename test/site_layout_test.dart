@@ -79,6 +79,9 @@ void main() {
           )
           .first,
     );
+    // A shorter Home (2026-11-25): bring the whole link into view.
+    await tester.ensureVisible(refunds);
+    await tester.pumpAndSettle();
     await tester.tap(refunds);
     expect(opened, [Uri.parse(sudhamrtamRefundsUrl)]);
 

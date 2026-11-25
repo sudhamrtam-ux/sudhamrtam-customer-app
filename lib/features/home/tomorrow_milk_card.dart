@@ -60,9 +60,14 @@ class TomorrowMilkCard extends StatefulWidget {
     required this.client,
     this.onChanged,
     this.now = DateTime.now,
+    this.compact = false,
   });
 
   final MilkTomorrowClient? client;
+
+  /// Home (owner request 2026-11-25): one line with what comes
+  /// tomorrow and a Change button that opens the full card.
+  final bool compact;
 
   /// After a skip: refresh the plans kept on the phone.
   final Future<void> Function()? onChanged;
@@ -124,6 +129,7 @@ class _TomorrowMilkCardState extends State<TomorrowMilkCard> {
     for (final s in milk.shifts) {
       plans.putIfAbsent(s.planId, () => []).add(s);
     }
+    if (widget.compact) return _strip(milk, plans);
 
     return Container(
       key: const Key('tomorrowMilk'),
@@ -164,6 +170,93 @@ class _TomorrowMilkCardState extends State<TomorrowMilkCard> {
         ],
       ),
     );
+  }
+
+  /// "Buffalo Milk 1.00 L + 0.50 L", "Curd 2 × 500 g", or skipped.
+  String _summary(List<TomorrowShift> shifts) {
+    final first = shifts.first;
+    if (first.skipped) return '${first.productName} skipped';
+    String amount(TomorrowShift s) {
+      final offer = sudhamrtamSubscriptionProducts.offerFor(s.productId);
+      return offer != null && offer.isPack
+          ? offer.quantityText(s.quantityMl)
+          : milkLitresText(s.quantityMl);
+    }
+
+    return '${first.productName} ${shifts.map(amount).join(' + ')}';
+  }
+
+  Widget _strip(TomorrowMilk milk, Map<String, List<TomorrowShift>> plans) {
+    final open = milk.shifts.any((s) => s.open);
+    return Material(
+      key: const Key('tomorrowStrip'),
+      color: const Color(0xFFF3F8EA),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFDDE8CC)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: _openFull,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+          child: Row(
+            children: [
+              const Icon(Icons.local_drink_outlined, color: _deepGreen),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tomorrow · ${_dayLabel(milk.date)}',
+                      style: const TextStyle(
+                        color: _deepGreen,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      plans.values.map(_summary).join(' · '),
+                      key: const Key('tomorrowSummary'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                key: const Key('tomorrowChange'),
+                onPressed: _openFull,
+                child: Text(open ? 'Change' : 'View'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The full card (skip, one-day quantity) in a sheet; the strip
+  /// shows any change after.
+  Future<void> _openFull() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: TomorrowMilkCard(
+            client: widget.client,
+            now: widget.now,
+            onChanged: widget.onChanged,
+          ),
+        ),
+      ),
+    );
+    await _load();
   }
 
   Widget _plan(

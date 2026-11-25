@@ -266,9 +266,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     compact: true,
                   ),
                 ),
-                const SizedBox(height: 14),
-                _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
-                const SizedBox(height: 16),
+                // Tomorrow in one line, under the badge (owner request
+                // 2026-11-25: less scrolling, offers seen at once).
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: TomorrowMilkCard(
+                    key: ValueKey('tomorrow-$_tomorrowTick'),
+                    client: sudhamrtamMilkTomorrow,
+                    onChanged: () => sudhamrtamMilkSync.refresh(force: true),
+                    compact: true,
+                  ),
+                ),
+                // Festive and combo offers next (owner decision 2026-11-15).
+                if (_combos.combos.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  ComboCards(
+                    combos: _combos.combos,
+                    cart: _cart,
+                    onOpenCart: widget.onOpenCart,
+                  ),
+                ],
+                const SizedBox(height: 4),
                 // What the customer should know at once; each only when it
                 // applies.
                 // An address without its map spot or details.
@@ -291,27 +309,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                // Skip tomorrow / extra milk tomorrow (owner decision 2026-11-15).
-                TomorrowMilkCard(
-                  key: ValueKey('tomorrow-$_tomorrowTick'),
-                  client: sudhamrtamMilkTomorrow,
-                  onChanged: () => sudhamrtamMilkSync.refresh(force: true),
-                ),
                 if (_rules != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   _DeliveryCard(rules: _rules!, now: widget.clock()),
                 ],
-                // Combo offers (owner decision 2026-11-15).
-                if (_combos.combos.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  ComboCards(
-                    combos: _combos.combos,
-                    cart: _cart,
-                    onOpenCart: widget.onOpenCart,
-                  ),
-                ],
+                const SizedBox(height: 12),
+                _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
                 if (essentials.isNotEmpty) ...[
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
                   _SectionTitle(
                     'Daily Essentials',
                     actionLabel: 'See all',
@@ -336,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     )
                   else
                     SizedBox(
-                      height: 290,
+                      height: 228,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: essentials.length,
@@ -347,7 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                 ],
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
                 const _SectionTitle('Shop by Category'),
                 const SizedBox(height: 12),
                 _CategoryGrid(
@@ -409,7 +414,7 @@ class _HeroCard extends StatelessWidget {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(18),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -438,39 +443,38 @@ class _HeroCard extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
-            right: 16,
-            bottom: 10,
-            child: Icon(
-              Icons.eco,
-              size: 72,
-              color: Colors.white.withValues(alpha: 0.18),
-            ),
-          ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+            child: Row(
               children: [
-                const Text(
-                  'Pure Goodness, Naturally',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Pure Goodness, Naturally',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Fresh dairy, natural honey and wood-pressed oils.',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          fontSize: 13,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Fresh dairy, natural honey and traditional wood-pressed oils.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.92),
-                    fontSize: 14,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(width: 10),
                 FilledButton.icon(
                   key: const Key('homeShopNow'),
                   onPressed: onShopNow,
@@ -479,11 +483,11 @@ class _HeroCard extends StatelessWidget {
                     foregroundColor: _darkGreen,
                     shape: const StadiumBorder(),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
+                      horizontal: 14,
+                      vertical: 10,
                     ),
                   ),
-                  icon: const Icon(Icons.storefront_outlined),
+                  icon: const Icon(Icons.storefront_outlined, size: 18),
                   label: const Text(
                     'Shop Now',
                     style: TextStyle(fontWeight: FontWeight.bold),
@@ -570,28 +574,31 @@ class _DeliveryCard extends StatelessWidget {
 
     return Container(
       key: const Key('homeDeliveryCard'),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: _cardDecoration(),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(7),
             decoration: const BoxDecoration(
               color: _paleGreen,
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.schedule_outlined, color: _darkGreen),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   detail,
                   style: const TextStyle(
@@ -599,7 +606,7 @@ class _DeliveryCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   '$terms • $payments',
                   style: const TextStyle(fontSize: 12, color: Colors.black54),
@@ -678,13 +685,13 @@ class _QuickAddCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: Key('quickAdd_${product.id}'),
-      width: 160,
-      padding: const EdgeInsets.all(10),
+      width: 140,
+      padding: const EdgeInsets.all(8),
       decoration: _cardDecoration(),
       child: Column(
         children: [
           Container(
-            height: 140,
+            height: 104,
             width: double.infinity,
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
@@ -810,11 +817,17 @@ class _CategoryGrid extends StatelessWidget {
       itemCount: categories.length,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         // A website: every category in one row.
-        crossAxisCount: isWideSite(context) ? 4 : 2,
-        crossAxisSpacing: isWideSite(context) ? 20 : 12,
-        mainAxisSpacing: 12,
-        // Tall tiles so the product photo is the main thing.
-        childAspectRatio: 0.78,
+        // Three in a row on a phone (owner request 2026-11-25: less
+        // scrolling); the photo is still the main thing.
+        // Up to four fit one row; more go three to a row.
+        crossAxisCount: isWideSite(context)
+            ? 4
+            : (categories.length <= 4 ? categories.length : 3),
+        crossAxisSpacing: isWideSite(context) ? 20 : 8,
+        mainAxisSpacing: 10,
+        childAspectRatio: isWideSite(context)
+            ? 0.78
+            : (categories.length == 4 ? 0.58 : 0.7),
       ),
       itemBuilder: (context, index) {
         final category = categories[index];
@@ -829,13 +842,13 @@ class _CategoryGrid extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               onTap: () => onOpen(category),
               child: Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(7),
                 child: Column(
                   children: [
                     Expanded(
                       child: Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
                           color: _paleGreen,
                           borderRadius: BorderRadius.circular(14),
@@ -848,12 +861,15 @@ class _CategoryGrid extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     Text(
                       category,
                       textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
                         color: _ink,
                       ),
                     ),
@@ -1046,16 +1062,11 @@ class _GreetingState extends State<_Greeting> {
         const SizedBox(height: 2),
         Text(
           'Welcome to Sudhamrtam',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w800,
             color: _ink,
             letterSpacing: -0.2,
           ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Pure farm goodness delivered to your doorstep.',
-          style: TextStyle(color: Colors.black54, fontSize: 14),
         ),
       ],
     );
