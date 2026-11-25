@@ -111,6 +111,13 @@ class _MilkSubscriptionSetupScreenState
   /// that stops by itself after a week.
   bool _trial = false;
 
+  /// Try for 7 days is for new customers only (owner decision
+  /// 2026-11-26): none who has or had a subscription, waiting ones
+  /// included; a rejected one does not count.
+  bool get _canTry =>
+      !_isEditing &&
+      !sudhamrtamMilkSubscriptions.subscriptions.any((s) => !s.isRejected);
+
   /// The product and its settings.
   late final SubscriptionOffer _offer;
 
@@ -412,7 +419,7 @@ class _MilkSubscriptionSetupScreenState
         for (final MapEntry(key: shift, value: draft) in _drafts.entries)
           if (draft.enabled)
             // A trial week: the 7th day is the last.
-            _trial && existing == null
+            _trial && existing == null && _canTry
                 ? draft
                       .toSchedule(shift)
                       .copyWith(
@@ -848,7 +855,7 @@ class _MilkSubscriptionSetupScreenState
               ),
             ),
             const SizedBox(height: 24),
-            if (!_isEditing)
+            if (_canTry)
               Card(
                 margin: const EdgeInsets.only(bottom: 18),
                 color: const Color(0xFFFFF8E1),

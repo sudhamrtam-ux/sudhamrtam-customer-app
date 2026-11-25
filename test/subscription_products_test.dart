@@ -279,6 +279,20 @@ void main() {
     );
     expect(plan.shiftSchedules, hasLength(1));
 
+    // Now an existing customer: no trial for another product.
+    await tester.pumpWidget(
+      MaterialApp(
+        key: UniqueKey(),
+        home: MilkSubscriptionSetupScreen(
+          productId: 'paneer',
+          checkAddress: (_) async => true,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Set Up Subscription'), findsOneWidget);
+    expect(find.byKey(const Key('try-7-days')), findsNothing);
+
     // The Subscriptions page: the product, in packs, and Keep it going.
     await tester.pumpWidget(
       MaterialApp(key: UniqueKey(), home: const MilkPlanScreen()),
