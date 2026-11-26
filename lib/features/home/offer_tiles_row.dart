@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/cart_manager.dart';
 import '../../models/combo_offer.dart';
+import '../../services/catalog_api_client.dart' show apiBaseUrl;
 import '../shop/product_image.dart' show productImageProvider;
 import '../shop/quantity_bill.dart' show billRupees;
 import 'offer_tile.dart';
@@ -15,6 +16,19 @@ const _months = [
 String giftNames(List<String> names) => names.length < 2
     ? names.join()
     : '${names.take(names.length - 1).join(', ')} & ${names.last}';
+
+/// The owner's picture of a combo as an image; null without one (or
+/// without a server).
+ImageProvider? comboPicture(ComboOffer combo) {
+  final path = combo.pictureUrl;
+  if (path == null || apiBaseUrl.isEmpty) return null;
+  final base = Uri.parse(
+    apiBaseUrl.endsWith('/') ? apiBaseUrl : '$apiBaseUrl/',
+  );
+  return NetworkImage(
+    base.resolve(path.startsWith('/') ? path.substring(1) : path).toString(),
+  );
+}
 
 /// "10% off", "12.5% off".
 String offHeadline(int discountBp) {
@@ -100,7 +114,15 @@ class _OfferTilesRowState extends State<OfferTilesRow> {
       key: Key('combo-card-${combo.id}'),
       colour: colour,
       headline: offHeadline(combo.discountBp),
-      title: giftNames([for (final i in combo.items) i.name]),
+      title: combo.title,
+      badge: combo.occasionLabel,
+      chips: [
+        for (final i in combo.items) '${i.quantity} × ${i.name} ${i.unit}',
+      ],
+      saving: combo.savingsPaise > 0
+          ? 'You save ${billRupees(combo.savingsPaise / 100)}'
+          : null,
+      picture: comboPicture(combo),
       tag: combo.title,
       items: [
         for (final i in combo.items)

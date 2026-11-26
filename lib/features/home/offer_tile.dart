@@ -2,10 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Offer tiles on Home (owner request and decisions 2026-11-26): a
-/// combo's tile shows its products as a gift (photos, a ribbon bow and
-/// a hanging tag). Text offers stay in the offer line, not tiles. The staff app draws
-/// the same tiles as a preview (keep the two in step).
+/// Combo tiles on Home (owner request and decisions 2026-11-26): the
+/// owner's picture, else the products drawn as a gift (photos, a ribbon
+/// bow and a hanging tag). The staff app draws the same tiles as a
+/// preview (keep the two in step).
 
 /// The tile colour of each occasion; [offerGreen] for any other.
 const occasionTileColours = {
@@ -520,7 +520,16 @@ class _Tag extends StatelessWidget {
   );
 }
 
-/// A combo's tile: the discount, the title, the gift and the price.
+/// The size to make a combo's picture (owner request 2026-11-26): the
+/// tile shows it at 4:3, never cropped when made at this shape.
+const comboPictureWidth = 1200;
+const comboPictureHeight = 900;
+const comboPictureRatio = comboPictureWidth / comboPictureHeight;
+
+/// A combo's tile: occasion badge, discount, title, products, saving,
+/// price and its picture (the owner's, else the drawn gift). Wide
+/// tiles put the words on the left and the picture on the right; tall
+/// ones the picture in the middle.
 class ComboTile extends StatelessWidget {
   const ComboTile({
     super.key,
@@ -529,6 +538,10 @@ class ComboTile extends StatelessWidget {
     required this.title,
     required this.tag,
     required this.items,
+    this.badge,
+    this.chips = const [],
+    this.saving,
+    this.picture,
     this.price,
     this.fullPrice,
     this.footnote,
@@ -543,9 +556,25 @@ class ComboTile extends StatelessWidget {
 
   /// e.g. "10% off".
   final String headline;
+
+  /// The combo's title.
   final String title;
+
+  /// The drawn gift's tag (used without [picture]).
   final String tag;
   final List<GiftItem> items;
+
+  /// e.g. "Festive offer".
+  final String? badge;
+
+  /// e.g. "2 × Curd 500 g".
+  final List<String> chips;
+
+  /// e.g. "You save ₹19.50".
+  final String? saving;
+
+  /// The owner's picture for the combo; null = the drawn gift.
+  final ImageProvider? picture;
 
   /// e.g. "₹175.50" and the struck-through "₹195".
   final String? price;
@@ -560,35 +589,88 @@ class ComboTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ink = tileTextColour(colour);
+    final soft = ink.withValues(alpha: 0.85);
+
+    final badgeChip = badge == null
+        ? null
+        : Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF6C343),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.redeem, size: 13, color: Color(0xFF5A3A00)),
+                const SizedBox(width: 4),
+                Text(
+                  badge!.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    letterSpacing: 0.6,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF5A3A00),
+                  ),
+                ),
+              ],
+            ),
+          );
     final headlineText = Text(
       headline,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: ink,
-        fontSize: 26,
-        height: 1.1,
-        fontWeight: FontWeight.w800,
+        fontSize: 30,
+        height: 1.05,
+        fontWeight: FontWeight.w900,
+        letterSpacing: -0.3,
       ),
     );
-    final titleText = Text(
+    Text titleText(int lines) => Text(
       title,
-      maxLines: 2,
+      maxLines: lines,
       overflow: TextOverflow.ellipsis,
-      style: TextStyle(color: ink.withValues(alpha: 0.92), fontSize: 14.5),
-    );
-    // The gift keeps its shape however wide the tile is.
-    final gift = Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(14),
+      style: TextStyle(
+        color: ink,
+        fontSize: 16,
+        height: 1.25,
+        fontWeight: FontWeight.w600,
       ),
-      padding: const EdgeInsets.fromLTRB(8, 18, 8, 6),
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: 1.1,
-          child: GiftPicture(items: items, tag: tag),
-        ),
+    );
+    final chipRow = chips.isEmpty
+        ? null
+        : Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final c in chips)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ink.withValues(alpha: 0.12),
+                    border: Border.all(color: ink.withValues(alpha: 0.22)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(c, style: TextStyle(color: ink, fontSize: 12)),
+                ),
+            ],
+          );
+    final picturePanel = ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: AspectRatio(
+        aspectRatio: comboPictureRatio,
+        child: picture != null
+            ? Image(
+                image: picture!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _GiftPanel(items: items, tag: tag),
+              )
+            : _GiftPanel(items: items, tag: tag),
       ),
     );
     final bottom = Row(
@@ -597,91 +679,225 @@ class ComboTile extends StatelessWidget {
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              if (fullPrice != null)
-                Text(
-                  fullPrice!,
-                  style: TextStyle(
-                    color: ink.withValues(alpha: 0.75),
-                    fontSize: 12,
-                    decoration: TextDecoration.lineThrough,
-                    decorationColor: ink.withValues(alpha: 0.75),
-                  ),
-                ),
-              if (price != null)
-                Text(
-                  price!,
-                  key: priceKey,
-                  style: TextStyle(
-                    color: ink,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              if (footnote != null)
-                Text(
-                  footnote!,
-                  style: TextStyle(
-                    color: ink.withValues(alpha: 0.8),
-                    fontSize: 11.5,
-                  ),
-                ),
+              Wrap(
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                children: [
+                  if (price != null)
+                    Text(
+                      price!,
+                      key: priceKey,
+                      style: TextStyle(
+                        color: ink,
+                        fontSize: 22,
+                        height: 1.1,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  if (fullPrice != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        fullPrice!,
+                        style: TextStyle(
+                          color: soft,
+                          fontSize: 13,
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: soft,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (saving != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE3F1D3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        saving!,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF2F5D12),
+                        ),
+                      ),
+                    ),
+                  if (footnote != null)
+                    Text(
+                      footnote!,
+                      style: TextStyle(color: soft, fontSize: 11.5),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
-        ?action,
+        if (action != null) ...[const SizedBox(width: 8), action!],
       ],
     );
+
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [colour, Color.lerp(colour, Colors.black, 0.18)!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(colour, Colors.white, 0.08)!,
+            colour,
+            Color.lerp(colour, Colors.black, 0.28)!,
+          ],
         ),
+        boxShadow: [
+          BoxShadow(
+            color: colour.withValues(alpha: 0.28),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      child: LayoutBuilder(
-        builder: (context, box) {
-          // A wide tile (one or two in a row on a computer): the words
-          // on the left, the gift on the right.
-          if (box.maxWidth > box.maxHeight * 1.35) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      headlineText,
-                      const SizedBox(height: 4),
-                      titleText,
-                      const Spacer(),
-                      bottom,
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 14),
-                SizedBox(width: box.maxHeight * 1.15, child: gift),
-              ],
-            );
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              headlineText,
-              const SizedBox(height: 2),
-              titleText,
-              const SizedBox(height: 10),
-              Expanded(child: gift),
-              const SizedBox(height: 10),
-              bottom,
-            ],
-          );
-        },
+      child: CustomPaint(
+        painter: _FestiveBackground(ink: ink),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: LayoutBuilder(
+            builder: (context, box) {
+              // Wide (one or two in a row on a computer): words left,
+              // picture right at its full height.
+              if (box.maxWidth > box.maxHeight * 1.5) {
+                // At most about half the tile, so the words keep room.
+                final pictureWidth = math.min(
+                  box.maxHeight * comboPictureRatio,
+                  box.maxWidth * 0.5,
+                );
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ?badgeChip,
+                          const SizedBox(height: 8),
+                          headlineText,
+                          const SizedBox(height: 4),
+                          titleText(2),
+                          if (chipRow != null) ...[
+                            const SizedBox(height: 10),
+                            Flexible(child: ClipRect(child: chipRow)),
+                          ],
+                          const Spacer(),
+                          bottom,
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    SizedBox(
+                      width: pictureWidth,
+                      child: Center(child: picturePanel),
+                    ),
+                  ],
+                );
+              }
+              // Tall: the picture between the words and the price.
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [?badgeChip, const Spacer()]),
+                  const SizedBox(height: 6),
+                  headlineText,
+                  const SizedBox(height: 2),
+                  titleText(1),
+                  const SizedBox(height: 10),
+                  Expanded(child: Center(child: picturePanel)),
+                  const SizedBox(height: 10),
+                  bottom,
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
+}
+
+/// The drawn gift on a light panel, when there is no picture.
+class _GiftPanel extends StatelessWidget {
+  const _GiftPanel({required this.items, required this.tag});
+
+  final List<GiftItem> items;
+  final String tag;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    color: Colors.white.withValues(alpha: 0.94),
+    padding: const EdgeInsets.fromLTRB(8, 18, 8, 6),
+    child: GiftPicture(items: items, tag: tag),
+  );
+}
+
+/// A soft glow and a faint rangoli dot pattern, so a large tile is not
+/// one flat colour.
+class _FestiveBackground extends CustomPainter {
+  const _FestiveBackground({required this.ink});
+
+  final Color ink;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final glow = Offset(size.width * 0.12, size.height * 0.1);
+    canvas.drawCircle(
+      glow,
+      size.shortestSide * 0.9,
+      Paint()
+        ..shader =
+            RadialGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.16),
+                Colors.white.withValues(alpha: 0),
+              ],
+            ).createShader(
+              Rect.fromCircle(center: glow, radius: size.shortestSide * 0.9),
+            ),
+    );
+    // Rangoli: small dots in a diamond grid, fading towards the right.
+    const step = 22.0;
+    final dot = Paint();
+    for (double y = step / 2; y < size.height; y += step) {
+      final row = (y / step).floor();
+      for (
+        double x = (row.isEven ? 0 : step / 2) + step / 2;
+        x < size.width;
+        x += step
+      ) {
+        final fade = 1 - (x / size.width);
+        dot.color = ink.withValues(alpha: 0.07 * fade);
+        canvas.drawCircle(Offset(x, y), 1.4, dot);
+      }
+    }
+    // A thin gold line along the bottom, like a festive border.
+    canvas.drawRect(
+      Rect.fromLTWH(0, size.height - 4, size.width, 4),
+      Paint()..color = const Color(0xFFF6C343).withValues(alpha: 0.9),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_FestiveBackground old) => old.ink != ink;
 }
