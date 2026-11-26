@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/period_filter.dart';
 import '../../core/widgets/site_layout.dart';
 
 import '../../app/sudhamrtam_app.dart';
@@ -106,6 +107,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
   /// Unread when the screen opened, so they stay marked as new here.
   Set<String> _newIds = const {};
 
+  /// How far back the list goes (owner request 2026-11-26).
+  Period _period = Period.all;
+
   @override
   void initState() {
     super.initState();
@@ -147,31 +151,53 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 'Sudhamrtam.',
               );
             }
-            final messages = inbox.messages;
-            if (messages == null) {
+            final all = inbox.messages;
+            if (all == null) {
               return inbox.error == null
                   ? const Center(
                       child: CircularProgressIndicator(color: _brandGreen),
                     )
                   : _Notice(inbox.error!, onRetry: inbox.refresh);
             }
+            final now = DateTime.now();
+            final messages = [
+              for (final m in all)
+                if (_period.includes(m.sentAt, now)) m,
+            ];
+            final filter = Align(
+              alignment: Alignment.centerLeft,
+              child: PeriodFilter(
+                value: _period,
+                onChanged: (p) => setState(() => _period = p),
+              ),
+            );
             return RefreshIndicator(
               color: _brandGreen,
               onRefresh: _open,
               child: messages.isEmpty
                   ? ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      children: const [
-                        SizedBox(height: 120),
-                        Center(child: Text('No messages yet.')),
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        if (all.isNotEmpty) filter,
+                        const SizedBox(height: 120),
+                        Center(
+                          child: Text(
+                            all.isEmpty
+                                ? 'No messages yet.'
+                                : 'No messages in this period.',
+                          ),
+                        ),
                       ],
                     )
                   : ListView.separated(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(16),
-                      itemCount: messages.length,
+                      itemCount: messages.length + 1,
                       separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, i) {
+                      itemBuilder: (context, index) {
+                        if (index == 0) return filter;
+                        final i = index - 1;
                         final m = messages[i];
                         final isNew = _newIds.contains(m.id);
                         return Container(

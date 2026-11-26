@@ -125,6 +125,7 @@ void main() {
           api: api,
           support: support,
           productLookup: (id) => id == milk.id ? milk : null,
+          clock: () => DateTime(2026, 11, 26, 9),
         ),
       ),
     );
@@ -175,6 +176,35 @@ void main() {
     await tester.pump();
     expect(find.text('Paneer'), findsOneWidget);
     expect(find.text('Arriving 6 December'), findsNothing);
+  });
+
+  testWidgets('period filter: last 15 days, last 3 months', (tester) async {
+    await open(tester);
+    expect(find.text('2 orders placed'), findsOneWidget);
+
+    // 26 Nov: the order of 18 Nov is in the last 15 days, 26 Oct is not.
+    await tester.tap(find.byKey(const Key('period-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('period-days15')));
+    await tester.pumpAndSettle();
+    expect(find.text('1 order of 2 shown'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('period-label'))).data,
+      'Last 15 days',
+    );
+
+    await tester.tap(find.byKey(const Key('period-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('period-months3')));
+    await tester.pumpAndSettle();
+    expect(find.text('2 orders placed'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('period-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('period-days7')));
+    await tester.pumpAndSettle();
+    expect(find.text('0 orders of 2 shown'), findsOneWidget);
+    expect(find.textContaining('Try another period'), findsOneWidget);
   });
 
   testWidgets('on a tablet the buttons stand beside the items', (tester) async {

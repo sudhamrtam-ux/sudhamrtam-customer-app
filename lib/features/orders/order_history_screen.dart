@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/period_filter.dart';
 import '../../core/widgets/site_layout.dart';
 
 import '../../app/sudhamrtam_app.dart';
@@ -88,7 +89,9 @@ class OrderHistoryScreen extends StatefulWidget {
     OrderApiClient? api,
     OrderProductLookup? productLookup,
     SupportApiClient? support,
-  }) : api = api ?? OrderDestination.server,
+    DateTime Function()? clock,
+  }) : clock = clock ?? DateTime.now,
+       api = api ?? OrderDestination.server,
        productLookup = productLookup ?? _shopProduct,
        support = support ?? sudhamrtamSupport;
 
@@ -100,6 +103,9 @@ class OrderHistoryScreen extends StatefulWidget {
 
   /// For photos and "Buy it again".
   final OrderProductLookup productLookup;
+
+  /// Today, for the period filter; replaceable in tests.
+  final DateTime Function() clock;
 
   @override
   State<OrderHistoryScreen> createState() => _OrderHistoryScreenState();
@@ -129,6 +135,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   final _search = TextEditingController();
   String _query = '';
   bool _openOnly = false;
+
+  /// How far back the list goes (owner request 2026-11-26).
+  Period _period = Period.all;
 
   @override
   void initState() {
@@ -317,12 +326,15 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  /// Orders matching the search and the "Not yet delivered" filter.
+  /// Orders matching the search, the period and the "Not yet
+  /// delivered" filter.
   List<CustomerOrder> _filtered(List<CustomerOrder> orders) {
     final q = _query.trim().toLowerCase();
+    final now = widget.clock();
     return [
       for (final order in orders)
-        if ((!_openOnly ||
+        if (_period.includes(order.createdAt, now) &&
+            (!_openOnly ||
                 isOpenOrder(effectiveStatus(order, _payments[order.id]))) &&
             (q.isEmpty ||
                 order.items.any(
@@ -440,6 +452,10 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
               label: const Text('Not yet delivered'),
               selected: _openOnly,
               onSelected: (_) => setState(() => _openOnly = true),
+            ),
+            PeriodFilter(
+              value: _period,
+              onChanged: (p) => setState(() => _period = p),
             ),
           ],
         ),
@@ -1009,7 +1025,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     padding: EdgeInsets.only(top: 40),
                     child: Center(
                       child: Text(
-                        'No orders match.',
+                        'No orders match. Try another period or search.',
                         style: TextStyle(color: Colors.black54),
                       ),
                     ),

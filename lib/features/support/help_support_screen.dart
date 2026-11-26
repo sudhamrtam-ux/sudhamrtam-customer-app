@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/sudhamrtam_app.dart';
 import '../../core/company.dart';
 import '../../core/widgets/page_app_bar.dart';
+import '../../core/widgets/period_filter.dart';
 import '../../services/support_api_client.dart';
 import '../feedback/feedback_screen.dart' show feedbackDate;
 import 'support_conversation_screen.dart';
@@ -49,6 +50,9 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   String _draftId = newSupportQueryId();
 
   List<SupportQuery>? _mine;
+
+  /// How far back "Your queries" goes (owner request 2026-11-26).
+  Period _period = Period.all;
   String? _loadError;
 
   SupportApiClient? get _api => widget.api ?? sudhamrtamSupport;
@@ -330,16 +334,34 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   }
 
   Widget _history(BuildContext context) {
-    final mine = _mine;
+    final all = _mine;
+    final now = DateTime.now();
+    final mine = all == null
+        ? null
+        : [
+            for (final q in all)
+              if (_period.includes(q.createdAt, now)) q,
+          ];
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Your queries',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Your queries',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            if (all != null && all.isNotEmpty)
+              PeriodFilter(
+                value: _period,
+                onChanged: (p) => setState(() => _period = p),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         if (_loadError != null)
@@ -347,7 +369,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         else if (mine == null)
           const Center(child: CircularProgressIndicator())
         else if (mine.isEmpty)
-          const Text('No queries yet.', style: TextStyle(color: Colors.black54))
+          Text(
+            all!.isEmpty ? 'No queries yet.' : 'No queries in this period.',
+            style: const TextStyle(color: Colors.black54),
+          )
         else
           for (final q in mine)
             Card(

@@ -52,6 +52,27 @@ void main() {
   }
 
   group('Order Details Screen', () {
+    testWidgets('a computer: the whole order on one screen', (tester) async {
+      tester.view.physicalSize = const Size(1280, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await openOrderDetails(tester, createTestOrder());
+
+      expect(find.byKey(const Key('order-details-wide')), findsOneWidget);
+      // Products on the left, delivery and payment on the right.
+      final products = tester.getRect(
+        find.byKey(const Key('order-details-products')),
+      );
+      final payment = tester.getRect(
+        find.byKey(const Key('order-details-payment')),
+      );
+      expect(payment.left, greaterThan(products.right));
+      // Everything fits without scrolling.
+      expect(payment.bottom, lessThan(720));
+      expect(tester.getRect(find.text('₹550.00')).bottom, lessThan(720));
+      expect(find.text('Please deliver in the morning.'), findsOneWidget);
+    });
+
     testWidgets('displays order ID, date and status', (tester) async {
       final order = createTestOrder();
 
@@ -102,7 +123,7 @@ void main() {
 
       await openOrderDetails(tester, order);
 
-      await tester.scrollUntilVisible(find.text('Payment Information'), 200);
+      await tester.scrollUntilVisible(find.text('PAYMENT INFORMATION'), 200);
 
       expect(find.text('Home Delivery'), findsOneWidget);
       expect(find.text('Kukatpally, Hyderabad'), findsOneWidget);

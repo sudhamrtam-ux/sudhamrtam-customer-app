@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/period_filter.dart';
 import '../../core/widgets/site_layout.dart';
 
 import '../../app/sudhamrtam_app.dart';
@@ -219,6 +220,9 @@ class MilkBillsScreen extends StatefulWidget {
 
 class _MilkBillsScreenState extends State<MilkBillsScreen> {
   List<MilkBill>? _bills;
+
+  /// How far back the bills go (owner request 2026-11-26).
+  Period _period = Period.all;
   String? _error;
 
   MilkBillApiClient? get _api => widget.api ?? sudhamrtamMilkBills;
@@ -255,6 +259,13 @@ class _MilkBillsScreenState extends State<MilkBillsScreen> {
       ),
     );
     await _load();
+  }
+
+  /// A bill (month "2026-11") is in the period when any of its days is.
+  bool _billShown(String month) {
+    final parts = month.split('-');
+    final lastDay = DateTime(int.parse(parts[0]), int.parse(parts[1]) + 1, 0);
+    return _period.includes(lastDay, (widget.today ?? DateTime.now)());
   }
 
   @override
@@ -294,12 +305,37 @@ class _MilkBillsScreenState extends State<MilkBillsScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-                      child: Text(
-                        'Bills',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Bills',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          if (bills.isNotEmpty)
+                            PeriodFilter(
+                              value: _period,
+                              options: const [
+                                Period.all,
+                                Period.months3,
+                                Period.months6,
+                              ],
+                              onChanged: (p) => setState(() => _period = p),
+                            ),
+                        ],
                       ),
                     ),
+                    if (bills.isNotEmpty &&
+                        !bills.any((b) => _billShown(b.month)))
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'No bills in this period.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     if (bills.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(32),
@@ -310,7 +346,8 @@ class _MilkBillsScreenState extends State<MilkBillsScreen> {
                         ),
                       ),
                     for (final bill in bills)
-                      _BillCard(bill: bill, onTap: () => _open(bill)),
+                      if (_billShown(bill.month))
+                        _BillCard(bill: bill, onTap: () => _open(bill)),
                   ],
                 ),
               ),
