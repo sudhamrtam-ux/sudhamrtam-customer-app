@@ -135,7 +135,8 @@ void main() {
     expect(calls.where((c) => c.startsWith('PUT')), isEmpty);
   });
 
-  testWidgets('Home: one line, Change opens the full card', (tester) async {
+  testWidgets('Home: a line per delivery time with - and +; Skip / more '
+      'opens the full card', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -151,24 +152,51 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('tomorrowStrip')), findsOneWidget);
     expect(find.text('Tomorrow · Sun, 8 Nov'), findsOneWidget);
+    // Morning, then Evening, each with its amount.
+    final morning = find.byKey(const Key('tomorrowLine-a1-morning'));
+    final evening = find.byKey(const Key('tomorrowLine-a1-evening'));
     expect(
-      tester.widget<Text>(find.byKey(const Key('tomorrowSummary'))).data,
-      'Buffalo Milk 1.00 L + 0.50 L',
+      tester.getTopLeft(morning).dy,
+      lessThan(tester.getTopLeft(evening).dy),
     );
-    // The controls are not on Home itself.
-    expect(find.byKey(const Key('tomorrowMore-a1-morning')), findsNothing);
+    expect(
+      find.descendant(of: morning, matching: find.text('Morning')),
+      findsOne,
+    );
+    expect(
+      find.descendant(of: evening, matching: find.text('Evening')),
+      findsOne,
+    );
+    String qty(String shift) =>
+        tester.widget<Text>(find.byKey(Key('tomorrowQty-a1-$shift'))).data!;
+    expect(qty('morning'), '1.00 L');
+    expect(qty('evening'), '0.50 L');
 
+    // + on the line: tomorrow only.
+    await tester.tap(find.byKey(const Key('tomorrowMoreLine-a1-morning')));
+    await tester.pumpAndSettle();
+    expect(qty('morning'), '1.50 L');
+    expect(calls.last, contains('"quantity_ml":1500'));
+    await tester.tap(find.byKey(const Key('tomorrowLess-a1-morning')));
+    await tester.pumpAndSettle();
+    expect(qty('morning'), '1.00 L');
+    // 0.50 L is the least: the evening − does nothing.
+    expect(
+      tester
+          .widget<InkWell>(
+            find.descendant(
+              of: find.byKey(const Key('tomorrowLess-a1-evening')),
+              matching: find.byType(InkWell),
+            ),
+          )
+          .onTap,
+      isNull,
+    );
+
+    // Skip / more: the full card, with Skip.
     await tester.tap(find.byKey(const Key('tomorrowChange')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('tomorrowMore-a1-morning')));
-    await tester.pumpAndSettle();
-    // Closing the sheet: the line shows the change.
-    await tester.tapAt(const Offset(20, 20));
-    await tester.pumpAndSettle();
-    expect(
-      tester.widget<Text>(find.byKey(const Key('tomorrowSummary'))).data,
-      'Buffalo Milk 1.50 L + 0.50 L',
-    );
+    expect(find.byKey(const Key('tomorrowSkip-a1')), findsOneWidget);
   });
 
   testWidgets('no milk tomorrow: nothing shown', (tester) async {

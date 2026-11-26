@@ -172,69 +172,150 @@ class _TomorrowMilkCardState extends State<TomorrowMilkCard> {
     );
   }
 
-  /// "Buffalo Milk 1.00 L + 0.50 L", "Curd 2 × 500 g", or skipped.
-  String _summary(List<TomorrowShift> shifts) {
-    final first = shifts.first;
-    if (first.skipped) return '${first.productName} skipped';
-    String amount(TomorrowShift s) {
-      final offer = sudhamrtamSubscriptionProducts.offerFor(s.productId);
-      return offer != null && offer.isPack
-          ? offer.quantityText(s.quantityMl)
-          : milkLitresText(s.quantityMl);
-    }
-
-    return '${first.productName} ${shifts.map(amount).join(' + ')}';
+  /// The steps for [s]: the product's pack sizes, or milk in 250 ml.
+  ({int? less, int? more, String Function(int) amount}) _steps(
+    TomorrowShift s,
+  ) {
+    final offer = sudhamrtamSubscriptionProducts.offerFor(s.productId);
+    final packs = offer != null && offer.isPack
+        ? ({...offer.quantities, s.usualMl}.toList()..sort())
+        : null;
+    return (
+      less: packs == null
+          ? previousMilkMl(s.quantityMl)
+          : packs.where((q) => q < s.quantityMl).lastOrNull,
+      more: packs == null
+          ? nextMilkMl(s.quantityMl)
+          : packs.where((q) => q > s.quantityMl).firstOrNull,
+      amount: (q) => packs == null ? milkLitresText(q) : offer!.quantityText(q),
+    );
   }
 
+  /// Home (owner request 2026-11-26): tomorrow's deliveries, one line
+  /// per delivery time with − and + for tomorrow only; More opens skip.
   Widget _strip(TomorrowMilk milk, Map<String, List<TomorrowShift>> plans) {
-    final open = milk.shifts.any((s) => s.open);
-    return Material(
+    const order = {'early_morning': 0, 'morning': 1, 'evening': 2};
+    final shifts = [...milk.shifts]
+      ..sort((a, b) => (order[a.shift] ?? 3).compareTo(order[b.shift] ?? 3));
+    return Container(
       key: const Key('tomorrowStrip'),
-      color: const Color(0xFFF3F8EA),
-      shape: RoundedRectangleBorder(
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F9EE),
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: Color(0xFFDDE8CC)),
+        border: Border.all(color: const Color(0xFFE1EBD3)),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: _openFull,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
-          child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              const Icon(Icons.local_drink_outlined, color: _deepGreen),
-              const SizedBox(width: 10),
+              const Icon(
+                Icons.local_drink_outlined,
+                size: 18,
+                color: _deepGreen,
+              ),
+              const SizedBox(width: 6),
               Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tomorrow · ${_dayLabel(milk.date)}',
-                      style: const TextStyle(
-                        color: _deepGreen,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      plans.values.map(_summary).join(' · '),
-                      key: const Key('tomorrowSummary'),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                child: Text(
+                  'Tomorrow · ${_dayLabel(milk.date)}',
+                  style: const TextStyle(
+                    color: _deepGreen,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               TextButton(
                 key: const Key('tomorrowChange'),
                 onPressed: _openFull,
-                child: Text(open ? 'Change' : 'View'),
+                style: TextButton.styleFrom(
+                  foregroundColor: _deepGreen,
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: const Text(
+                  'Skip / more',
+                  style: TextStyle(fontSize: 13),
+                ),
               ),
             ],
           ),
-        ),
+          for (final s in shifts) _line(milk.date, s),
+        ],
+      ),
+    );
+  }
+
+  /// "Morning   Buffalo Milk   − 1.00 L +".
+  Widget _line(String date, TomorrowShift s) {
+    final client = widget.client!;
+    final steps = _steps(s);
+    final canChange = s.open && !_busy && !s.skipped;
+    void set(int ml) => _run(
+      () => client.setQuantity(
+        s.planId,
+        date: date,
+        shift: s.shift,
+        quantityMl: ml,
+      ),
+    );
+    return Padding(
+      key: Key('tomorrowLine-${s.planId}-${s.shift}'),
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              _shiftNames[s.shift] ?? s.shift,
+              style: const TextStyle(color: Colors.black54, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              s.skipped ? '${s.productName} · skipped' : s.productName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: s.skipped ? Colors.black45 : const Color(0xFF2B3A1E),
+              ),
+            ),
+          ),
+          if (!s.skipped) ...[
+            _SoftStep(
+              key: Key('tomorrowLess-${s.planId}-${s.shift}'),
+              icon: Icons.remove,
+              tooltip: 'Less tomorrow',
+              onTap: canChange && steps.less != null
+                  ? () => set(steps.less!)
+                  : null,
+            ),
+            SizedBox(
+              width: 64,
+              child: Text(
+                steps.amount(s.quantityMl),
+                key: Key('tomorrowQty-${s.planId}-${s.shift}'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: s.changed ? _deepGreen : const Color(0xFF2B3A1E),
+                ),
+              ),
+            ),
+            _SoftStep(
+              key: Key('tomorrowMoreLine-${s.planId}-${s.shift}'),
+              icon: Icons.add,
+              tooltip: 'More tomorrow',
+              onTap: canChange && steps.more != null
+                  ? () => set(steps.more!)
+                  : null,
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -401,6 +482,46 @@ class _TomorrowMilkCardState extends State<TomorrowMilkCard> {
       ),
     );
   }
+}
+
+/// A small round − or + with a soft outline (Home's Tomorrow lines).
+class _SoftStep extends StatelessWidget {
+  const _SoftStep({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: Material(
+      color: Colors.white,
+      shape: CircleBorder(
+        side: BorderSide(
+          color: onTap == null ? const Color(0xFFE0E0E0) : _green,
+          width: 1.4,
+        ),
+      ),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(
+            icon,
+            size: 16,
+            color: onTap == null ? Colors.black26 : _deepGreen,
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _StepButton extends StatelessWidget {

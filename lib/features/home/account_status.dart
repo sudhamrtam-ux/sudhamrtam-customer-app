@@ -211,7 +211,7 @@ class AccountStatusCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               color: status.color,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
@@ -257,7 +257,7 @@ class AccountStatusCard extends StatelessWidget {
                         key: const Key('accountStatusLabel'),
                         style: TextStyle(
                           color: status.color,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       if (onOpen != null)

@@ -180,7 +180,7 @@ class _ComboCard extends StatelessWidget {
           color: ribbon,
           textStyle: const TextStyle(
             fontSize: 10.5,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: Colors.white,
             letterSpacing: 0.3,
           ),
@@ -233,7 +233,7 @@ class _ComboCard extends StatelessWidget {
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 letterSpacing: 0.6,
                               ),
                             ),
@@ -249,7 +249,7 @@ class _ComboCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: Color(0xFF2F2A26),
                           ),
                         ),
@@ -303,7 +303,7 @@ class _ComboCard extends StatelessWidget {
                                     key: Key('combo-price-${combo.id}'),
                                     style: const TextStyle(
                                       fontSize: 22,
-                                      fontWeight: FontWeight.w900,
+                                      fontWeight: FontWeight.w700,
                                       color: Color(0xFF2F2A26),
                                     ),
                                   ),

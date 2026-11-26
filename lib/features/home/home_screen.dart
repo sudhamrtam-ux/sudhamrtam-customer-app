@@ -267,7 +267,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     compact: true,
                   ),
                 ),
-                // Festive and combo offers first (owner decision 2026-11-15
+                // The banner right under the welcome (owner request
+                // 2026-11-26).
+                const SizedBox(height: 12),
+                _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
+                // Festive and combo offers next (owner decision 2026-11-15
                 // and request 2026-11-25).
                 if (_combos.combos.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -317,7 +321,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
                 if (essentials.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   _SectionTitle(
@@ -460,7 +463,7 @@ class _HeroCard extends StatelessWidget {
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 17,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           letterSpacing: 0.2,
                         ),
                       ),
@@ -661,7 +664,7 @@ class _SectionTitle extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w800, color: _ink),
+                ?.copyWith(fontWeight: FontWeight.w700, color: _ink),
           ),
         ),
         if (actionLabel != null)
@@ -1098,7 +1101,7 @@ class _GreetingState extends State<_Greeting> {
         Text(
           'Welcome to Sudhamrtam',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: _ink,
             letterSpacing: -0.2,
           ),
