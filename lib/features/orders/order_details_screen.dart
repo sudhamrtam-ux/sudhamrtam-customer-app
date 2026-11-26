@@ -7,7 +7,11 @@ import '../../models/combo_offer.dart';
 import '../../models/customer_order.dart';
 import '../../models/order_item.dart';
 import '../payment/order_payment_status.dart';
+import '../../database/order_ref_service.dart';
+import '../../services/order_api_client.dart' show OrderPaymentStatus;
+import '../milk_bills/bill_pdf.dart' show billLogo, outputBillPdf;
 import 'order_number.dart';
+import 'order_receipt_pdf.dart';
 import 'order_status_labels.dart';
 import '../../core/widgets/page_app_bar.dart';
 
@@ -251,7 +255,14 @@ class OrderDetailsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          StatusChip(deliveryLabel(order.status)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              StatusChip(deliveryLabel(order.status)),
+              const SizedBox(height: 6),
+              _ReceiptButton(order: order),
+            ],
+          ),
         ],
       ),
     );
@@ -383,4 +394,84 @@ class OrderDetailsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Downloads the order receipt PDF (owner request 2026-11-26): both
+/// addresses, the items, the total and the payment as the server has it.
+class _ReceiptButton extends StatefulWidget {
+  const _ReceiptButton({required this.order});
+
+  final CustomerOrder order;
+
+  @override
+  State<_ReceiptButton> createState() => _ReceiptButtonState();
+}
+
+class _ReceiptButtonState extends State<_ReceiptButton> {
+  bool _busy = false;
+
+  Future<void> _download() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final order = widget.order;
+    try {
+      // The server's payment and short number when it can be asked.
+      OrderPaymentStatus? server;
+      final api = OrderDestination.server;
+      if (api != null) {
+        try {
+          server = await api.fetchPaymentStatus(order.id);
+        } catch (_) {
+          // The phone's copy is enough for a receipt.
+        }
+      }
+      String? ref = server?.orderRef;
+      if (ref == null && OrderDestination.sendsToServer) {
+        try {
+          ref = await OrderRefService.instance.refFor(order.id);
+        } catch (_) {}
+      }
+      final bytes = await buildOrderReceiptPdf(
+        order,
+        orderRef: ref,
+        payment: paymentLabel(order, server).text,
+        status: deliveryLabel(order.status).text,
+        logo: await billLogo(),
+      );
+      await outputBillPdf(
+        bytes,
+        'Sudhamrtam receipt ${ref ?? order.id}',
+        share: true,
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not make the receipt. Try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    key: const Key('order-receipt'),
+    onPressed: _busy ? null : _download,
+    style: OutlinedButton.styleFrom(
+      foregroundColor: const Color(0xFF4F7A1F),
+      side: const BorderSide(color: Color(0xFF82B440)),
+      visualDensity: VisualDensity.compact,
+    ),
+    icon: _busy
+        ? const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.receipt_long_outlined, size: 18),
+    label: const Text('Receipt'),
+  );
 }
