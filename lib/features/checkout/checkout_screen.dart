@@ -77,6 +77,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   List<CustomerAddress> _savedAddresses = [];
   String? _selectedAddressId;
+
+  /// Billing address (owner request 2026-11-26): the delivery one,
+  /// unless the customer unticks "same" and picks another.
+  bool _billingSame = true;
+  String? _billingAddressId;
   bool _addressesLoading = true;
   String? _addressError;
 
@@ -129,6 +134,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (address.id == _selectedAddressId) {
         return address;
       }
+    }
+    return null;
+  }
+
+  /// The address the order is billed to; null: the delivery one.
+  CustomerAddress? get _billingAddress {
+    if (_billingSame) return null;
+    for (final address in _savedAddresses) {
+      if (address.id == _billingAddressId) return address;
     }
     return null;
   }
@@ -580,6 +594,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ? _deliveryInstructionsController.text
               : null,
           deliveryDate: isDelivery ? _chosenDateIso() : null,
+          billing: isDelivery ? _billingAddress : null,
         ),
       );
 
@@ -947,7 +962,84 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             side: const BorderSide(color: _brandGreen),
           ),
         ),
+        const SizedBox(height: 12),
+        _buildBillingChoice(),
       ],
+    );
+  }
+
+  /// "Billing address same as delivery address", or another saved one.
+  Widget _buildBillingChoice() {
+    final others = [
+      for (final a in _savedAddresses)
+        if (a.id != _selectedAddressId) a,
+    ];
+    return Material(
+      key: const Key('billing-choice'),
+      color: Colors.white,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CheckboxListTile(
+            key: const Key('billing-same'),
+            value: _billingSame,
+            activeColor: _brandGreen,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text('Billing address same as delivery address'),
+            onChanged: (on) => setState(() {
+              _billingSame = on ?? true;
+              if (!_billingSame &&
+                  !others.any((a) => a.id == _billingAddressId)) {
+                _billingAddressId = others.isEmpty
+                    ? null
+                    : others
+                          .firstWhere(
+                            (a) => a.isBilling,
+                            orElse: () => others.first,
+                          )
+                          .id;
+              }
+            }),
+          ),
+          if (!_billingSame)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: others.isEmpty
+                  ? const Text(
+                      'Add another address to bill this order to it.',
+                      style: TextStyle(color: Colors.black54),
+                    )
+                  : DropdownButtonFormField<String>(
+                      key: const Key('billing-address'),
+                      initialValue: _billingAddressId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Bill to',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: [
+                        for (final a in others)
+                          DropdownMenuItem(
+                            value: a.id,
+                            child: Text(
+                              '${a.label}: ${a.recipientName}, '
+                              '${a.formattedAddress}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: (id) => setState(() => _billingAddressId = id),
+                    ),
+            ),
+        ],
+      ),
     );
   }
 

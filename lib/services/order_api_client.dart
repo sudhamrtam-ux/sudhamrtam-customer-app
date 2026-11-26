@@ -221,6 +221,9 @@ class OrderApiClient {
     'notes': order.notes,
     // Left out when not chosen, so earlier orders send the same body.
     if (order.deliveryDate != null) 'delivery_date': order.deliveryDate,
+    // Left out when billed to the delivery address (2026-11-26).
+    if (order.billingAddressId != null)
+      'billing_address_id': order.billingAddressId,
     'items': [
       for (final item in order.items)
         if (!isComboProductId(item.productId))

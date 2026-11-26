@@ -286,6 +286,32 @@ class CustomerAddressDatabaseService {
     await db.delete(_table, where: 'customer_id = ?', whereArgs: [customerId]);
   }
 
+  /// Marks [addressId] as the billing address (the others unmarked), or
+  /// unmarks it.
+  Future<void> setBillingAddress({
+    required String customerId,
+    required String addressId,
+    required bool on,
+  }) async {
+    final db = await MilkDatabaseService.instance.database;
+    await db.transaction((txn) async {
+      if (on) {
+        await txn.update(
+          _table,
+          {'is_billing': 0},
+          where: 'customer_id = ? AND is_billing = 1',
+          whereArgs: [customerId],
+        );
+      }
+      await txn.update(
+        _table,
+        {'is_billing': on ? 1 : 0},
+        where: 'id = ? AND customer_id = ?',
+        whereArgs: [addressId, customerId],
+      );
+    });
+  }
+
   /// Removes the default flag from every address belonging
   /// to the specified customer.
   Future<void> _clearDefault(

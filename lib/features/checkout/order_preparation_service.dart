@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import '../../models/customer_address.dart';
+
 import '../../models/cart_manager.dart';
 import '../../models/customer_order.dart';
 import '../../models/order_item.dart';
@@ -23,6 +25,7 @@ class OrderPreparationService {
     String? addressId,
     String? deliveryInstructions,
     String? deliveryDate,
+    CustomerAddress? billing,
   }) {
     final normalizedAddress = deliveryAddress?.trim();
     final normalizedRecipientName = recipientName?.trim();
@@ -30,6 +33,7 @@ class OrderPreparationService {
     final normalizedInstructions = deliveryInstructions?.trim();
 
     final isDelivery = fulfillmentMethod == FulfillmentMethod.delivery;
+    final billedElsewhere = billing != null && billing.id != addressId;
 
     // Delivery orders must say who receives them and how
     // to reach that person.
@@ -82,6 +86,13 @@ class OrderPreparationService {
       recipientPhone: isDelivery ? normalizedRecipientPhone : null,
       addressId: isDelivery ? addressId : null,
       deliveryDate: isDelivery ? deliveryDate : null,
+      // Billed to another saved address; the same one is no change.
+      billingAddressId: isDelivery && billedElsewhere ? billing.id : null,
+      billingName: isDelivery && billedElsewhere ? billing.recipientName : null,
+      billingPhone: isDelivery && billedElsewhere ? billing.phoneNumber : null,
+      billingAddress: isDelivery && billedElsewhere
+          ? billing.formattedAddress
+          : null,
       notes:
           fulfillmentMethod == FulfillmentMethod.delivery &&
               normalizedInstructions != null &&

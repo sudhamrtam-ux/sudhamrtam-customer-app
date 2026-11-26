@@ -170,6 +170,27 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
     }
   }
 
+  /// The address on the monthly milk bill (owner decision 2026-11-26).
+  Future<void> _setBilling(CustomerAddress address, bool on) async {
+    if (_isDeleting || _isUpdatingDefault) return;
+    setState(() => _isUpdatingDefault = true);
+    try {
+      await widget.account.setBillingAddress(address.id, on);
+      if (!mounted) return;
+      await _loadAddresses();
+      if (!mounted) return;
+      _showMessage(
+        on
+            ? '${address.label} is now on your milk bills.'
+            : 'Milk bills use your default address again.',
+      );
+    } catch (error) {
+      _showMessage('Unable to change the billing address: ${_reason(error)}');
+    } finally {
+      if (mounted) setState(() => _isUpdatingDefault = false);
+    }
+  }
+
   Future<void> _deleteAddress(CustomerAddress address) async {
     if (_isDeleting || _isUpdatingDefault) return;
 
@@ -288,6 +309,14 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                     ),
                   ),
                 ),
+                if (address.isBilling) ...[
+                  const Chip(
+                    key: Key('billing-chip'),
+                    label: Text('Billing'),
+                    backgroundColor: Color(0xFFFFF3E0),
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 if (address.isDefault)
                   const Chip(
                     label: Text('Default'),
@@ -359,6 +388,28 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                       side: const BorderSide(color: _brandGreen),
                     ),
                   ),
+
+                OutlinedButton.icon(
+                  key: Key('billing-toggle-${address.id}'),
+                  onPressed: isBusy
+                      ? null
+                      : () => _setBilling(address, !address.isBilling),
+                  icon: Icon(
+                    address.isBilling
+                        ? Icons.receipt_long
+                        : Icons.receipt_long_outlined,
+                    size: 18,
+                  ),
+                  label: Text(
+                    address.isBilling
+                        ? 'Stop using for bills'
+                        : 'Use for bills',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _brandGreen,
+                    side: const BorderSide(color: _brandGreen),
+                  ),
+                ),
 
                 OutlinedButton.icon(
                   onPressed: isBusy

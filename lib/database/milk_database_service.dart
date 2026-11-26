@@ -33,7 +33,7 @@ class MilkDatabaseService {
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 22;
+  static const int databaseVersion = 23;
   static const String orderRefsTable = 'order_refs';
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
@@ -154,6 +154,7 @@ class MilkDatabaseService {
     await _addAddressDeliveryNoteColumn(db);
     await _addOrderDeliveryDateColumn(db);
     await _createOrderRefsTable(db);
+    await _addBillingColumns(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -265,6 +266,41 @@ class MilkDatabaseService {
 
     if (oldVersion < 22) {
       await _allowAnySubscriptionProduct(db);
+    }
+
+    if (oldVersion < 23) {
+      await _addBillingColumns(db);
+    }
+  }
+
+  /// Version 23 (owner request 2026-11-26): who an order is billed to
+  /// (null: the delivery address), and the address used on milk bills.
+  Future<void> _addBillingColumns(Database db) async {
+    final orderColumns = {
+      for (final c in await db.rawQuery('PRAGMA table_info($ordersTable)'))
+        c['name'],
+    };
+    for (final name in [
+      'billing_address_id',
+      'billing_name',
+      'billing_phone',
+      'billing_address',
+    ]) {
+      if (orderColumns.isNotEmpty && !orderColumns.contains(name)) {
+        await db.execute('ALTER TABLE $ordersTable ADD COLUMN $name TEXT');
+      }
+    }
+    final addressColumns = {
+      for (final c in await db.rawQuery(
+        'PRAGMA table_info($customerAddressesTable)',
+      ))
+        c['name'],
+    };
+    if (addressColumns.isNotEmpty && !addressColumns.contains('is_billing')) {
+      await db.execute(
+        'ALTER TABLE $customerAddressesTable '
+        'ADD COLUMN is_billing INTEGER NOT NULL DEFAULT 0',
+      );
     }
   }
 

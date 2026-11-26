@@ -260,6 +260,21 @@ class AccountSyncService extends ChangeNotifier {
     notifyListeners();
   });
 
+  /// The address used on milk bills (owner decision 2026-11-26).
+  Future<void> setBillingAddress(String addressId, bool on) =>
+      _serial(() async {
+        final client = api;
+        if (isSignedIn && client != null && !(await _isUnsynced(addressId))) {
+          await _call(() => client.setBillingAddress(addressId, on));
+        }
+        await _addresses.setBillingAddress(
+          customerId: localCustomerId,
+          addressId: addressId,
+          on: on,
+        );
+        notifyListeners();
+      });
+
   Future<void> setDefaultAddress(String addressId) => _serial(() async {
     final client = api;
     if (isSignedIn && client != null && !(await _isUnsynced(addressId))) {

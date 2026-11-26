@@ -191,7 +191,7 @@ void main() {
     await old.close();
 
     final db = await MilkDatabaseService.instance.database;
-    expect(await db.getVersion(), 22);
+    expect(await db.getVersion(), MilkDatabaseService.databaseVersion);
     final plans = await MilkSubscriptionRepository().loadSubscriptions();
     expect(plans.single.productId, 'cow_milk');
     expect(plans.single.shiftSchedules.single.quantityMl, 1500);

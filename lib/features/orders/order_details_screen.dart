@@ -276,7 +276,7 @@ class OrderDetailsScreen extends StatelessWidget {
   Widget _delivery() {
     final notes = order.notes?.trim();
     return _card(
-      'DELIVERY / PICKUP',
+      'DELIVERY & BILLING',
       Icons.local_shipping_outlined,
       key: const Key('order-details-delivery'),
       [
@@ -293,6 +293,20 @@ class OrderDetailsScreen extends StatelessWidget {
         ],
         if (notes != null && notes.isNotEmpty)
           _detailRow('Instructions', notes),
+        // Billed to (owner request 2026-11-26).
+        if (order.fulfillmentMethod == FulfillmentMethod.delivery)
+          _detailRow(
+            'Billed to',
+            order.billedElsewhere
+                ? [
+                    [
+                      order.billingName ?? '',
+                      if (order.billingPhone != null) order.billingPhone!,
+                    ].where((p) => p.isNotEmpty).join(' · '),
+                    order.billingAddress!,
+                  ].join('\n')
+                : 'Same as delivery address',
+          ),
       ],
     );
   }

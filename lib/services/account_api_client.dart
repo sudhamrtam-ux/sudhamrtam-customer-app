@@ -103,6 +103,7 @@ class AddressJson {
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       isDefault: json['is_default'] as bool,
+      isBilling: json['is_billing'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       societyId: json['society_id'] as String?,
@@ -179,6 +180,14 @@ class AccountApiClient {
       'v1/addresses/${Uri.encodeComponent(addressId)}',
       null,
       const {404},
+    );
+  }
+
+  /// Marks (or unmarks) the address used on milk bills.
+  Future<void> setBillingAddress(String addressId, bool on) async {
+    await _send(
+      on ? 'POST' : 'DELETE',
+      'v1/addresses/${Uri.encodeComponent(addressId)}/billing',
     );
   }
 

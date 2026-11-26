@@ -25,6 +25,9 @@ class CustomerAddress {
   final double? longitude;
 
   final bool isDefault;
+
+  /// Used on the monthly milk bill (owner decision 2026-11-26).
+  final bool isBilling;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -65,6 +68,7 @@ class CustomerAddress {
     this.latitude,
     this.longitude,
     this.isDefault = false,
+    this.isBilling = false,
     required this.createdAt,
     required this.updatedAt,
     this.societyId,
@@ -120,6 +124,7 @@ class CustomerAddress {
     double? longitude,
     bool clearMapLocation = false,
     bool? isDefault,
+    bool? isBilling,
     DateTime? updatedAt,
   }) {
     // Society, block, flat and house are set in the address form,
@@ -142,6 +147,7 @@ class CustomerAddress {
       latitude: clearMapLocation ? null : latitude ?? this.latitude,
       longitude: clearMapLocation ? null : longitude ?? this.longitude,
       isDefault: isDefault ?? this.isDefault,
+      isBilling: isBilling ?? this.isBilling,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       societyId: societyId,
@@ -188,6 +194,9 @@ class CustomerAddress {
       'latitude': latitude,
       'longitude': longitude,
       'is_default': isDefault ? 1 : 0,
+      // Only when set, so older upgrade steps that copy addresses run
+      // before the v23 column exists.
+      if (isBilling) 'is_billing': 1,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'society_id': societyId,
@@ -218,6 +227,7 @@ class CustomerAddress {
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),
       isDefault: (map['is_default'] as int) == 1,
+      isBilling: (map['is_billing'] as int? ?? 0) == 1,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
       societyId: map['society_id'] as String?,

@@ -107,6 +107,7 @@ void main() {
   Future<void> setUpAddress({
     required String? areaId,
     bool onMap = true,
+    bool withOffice = false,
   }) async {
     await CustomerProfileDatabaseService.instance.saveSyncedProfile(
       customerId: AccountSyncService.localCustomerId,
@@ -134,6 +135,24 @@ void main() {
           createdAt: now,
           updatedAt: now,
         ),
+        if (withOffice)
+          CustomerAddress(
+            id: 'office_1',
+            customerId: AccountSyncService.localCustomerId,
+            areaId: areaId,
+            label: 'Office',
+            recipientName: 'Asha Enterprises',
+            phoneNumber: '9876543210',
+            addressLine1: 'Plot 7, Industrial Estate',
+            landmark: '',
+            city: 'Hyderabad',
+            state: 'Telangana',
+            postalCode: '500090',
+            latitude: 17.5,
+            longitude: 78.4,
+            createdAt: now,
+            updatedAt: now,
+          ),
       ],
     );
   }
@@ -208,6 +227,32 @@ void main() {
     expect(order.addressId, 'home_1');
     expect(order.fulfillmentMethod, FulfillmentMethod.delivery);
     expect(order.paymentMethod, OrderPaymentMethod.cashOnDelivery);
+  });
+
+  testWidgets('billing: same as delivery, or another saved address '
+      '(2026-11-26)', (tester) async {
+    await tester.runAsync(
+      () => setUpAddress(areaId: 'nizampet', withOffice: true),
+    );
+    await pump(tester);
+
+    final same = find.byKey(const Key('billing-same'));
+    await tester.ensureVisible(same);
+    expect(tester.widget<CheckboxListTile>(same).value, isTrue);
+    expect(find.byKey(const Key('billing-address')), findsNothing);
+
+    // Untick: the other saved address is offered and chosen.
+    await tester.tap(same);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('billing-address')), findsOneWidget);
+    expect(find.textContaining('Office: Asha Enterprises'), findsOneWidget);
+
+    await tester.tap(button('Place Order'));
+    await tester.pump();
+    final order = coordinator.received.single;
+    expect(order.addressId, 'home_1');
+    expect(order.billingAddressId, 'office_1');
+    expect(order.billingName, 'Asha Enterprises');
   });
 
   testWidgets('the customer chooses the delivery date (morning)', (

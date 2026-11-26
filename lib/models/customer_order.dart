@@ -55,6 +55,15 @@ class CustomerOrder {
   // Null: the earliest date (and for orders placed before v20).
   final String? deliveryDate;
 
+  // Billed to another saved address (schema v23, owner request
+  // 2026-11-26). Null: the same as the delivery address.
+  final String? billingAddressId;
+  final String? billingName;
+  final String? billingPhone;
+  final String? billingAddress;
+
+  bool get billedElsewhere => billingAddress != null;
+
   CustomerOrder({
     required this.id,
     required this.createdAt,
@@ -68,6 +77,10 @@ class CustomerOrder {
     this.addressId,
     this.notes,
     this.deliveryDate,
+    this.billingAddressId,
+    this.billingName,
+    this.billingPhone,
+    this.billingAddress,
   }) : items = List<OrderItem>.unmodifiable(items) {
     if (id.trim().isEmpty) {
       throw ArgumentError('Order ID cannot be empty.');
@@ -112,6 +125,10 @@ class CustomerOrder {
       addressId: addressId,
       notes: notes,
       deliveryDate: deliveryDate,
+      billingAddressId: billingAddressId,
+      billingName: billingName,
+      billingPhone: billingPhone,
+      billingAddress: billingAddress,
     );
   }
 
@@ -137,6 +154,11 @@ class CustomerOrder {
       'subtotal': subtotal,
       // Same rule for the chosen delivery date (v20).
       if (deliveryDate != null) 'delivery_date': deliveryDate,
+      // Same rule for the billing address (v23).
+      if (billingAddressId != null) 'billing_address_id': billingAddressId,
+      if (billingName != null) 'billing_name': billingName,
+      if (billingPhone != null) 'billing_phone': billingPhone,
+      if (billingAddress != null) 'billing_address': billingAddress,
     };
   }
 
@@ -162,6 +184,10 @@ class CustomerOrder {
       addressId: map['address_id'] as String?,
       notes: map['notes'] as String?,
       deliveryDate: map['delivery_date'] as String?,
+      billingAddressId: map['billing_address_id'] as String?,
+      billingName: map['billing_name'] as String?,
+      billingPhone: map['billing_phone'] as String?,
+      billingAddress: map['billing_address'] as String?,
     );
   }
 }
