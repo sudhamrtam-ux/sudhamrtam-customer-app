@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 
 /// Offer tiles on Home (owner request and decisions 2026-11-26): a
 /// combo's tile shows its products as a gift (photos, a ribbon bow and
-/// a hanging tag); a text offer's tile its message. The staff app draws
+/// a hanging tag). Text offers stay in the offer line, not tiles. The staff app draws
 /// the same tiles as a preview (keep the two in step).
 
-/// The tile colour of each occasion; text offers use [offerGreen].
+/// The tile colour of each occasion; [offerGreen] for any other.
 const occasionTileColours = {
   'festive': Color(0xFF8E1B3A),
   'inaugural': Color(0xFFC8641A),
@@ -681,96 +681,6 @@ class ComboTile extends StatelessWidget {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-/// A text offer's tile: the message on its colour.
-class TextOfferTile extends StatelessWidget {
-  const TextOfferTile({
-    super.key,
-    required this.colour,
-    required this.message,
-    this.footnote,
-  });
-
-  final Color colour;
-  final String message;
-  final String? footnote;
-
-  @override
-  Widget build(BuildContext context) {
-    final ink = tileTextColour(colour);
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [colour, Color.lerp(colour, Colors.black, 0.2)!],
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -18,
-            bottom: -18,
-            child: Icon(
-              Icons.redeem,
-              size: 130,
-              color: ink.withValues(alpha: 0.12),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF6C343),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'OFFER',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF2B2B2B),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: Text(
-                    message,
-                    overflow: TextOverflow.fade,
-                    style: TextStyle(
-                      color: ink,
-                      fontSize: 22,
-                      height: 1.2,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                if (footnote != null)
-                  Text(
-                    footnote!,
-                    style: TextStyle(
-                      color: ink.withValues(alpha: 0.85),
-                      fontSize: 12,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

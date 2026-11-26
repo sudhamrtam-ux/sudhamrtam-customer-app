@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../models/cart_manager.dart';
 import '../../models/combo_offer.dart';
-import '../../services/offer_api_client.dart';
 import '../shop/product_image.dart' show productImageProvider;
 import '../shop/quantity_bill.dart' show billRupees;
 import 'offer_tile.dart';
@@ -26,8 +25,9 @@ String offHeadline(int discountBp) {
   return '$text% off';
 }
 
-/// The offers on Home as big tiles (owner request and decisions
-/// 2026-11-26): combos with their gift picture, then text offers. On a
+/// Combo offers on Home as big tiles with their gift picture (owner
+/// request and decisions 2026-11-26; text offers stay in the offer
+/// line). On a
 /// computer [perRow] tiles share the row (the owner's choice); a phone
 /// shows one (two on a tablet) and the rest swipe. More tiles than fit
 /// slide in with the arrows.
@@ -36,13 +36,11 @@ class OfferTilesRow extends StatefulWidget {
     super.key,
     required this.combos,
     required this.cart,
-    this.textOffers = const [],
     this.perRow = 2,
     this.onOpenCart,
   });
 
   final List<ComboOffer> combos;
-  final List<TextOffer> textOffers;
   final int perRow;
   final CartManager cart;
   final VoidCallback? onOpenCart;
@@ -144,15 +142,7 @@ class _OfferTilesRowState extends State<OfferTilesRow> {
 
   @override
   Widget build(BuildContext context) {
-    final tiles = <Widget>[
-      for (final c in widget.combos) _comboTile(c),
-      for (final o in widget.textOffers)
-        TextOfferTile(
-          key: Key('offer-tile-${o.id}'),
-          colour: colourFromHex(o.tileColour) ?? offerGreen,
-          message: o.message,
-        ),
-    ];
+    final tiles = <Widget>[for (final c in widget.combos) _comboTile(c)];
     if (tiles.isEmpty) return const SizedBox.shrink();
 
     return LayoutBuilder(

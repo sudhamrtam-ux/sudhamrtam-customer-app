@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sudhamrtam_customer_app/features/home/offer_tiles_row.dart';
 import 'package:sudhamrtam_customer_app/models/cart_manager.dart';
 import 'package:sudhamrtam_customer_app/models/combo_offer.dart';
-import 'package:sudhamrtam_customer_app/services/offer_api_client.dart';
 
 import 'combo_cards_test.dart' show diwali;
 
@@ -14,7 +13,6 @@ void main() {
     WidgetTester tester, {
     required double width,
     required int perRow,
-    List<TextOffer> texts = const [],
     List<ComboOffer>? combos,
   }) async {
     tester.view.physicalSize = Size(width, 900);
@@ -26,7 +24,6 @@ void main() {
           body: SingleChildScrollView(
             child: OfferTilesRow(
               combos: combos ?? [diwali()],
-              textOffers: texts,
               perRow: perRow,
               cart: CartManager(productLookup: (_) => null),
             ),
@@ -37,25 +34,52 @@ void main() {
     await tester.pump();
   }
 
-  const paneer = TextOffer(
-    id: 'offer_paneer',
-    message: 'Fresh paneer now available daily',
-    tileColour: '#1F6F6B',
-  );
-  const honey = TextOffer(id: 'offer_honey', message: 'Raw honey is back');
+  ComboOffer another(String id) => ComboOffer.fromJson({
+    'id': id,
+    'title': 'Combo $id',
+    'occasion': 'seasonal',
+    'discount_bp': 500,
+    'starts_on': '2026-11-07',
+    'ends_on': '2026-11-30',
+    'max_per_order': 2,
+    'tile_colour': '#1F6F6B',
+    'items': [
+      {
+        'product_id': 'curd',
+        'name': 'Curd',
+        'unit_label': '500 g',
+        'quantity': 1,
+        'unit_price_paise': 6000,
+        'is_available': true,
+      },
+      {
+        'product_id': 'cow_milk',
+        'name': 'Cow Milk',
+        'unit_label': '1 L',
+        'quantity': 1,
+        'unit_price_paise': 9000,
+        'is_available': true,
+      },
+    ],
+    'full_paise': 15000,
+    'price_paise': 14250,
+    'savings_paise': 750,
+  });
+  final three = [diwali(), another('paneer_combo'), another('honey_combo')];
 
   testWidgets('a computer: the owner\'s number of tiles share the row', (
     tester,
   ) async {
-    await show(tester, width: 1240, perRow: 3, texts: [paneer, honey]);
+    await show(tester, width: 1240, perRow: 3, combos: three);
     final combo = tester.getSize(
       find.byKey(const Key('combo-card-diwali_combo_1')),
     );
-    final text = tester.getSize(find.byKey(const Key('offer-tile-offer_paneer')));
+    final other = tester.getSize(
+      find.byKey(const Key('combo-card-paneer_combo')),
+    );
     // Three across: (1240 − 2 gaps of 12) / 3.
     expect(combo.width, closeTo((1240 - 24) / 3, 0.5));
-    expect(text.width, combo.width);
-    expect(find.text('Fresh paneer now available daily'), findsOneWidget);
+    expect(other.width, combo.width);
     // All fit: no arrows.
     expect(find.byKey(const Key('offer-tiles-next')), findsNothing);
   });
@@ -63,10 +87,10 @@ void main() {
   testWidgets('more tiles than places: arrows slide to the next', (
     tester,
   ) async {
-    await show(tester, width: 1240, perRow: 2, texts: [paneer, honey]);
+    await show(tester, width: 1240, perRow: 2, combos: three);
     expect(find.byKey(const Key('offer-tiles-next')), findsOneWidget);
     // The second tile moves to the first place.
-    final second = find.byKey(const Key('offer-tile-offer_paneer'));
+    final second = find.byKey(const Key('combo-card-paneer_combo'));
     expect(tester.getTopLeft(second).dx, closeTo((1240 - 12) / 2 + 12, 0.5));
     await tester.tap(find.byKey(const Key('offer-tiles-next')));
     await tester.pumpAndSettle();
@@ -82,7 +106,12 @@ void main() {
   });
 
   testWidgets('a phone: one tile, the next peeking in', (tester) async {
-    await show(tester, width: 400, perRow: 4, texts: [paneer]);
+    await show(
+      tester,
+      width: 400,
+      perRow: 4,
+      combos: [diwali(), another('paneer_combo')],
+    );
     expect(
       tester.getSize(find.byKey(const Key('combo-card-diwali_combo_1'))).width,
       closeTo(400 * 0.84, 0.5),

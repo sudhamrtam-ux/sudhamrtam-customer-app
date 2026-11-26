@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-/// A text offer as a Home tile (owner request 2026-11-26).
+/// A text offer of the offer line.
 class TextOffer {
   const TextOffer({required this.id, required this.message, this.tileColour});
 
@@ -13,8 +13,8 @@ class TextOffer {
   final String? tileColour;
 }
 
-/// Today's text offers and how many tiles share the Home row on a
-/// computer (the owner's choice, 1-4).
+/// Today's text offers and how many combo tiles share the Home row on
+/// a computer (the owner's choice, 1-4, 2026-11-26).
 class OfferTiles {
   const OfferTiles({this.offers = const [], this.perRow = 2});
 

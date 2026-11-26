@@ -139,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
   OrderRules? _rules;
   List<String> _offers = const [];
 
-  /// Text offers as tiles, and how many tiles share the row.
+  /// How many combo tiles share the row (and the offer line's texts).
   OfferTiles _tiles = const OfferTiles();
   Timer? _ticker;
 
@@ -299,12 +299,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
                 // Festive and combo offers next (owner decision 2026-11-15
                 // and request 2026-11-25).
-                // As tiles with gift pictures (owner request 2026-11-26).
-                if (_combos.combos.isNotEmpty || _tiles.offers.isNotEmpty) ...[
+                // As tiles with gift pictures (owner request 2026-11-26);
+                // text offers stay in the offer line.
+                if (_combos.combos.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   OfferTilesRow(
                     combos: _combos.combos,
-                    textOffers: _tiles.offers,
                     perRow: _tiles.perRow,
                     cart: _cart,
                     onOpenCart: widget.onOpenCart,
