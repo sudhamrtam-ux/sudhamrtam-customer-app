@@ -122,6 +122,8 @@ void main() {
     expect(find.byKey(const Key('combo-cards')), findsOneWidget);
     expect(find.byKey(const Key('combo-card-diwali_combo_1')), findsOneWidget);
     expect(find.text('10% off'), findsOneWidget);
+    // The cross belt over the corner (2026-11-26).
+    expect(find.text('10% OFF'), findsOneWidget);
     expect(find.text('FESTIVE OFFER'), findsOneWidget);
     expect(find.text('Diwali Delight'), findsOneWidget);
     expect(find.text('You save ₹21.00'), findsOneWidget);

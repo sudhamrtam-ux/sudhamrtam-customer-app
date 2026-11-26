@@ -114,6 +114,7 @@ class _OfferTilesRowState extends State<OfferTilesRow> {
       key: Key('combo-card-${combo.id}'),
       colour: colour,
       headline: offHeadline(combo.discountBp),
+      sash: offHeadline(combo.discountBp).toUpperCase(),
       title: combo.title,
       badge: combo.occasionLabel,
       chips: [

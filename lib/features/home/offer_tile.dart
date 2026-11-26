@@ -547,9 +547,13 @@ class ComboTile extends StatelessWidget {
     this.footnote,
     this.action,
     this.priceKey,
+    this.sash,
   });
 
   final Color colour;
+
+  /// The cross belt's words over the top-right corner, e.g. "15% OFF".
+  final String? sash;
 
   /// For tests: the price text's key.
   final Key? priceKey;
@@ -639,27 +643,7 @@ class ComboTile extends StatelessWidget {
         fontWeight: FontWeight.w600,
       ),
     );
-    final chipRow = chips.isEmpty
-        ? null
-        : Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final c in chips)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: ink.withValues(alpha: 0.12),
-                    border: Border.all(color: ink.withValues(alpha: 0.22)),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Text(c, style: TextStyle(color: ink, fontSize: 12)),
-                ),
-            ],
-          );
+    final chipRow = chips.isEmpty ? null : _FitChips(chips: chips, ink: ink);
     final picturePanel = ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: AspectRatio(
@@ -771,70 +755,324 @@ class ComboTile extends StatelessWidget {
           ),
         ],
       ),
-      child: CustomPaint(
-        painter: _FestiveBackground(ink: ink),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: LayoutBuilder(
-            builder: (context, box) {
-              // Wide (one or two in a row on a computer): words left,
-              // picture right at its full height.
-              if (box.maxWidth > box.maxHeight * 1.5) {
-                // At most about half the tile, so the words keep room.
-                final pictureWidth = math.min(
-                  box.maxHeight * comboPictureRatio,
-                  box.maxWidth * 0.5,
-                );
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ?badgeChip,
-                          const SizedBox(height: 8),
-                          headlineText,
-                          const SizedBox(height: 4),
-                          titleText(2),
-                          if (chipRow != null) ...[
-                            const SizedBox(height: 10),
-                            Flexible(child: ClipRect(child: chipRow)),
-                          ],
-                          const Spacer(),
-                          bottom,
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    SizedBox(
-                      width: pictureWidth,
-                      child: Center(child: picturePanel),
-                    ),
-                  ],
-                );
-              }
-              // Tall: the picture between the words and the price.
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [?badgeChip, const Spacer()]),
-                  const SizedBox(height: 6),
-                  headlineText,
-                  const SizedBox(height: 2),
-                  titleText(1),
-                  const SizedBox(height: 10),
-                  Expanded(child: Center(child: picturePanel)),
-                  const SizedBox(height: 10),
-                  bottom,
-                ],
-              );
-            },
+      child: Stack(
+        children: [
+          CustomPaint(
+            painter: _FestiveBackground(ink: ink),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  // Wide (one or two in a row on a computer): words left,
+                  // picture right at its full height.
+                  if (box.maxWidth > box.maxHeight * 1.5) {
+                    // At most about half the tile, so the words keep room.
+                    final pictureWidth = math.min(
+                      box.maxHeight * comboPictureRatio,
+                      box.maxWidth * 0.5,
+                    );
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ?badgeChip,
+                              const SizedBox(height: 8),
+                              headlineText,
+                              const SizedBox(height: 4),
+                              titleText(2),
+                              if (chipRow != null) ...[
+                                const SizedBox(height: 10),
+                                // All the products, smaller when needed.
+                                Expanded(child: chipRow),
+                                const SizedBox(height: 8),
+                              ] else
+                                const Spacer(),
+                              bottom,
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        SizedBox(
+                          width: pictureWidth,
+                          child: Center(child: picturePanel),
+                        ),
+                      ],
+                    );
+                  }
+                  // Tall: the picture between the words and the price.
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [?badgeChip, const Spacer()]),
+                      const SizedBox(height: 6),
+                      headlineText,
+                      const SizedBox(height: 2),
+                      titleText(1),
+                      const SizedBox(height: 10),
+                      Expanded(child: Center(child: picturePanel)),
+                      const SizedBox(height: 10),
+                      bottom,
+                    ],
+                  );
+                },
+              ),
+            ),
           ),
+          if (sash != null)
+            Positioned(top: 0, right: 0, child: _CornerSash(text: sash!)),
+        ],
+      ),
+    );
+  }
+}
+
+/// The combo's products as chips that always show them all (owner
+/// request 2026-11-26): smaller text and padding when the space is
+/// short; only when even the smallest do not fit, as many as fit and
+/// "+N more".
+class _FitChips extends StatelessWidget {
+  const _FitChips({required this.chips, required this.ink});
+
+  final List<String> chips;
+  final Color ink;
+
+  /// Font size, side padding and top/bottom padding, largest first.
+  static const _sizes = [
+    (12.0, 9.0, 4.0),
+    (11.0, 8.0, 3.0),
+    (10.5, 7.0, 2.5),
+    (9.5, 6.0, 2.0),
+  ];
+  static const _gap = 6.0;
+
+  /// The chips' sizes for [labels] at one size.
+  static List<Size> _measure(
+    List<String> labels,
+    (double, double, double) size,
+    TextScaler scaler,
+  ) {
+    final (font, padX, padY) = size;
+    return [
+      for (final l in labels)
+        () {
+          final painter = TextPainter(
+            text: TextSpan(
+              text: l,
+              style: TextStyle(fontSize: font),
+            ),
+            textDirection: TextDirection.ltr,
+            textScaler: scaler,
+            maxLines: 1,
+          )..layout();
+          final s = Size(
+            painter.width + padX * 2 + 2,
+            painter.height + padY * 2 + 2,
+          );
+          painter.dispose();
+          return s;
+        }(),
+    ];
+  }
+
+  /// How many of [sizes] fit in [box] as a wrap (in order).
+  static int _fitting(List<Size> sizes, Size box) {
+    var x = 0.0;
+    var y = 0.0;
+    var rowHeight = 0.0;
+    for (var i = 0; i < sizes.length; i++) {
+      final s = sizes[i];
+      if (x > 0 && x + s.width > box.width) {
+        y += rowHeight + _gap;
+        x = 0;
+        rowHeight = 0;
+      }
+      if (y + s.height > box.height || s.width > box.width) return i;
+      x += s.width + _gap;
+      if (s.height > rowHeight) rowHeight = s.height;
+    }
+    return sizes.length;
+  }
+
+  Widget _chip(
+    String label,
+    (double, double, double) size, {
+    bool more = false,
+  }) {
+    final (font, padX, padY) = size;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: padX, vertical: padY),
+      decoration: BoxDecoration(
+        color: more ? const Color(0xFFF6C343) : ink.withValues(alpha: 0.12),
+        border: Border.all(
+          color: more ? const Color(0xFFF6C343) : ink.withValues(alpha: 0.22),
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        style: TextStyle(
+          color: more ? const Color(0xFF5A3A00) : ink,
+          fontSize: font,
+          fontWeight: more ? FontWeight.w800 : FontWeight.w400,
         ),
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final scaler = MediaQuery.textScalerOf(context);
+      final area = Size(box.maxWidth, box.maxHeight);
+      // The largest size that shows every product.
+      for (final size in _sizes) {
+        if (_fitting(_measure(chips, size, scaler), area) == chips.length) {
+          return Wrap(
+            spacing: _gap,
+            runSpacing: _gap,
+            children: [for (final c in chips) _chip(c, size)],
+          );
+        }
+      }
+      // Even the smallest is too big: as many as fit, then "+N more".
+      final size = _sizes.last;
+      var shown = chips.length - 1;
+      while (shown > 0) {
+        final labels = [...chips.take(shown), '+${chips.length - shown} more'];
+        if (_fitting(_measure(labels, size, scaler), area) == labels.length) {
+          break;
+        }
+        shown--;
+      }
+      return Wrap(
+        spacing: _gap,
+        runSpacing: _gap,
+        children: [
+          for (final c in chips.take(shown)) _chip(c, size),
+          _chip('+${chips.length - shown} more', size, more: true),
+        ],
+      );
+    },
+  );
+}
+
+/// The cross belt over the tile's top-right corner with the discount,
+/// e.g. "15% OFF" (owner request 2026-11-26): a red ribbon with gold
+/// edges, a soft shadow and the words along it. The tile's rounded
+/// corner cuts its ends, so it looks wrapped around the tile.
+class _CornerSash extends StatelessWidget {
+  const _CornerSash({required this.text});
+
+  final String text;
+
+  /// The square it sits in, and where the band runs across it.
+  static const size = 124.0;
+  static const _near = 34.0;
+  static const _far = 68.0;
+
+  @override
+  Widget build(BuildContext context) {
+    // The band's middle line runs from (size − m, 0) to (size, m); the
+    // words sit at its centre.
+    const m = (_near + _far) / 2;
+    return IgnorePointer(
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Positioned.fill(child: CustomPaint(painter: _SashPainter())),
+            Positioned(
+              left: size - m / 2,
+              top: m / 2,
+              child: FractionalTranslation(
+                translation: const Offset(-0.5, -0.5),
+                child: Transform.rotate(
+                  angle: math.pi / 4,
+                  // As wide as the band's middle allows; longer words
+                  // ("12.5% OFF") shrink to fit.
+                  child: SizedBox(
+                    width: m * math.sqrt2 - 10,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        text,
+                        key: const Key('tile-sash'),
+                        maxLines: 1,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                          shadows: [
+                            Shadow(
+                              color: Color(0x66000000),
+                              blurRadius: 2,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SashPainter extends CustomPainter {
+  const _SashPainter();
+
+  @override
+  void paint(Canvas canvas, Size box) {
+    const near = _CornerSash._near;
+    const far = _CornerSash._far;
+    final s = box.width;
+    // From the top edge to the right edge, across the corner.
+    final band = Path()
+      ..moveTo(s - far, 0)
+      ..lineTo(s - near, 0)
+      ..lineTo(s, near)
+      ..lineTo(s, far)
+      ..close();
+    canvas.drawShadow(band, Colors.black, 4, false);
+    canvas.drawPath(
+      band,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE53935), Color(0xFFB71C1C)],
+        ).createShader(Offset.zero & box),
+    );
+    // A light sheen along the middle, like satin.
+    canvas.drawLine(
+      Offset(s - (near + far) / 2, 0),
+      Offset(s, (near + far) / 2),
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.12)
+        ..strokeWidth = 6,
+    );
+    // Gold edges.
+    final gold = Paint()
+      ..color = const Color(0xFFF6C343)
+      ..strokeWidth = 2;
+    canvas.drawLine(Offset(s - near, 0), Offset(s, near), gold);
+    canvas.drawLine(Offset(s - far, 0), Offset(s, far), gold);
+  }
+
+  @override
+  bool shouldRepaint(_SashPainter old) => false;
 }
 
 /// The drawn gift on a light panel, when there is no picture.

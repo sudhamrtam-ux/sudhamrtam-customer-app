@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:sudhamrtam_customer_app/features/home/offer_tile.dart';
 import 'package:sudhamrtam_customer_app/features/home/offer_tiles_row.dart';
 import 'package:sudhamrtam_customer_app/models/cart_manager.dart';
 import 'package:sudhamrtam_customer_app/models/combo_offer.dart';
@@ -117,6 +118,44 @@ void main() {
       closeTo(400 * 0.84, 0.5),
     );
     expect(find.byKey(const Key('offer-tiles-next')), findsNothing);
+  });
+
+  testWidgets('every product of the combo shows on a wide tile', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1240, 400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const chips = [
+      '1 × Buffalo Ghee 500 g',
+      '1 × Cow Ghee 250 g',
+      '1 × Raw Honey 500 g',
+      '2 × Cow Milk 500 ml',
+      '1 × Curd 500 g',
+    ];
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1240,
+            height: 330,
+            child: ComboTile(
+              colour: Color(0xFF3A3A3A),
+              headline: '15% off',
+              title: 'Diwali Delight Hamper!!',
+              tag: 'Diwali',
+              items: [],
+              chips: chips,
+            ),
+          ),
+        ),
+      ),
+    );
+    for (final c in chips) {
+      expect(find.text(c), findsOneWidget);
+    }
+    expect(find.textContaining('more'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   test('the offers answer: tiles per row, colours, an older server', () {
