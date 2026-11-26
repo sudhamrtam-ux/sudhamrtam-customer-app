@@ -670,9 +670,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   onPressed: () => _buyAgain(item),
                   icon: const Icon(Icons.replay, size: 18),
                   label: const Text('Buy it again'),
+                  // The site's soft green (owner request 2026-11-26).
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD814),
-                    foregroundColor: Colors.black87,
+                    backgroundColor: const Color(0xFFEFF6E4),
+                    foregroundColor: const Color(0xFF3F6A14),
+                    side: const BorderSide(color: Color(0xFFB9D88F)),
+                    elevation: 0,
                     visualDensity: VisualDensity.compact,
                     shape: const StadiumBorder(),
                   ),
@@ -851,22 +854,32 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     final summary = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(headline.icon, color: headline.color, size: 22),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                headline.text,
-                key: Key('delivery_${order.id}'),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: headline.color,
+        // A soft tinted pill (owner request 2026-11-26).
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: headline.color.withValues(alpha: 0.09),
+            border: Border.all(color: headline.color.withValues(alpha: 0.25)),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(headline.icon, color: headline.color, size: 18),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  headline.text,
+                  key: Key('delivery_${order.id}'),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: headline.color,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 8),
         Wrap(

@@ -358,10 +358,9 @@ class OrderDetailsScreen extends StatelessWidget {
                         key: const Key('order-details-wide'),
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(flex: 3, child: _products()),
-                          const SizedBox(width: 10),
+                          // Delivery & billing on the left, products on
+                          // the right (owner request 2026-11-26).
                           Expanded(
-                            flex: 2,
                             child: Column(
                               children: [
                                 _delivery(),
@@ -370,6 +369,8 @@ class OrderDetailsScreen extends StatelessWidget {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 10),
+                          Expanded(child: _products()),
                         ],
                       )
                     else ...[

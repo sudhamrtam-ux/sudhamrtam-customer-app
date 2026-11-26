@@ -14,6 +14,10 @@ class StatusLabel {
 
 const _green = Color(0xFF4E8A1E);
 
+/// Waiting: a calm amber, easier on the eye than bright orange
+/// (owner request 2026-11-26).
+const _amber = Color(0xFFA0640F);
+
 /// Where the order is on its way to the customer.
 StatusLabel deliveryLabel(OrderStatus status) {
   switch (status) {
@@ -22,7 +26,7 @@ StatusLabel deliveryLabel(OrderStatus status) {
     case OrderStatus.preparing:
       return const StatusLabel(
         'Delivery pending',
-        Colors.orange,
+        _amber,
         Icons.schedule_outlined,
       );
     case OrderStatus.outForDelivery:
@@ -65,7 +69,7 @@ StatusLabel paymentLabel(CustomerOrder order, OrderPaymentStatus? server) {
     if (server.isAwaitingPayment) {
       return const StatusLabel(
         'Payment pending',
-        Colors.orange,
+        _amber,
         Icons.hourglass_bottom,
       );
     }

@@ -59,14 +59,15 @@ void main() {
       await openOrderDetails(tester, createTestOrder());
 
       expect(find.byKey(const Key('order-details-wide')), findsOneWidget);
-      // Products on the left, delivery and payment on the right.
+      // Delivery and payment on the left, products on the right
+      // (owner request 2026-11-26).
       final products = tester.getRect(
         find.byKey(const Key('order-details-products')),
       );
       final payment = tester.getRect(
         find.byKey(const Key('order-details-payment')),
       );
-      expect(payment.left, greaterThan(products.right));
+      expect(products.left, greaterThan(payment.right));
       // Everything fits without scrolling.
       expect(payment.bottom, lessThan(720));
       expect(tester.getRect(find.text('₹550.00')).bottom, lessThan(720));
