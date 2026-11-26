@@ -13,7 +13,7 @@ import '../../models/customer_order.dart';
 import '../milk_bills/bill_pdf.dart'
     show billPdfAmount, billPdfLongDate, rupeesInWords;
 
-const _company = 'Sudhamrtam Pvt. Ltd.';
+const _company = 'Sudhamrtam';
 const _companyAddress =
     '1-47, Donthi Village, Shivampet Mandal, Medak Dist, Telangana - 502334';
 const _companyContact = '+91 86882 21433  |  sudhamrtam@gmail.com';
