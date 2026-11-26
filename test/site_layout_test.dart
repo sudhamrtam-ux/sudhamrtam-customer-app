@@ -148,6 +148,48 @@ void main() {
     await closeShell(tester);
   });
 
+  testWidgets('a computer: the cart panel on the right once something is in '
+      'the cart', (tester) async {
+    sudhamrtamCart.clearCart();
+    await pumpShell(tester, const Size(1440, 900));
+    expect(find.byKey(const Key('site-cart-rail')), findsNothing);
+
+    sudhamrtamCart.addProduct(sudhamrtamCatalog.productById('cow_milk')!);
+    await tester.pump();
+    final rail = find.byKey(const Key('site-cart-rail'));
+    expect(rail, findsOneWidget);
+    expect(tester.getRect(rail).right, 1440);
+    final price = sudhamrtamCatalog.productById('cow_milk')!.price;
+    expect(
+      tester.widget<Text>(find.byKey(const Key('site-cart-subtotal'))).data,
+      '₹${price.toStringAsFixed(2)}',
+    );
+    // + adds one; at one the bin takes it out, and the panel goes.
+    await tester.tap(find.byKey(const Key('site-cart-more-cow_milk')));
+    await tester.pump();
+    expect(sudhamrtamCart.quantityFor('cow_milk'), 2);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('site-cart-subtotal'))).data,
+      '₹${(price * 2).toStringAsFixed(2)}',
+    );
+    await tester.tap(find.byKey(const Key('site-cart-less-cow_milk')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('site-cart-less-cow_milk')));
+    await tester.pump();
+    expect(sudhamrtamCart.isEmpty, isTrue);
+    expect(rail, findsNothing);
+
+    // Go to Cart opens the Cart page, which needs no panel.
+    sudhamrtamCart.addProduct(sudhamrtamCatalog.productById('cow_milk')!);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('site-cart-go')));
+    await tester.pump();
+    expect(rail, findsNothing);
+    expect(tester.takeException(), isNull);
+    sudhamrtamCart.clearCart();
+    await closeShell(tester);
+  });
+
   testWidgets('a computer: the product page in two columns', (tester) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1;

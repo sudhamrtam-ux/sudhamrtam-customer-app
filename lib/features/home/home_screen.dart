@@ -337,10 +337,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             crossAxisCount: 4,
                             crossAxisSpacing: 20,
                             mainAxisSpacing: 20,
-                            mainAxisExtent: 290,
+                            mainAxisExtent: 330,
                           ),
                       itemBuilder: (context, index) =>
-                          _quickAdd(essentials[index]),
+                          _quickAdd(essentials[index], wide: true),
                     )
                   else
                     SizedBox(
@@ -394,7 +394,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _quickAdd(Product product) => _QuickAddCard(
+  Widget _quickAdd(Product product, {bool wide = false}) => _QuickAddCard(
+    wide: wide,
     product: product,
     quantity: _cart.quantityFor(product.id),
     onAdd: () => _add(product),
@@ -688,13 +689,37 @@ class _SectionTitle extends StatelessWidget {
 // =====================================================
 
 class _QuickAddCard extends StatelessWidget {
+  Widget _picture() {
+    final picture = Container(
+      height: wide ? null : 104,
+      width: double.infinity,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: _paleGreen,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: ProductImage(
+        productId: product.id,
+        icon: product.icon,
+        iconSize: wide ? 56 : 36,
+        borderRadius: 10,
+      ),
+    );
+    return wide ? Expanded(child: picture) : picture;
+  }
+
   const _QuickAddCard({
     required this.product,
     required this.quantity,
     required this.onAdd,
     required this.onIncrease,
     required this.onDecrease,
+    this.wide = false,
   });
+
+  /// On the website: no fixed width, and the picture takes the room
+  /// the card has (owner request 2026-11-26: pictures were too small).
+  final bool wide;
 
   final Product product;
   final int quantity;
@@ -706,43 +731,32 @@ class _QuickAddCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       key: Key('quickAdd_${product.id}'),
-      width: 140,
-      padding: const EdgeInsets.all(8),
+      width: wide ? null : 140,
+      padding: EdgeInsets.all(wide ? 10 : 8),
       decoration: _cardDecoration(),
       child: Column(
         children: [
-          Container(
-            height: 104,
-            width: double.infinity,
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: _paleGreen,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: ProductImage(
-              productId: product.id,
-              icon: product.icon,
-              iconSize: 36,
-              borderRadius: 10,
-            ),
-          ),
-          const SizedBox(height: 8),
+          _picture(),
+          SizedBox(height: wide ? 10 : 8),
           Text(
             product.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: wide ? 16 : null,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             '₹${product.price.toStringAsFixed(0)} / ${product.unit}',
-            style: const TextStyle(
-              fontSize: 13,
+            style: TextStyle(
+              fontSize: wide ? 14.5 : 13,
               color: _darkGreen,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const Spacer(),
+          if (wide) const SizedBox(height: 10) else const Spacer(),
           if (quantity == 0)
             SizedBox(
               width: double.infinity,

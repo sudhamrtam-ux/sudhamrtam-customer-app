@@ -12,6 +12,7 @@ import '../shop/product_image.dart';
 import '../shop/shop_screen.dart';
 import 'site_header.dart';
 import '../cart/cart_screen.dart';
+import '../cart/site_cart_rail.dart';
 import '../milk_plan/milk_plan_screen.dart';
 import '../milk_plan/milk_sqlite_test_screen.dart';
 import '../account/account_screen.dart';
@@ -103,21 +104,37 @@ class _CustomerShellState extends State<CustomerShell> {
           preferredSize: const Size.fromHeight(72),
           child: SiteHeader(selectedIndex: _selectedIndex, onSelect: _select),
         ),
-        // Home, Shop and Cart lay themselves out as web pages; Milk
-        // Plan and Account sit in a readable column in the middle.
-        body: _selectedIndex <= 1 || _selectedIndex == 3
-            ? _buildSelectedScreen(context)
-            : Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: _selectedIndex == 2 || _selectedIndex == 4
-                        ? 1100
-                        : 860,
+        // The cart panel on the right while the cart has something in it
+        // (owner request 2026-11-26), except on the Cart page itself.
+        body: ListenableBuilder(
+          listenable: sudhamrtamCart,
+          builder: (context, _) {
+            final page = _sitePage(context);
+            if (sudhamrtamCart.isEmpty || _selectedIndex == 3) return page;
+            final media = MediaQuery.of(context);
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // The page lays itself out for the width left over.
+                Expanded(
+                  child: MediaQuery(
+                    data: media.copyWith(
+                      size: Size(
+                        media.size.width - siteCartRailWidth,
+                        media.size.height,
+                      ),
+                    ),
+                    child: page,
                   ),
-                  child: _buildSelectedScreen(context),
                 ),
-              ),
+                SiteCartRail(
+                  cart: sudhamrtamCart,
+                  onOpenCart: () => _select(3),
+                ),
+              ],
+            );
+          },
+        ),
       );
     }
     return Scaffold(
@@ -214,6 +231,21 @@ class _CustomerShellState extends State<CustomerShell> {
       ),
     );
   }
+
+  /// Home, Shop and Cart lay themselves out as web pages; Milk Plan and
+  /// Account sit in a readable column in the middle.
+  Widget _sitePage(BuildContext context) =>
+      _selectedIndex <= 1 || _selectedIndex == 3
+      ? _buildSelectedScreen(context)
+      : Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: _selectedIndex == 2 || _selectedIndex == 4 ? 1100 : 860,
+            ),
+            child: _buildSelectedScreen(context),
+          ),
+        );
 
   // Display the screen selected in bottom navigation.
   Widget _buildSelectedScreen(BuildContext context) {
