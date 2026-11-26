@@ -23,6 +23,7 @@ import 'combo_cards.dart';
 import 'even_row.dart';
 import 'glance_cards.dart';
 import 'offer_ticker.dart';
+import 'village_scene.dart';
 import 'tomorrow_milk_card.dart';
 
 const _green = Color(0xFF82B440);
@@ -419,14 +420,12 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      // At least room for the village; taller when the words wrap.
+      constraints: const BoxConstraints(minHeight: 132),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF9CCB57), _green, _darkGreen],
-        ),
+        color: _darkGreen,
         boxShadow: const [
           BoxShadow(
             color: Color(0x3382B440),
@@ -437,22 +436,29 @@ class _HeroCard extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // Soft leaf shapes for depth.
-          Positioned(
-            right: -30,
-            top: -30,
-            child: Container(
-              width: 140,
-              height: 140,
+          // A village morning: rising sun, cows and a bullock cart
+          // (owner request 2026-11-26).
+          const Positioned.fill(child: VillageScene()),
+          // A soft shade behind the words, so they stay easy to read.
+          Positioned.fill(
+            child: DecoratedBox(
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.10),
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    const Color(0xFF1F3D12).withValues(alpha: 0.55),
+                    const Color(0xFF1F3D12).withValues(alpha: 0),
+                  ],
+                  stops: const [0, 0.6],
+                ),
               ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
