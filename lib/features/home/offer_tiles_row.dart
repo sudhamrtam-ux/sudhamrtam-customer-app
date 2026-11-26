@@ -113,6 +113,10 @@ class _OfferTilesRowState extends State<OfferTilesRow> {
     return ComboTile(
       key: Key('combo-card-${combo.id}'),
       colour: colour,
+      // The owner's gradient (2026-11-26), only with their own colour.
+      colourEnd: combo.tileColour == null
+          ? null
+          : colourFromHex(combo.tileColourEnd),
       headline: offHeadline(combo.discountBp),
       sash: offHeadline(combo.discountBp).toUpperCase(),
       title: combo.title,

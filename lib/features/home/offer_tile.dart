@@ -31,6 +31,19 @@ const tileSwatches = [
   Color(0xFF3A3A3A), // charcoal
 ];
 
+/// Ready-made gradients for combo tiles (owner request 2026-11-26):
+/// name, first colour, second colour. Deep enough for white text.
+const tileGradients = [
+  ('Diwali', Color(0xFFE65100), Color(0xFF8E1B3A)),
+  ('Sunrise', Color(0xFFF57C00), Color(0xFFC62828)),
+  ('Leaf', Color(0xFF558B2F), Color(0xFF1F6F6B)),
+  ('Forest', Color(0xFF2F5D1E), Color(0xFF1B3A12)),
+  ('Ocean', Color(0xFF1F6F6B), Color(0xFF2A5C9A)),
+  ('Royal', Color(0xFF2A5C9A), Color(0xFF5B3A9E)),
+  ('Rose', Color(0xFFAD1457), Color(0xFF5B3A9E)),
+  ('Gold', Color(0xFFB8860B), Color(0xFF8E1B3A)),
+];
+
 /// '#8E1B3A' ↔ Color.
 Color? colourFromHex(String? hex) {
   if (hex == null || !RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(hex)) return null;
@@ -534,6 +547,7 @@ class ComboTile extends StatelessWidget {
   const ComboTile({
     super.key,
     required this.colour,
+    this.colourEnd,
     required this.headline,
     required this.title,
     required this.tag,
@@ -551,6 +565,9 @@ class ComboTile extends StatelessWidget {
   });
 
   final Color colour;
+
+  /// With it, the tile runs from [colour] to this (a gradient).
+  final Color? colourEnd;
 
   /// The cross belt's words over the top-right corner, e.g. "15% OFF".
   final String? sash;
@@ -592,7 +609,10 @@ class ComboTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ink = tileTextColour(colour);
+    // The words follow the middle of a gradient.
+    final ink = tileTextColour(
+      colourEnd == null ? colour : Color.lerp(colour, colourEnd, 0.5)!,
+    );
     final soft = ink.withValues(alpha: 0.85);
 
     final badgeChip = badge == null
@@ -741,11 +761,19 @@ class ComboTile extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color.lerp(colour, Colors.white, 0.08)!,
-            colour,
-            Color.lerp(colour, Colors.black, 0.28)!,
-          ],
+          colors: colourEnd == null
+              ? [
+                  Color.lerp(colour, Colors.white, 0.08)!,
+                  colour,
+                  Color.lerp(colour, Colors.black, 0.28)!,
+                ]
+              : [
+                  Color.lerp(colour, Colors.white, 0.06)!,
+                  colour,
+                  colourEnd!,
+                  Color.lerp(colourEnd, Colors.black, 0.18)!,
+                ],
+          stops: colourEnd == null ? null : const [0, 0.3, 0.8, 1],
         ),
         boxShadow: [
           BoxShadow(

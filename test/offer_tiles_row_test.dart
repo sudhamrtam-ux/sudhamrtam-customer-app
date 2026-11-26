@@ -106,6 +106,48 @@ void main() {
     );
   });
 
+  testWidgets('the owner gradient paints the tile (2026-11-26)', (
+    tester,
+  ) async {
+    final json = {
+      ...{
+        'id': 'g1',
+        'title': 'Gradient',
+        'occasion': 'seasonal',
+        'discount_bp': 500,
+        'starts_on': '2026-11-07',
+        'ends_on': '2026-11-30',
+        'max_per_order': 2,
+        'items': <Object>[],
+        'full_paise': 15000,
+        'price_paise': 14250,
+        'savings_paise': 750,
+      },
+      'tile_colour': '#E65100',
+      'tile_colour_end': '#8E1B3A',
+    };
+    expect(ComboOffer.fromJson(json).tileColourEnd, '#8E1B3A');
+    await show(
+      tester,
+      width: 1240,
+      perRow: 2,
+      combos: [ComboOffer.fromJson(json)],
+    );
+    final tile = tester.widget<ComboTile>(
+      find.byKey(const Key('combo-card-g1')),
+    );
+    expect(tile.colour, const Color(0xFFE65100));
+    expect(tile.colourEnd, const Color(0xFF8E1B3A));
+    // One colour: no gradient.
+    await show(tester, width: 1240, perRow: 2, combos: [another('one')]);
+    expect(
+      tester
+          .widget<ComboTile>(find.byKey(const Key('combo-card-one')))
+          .colourEnd,
+      isNull,
+    );
+  });
+
   testWidgets('a phone: one tile, the next peeking in', (tester) async {
     await show(
       tester,
