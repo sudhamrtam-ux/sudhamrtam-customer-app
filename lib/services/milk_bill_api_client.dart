@@ -392,8 +392,31 @@ class SubscriptionClosing {
       SubscriptionClosing(
         status: json['status'] as String,
         lastDeliveryDate: json['last_delivery_date'] as String,
-        billIds: [for (final id in json['bill_ids'] as List? ?? []) id as String],
+        billIds: [
+          for (final id in json['bill_ids'] as List? ?? []) id as String,
+        ],
       );
+}
+
+/// An issued bill not paid yet, as the closing card lists it.
+class UnpaidBill {
+  const UnpaidBill({
+    required this.id,
+    required this.month,
+    required this.totalPaise,
+  });
+
+  final String id;
+
+  /// "2026-11".
+  final String month;
+  final int totalPaise;
+
+  factory UnpaidBill.fromJson(Map<String, dynamic> json) => UnpaidBill(
+    id: json['id'] as String,
+    month: json['month'] as String,
+    totalPaise: json['total_paise'] as int,
+  );
 }
 
 class ClosingInfo {
@@ -402,6 +425,7 @@ class ClosingInfo {
     required this.openPlans,
     required this.canClose,
     required this.lastDeliveryDate,
+    this.unpaidBills = const [],
     required this.unpaidPaise,
     required this.soFarPaise,
     required this.totalPaise,
@@ -413,6 +437,9 @@ class ClosingInfo {
 
   /// The last delivery day if the customer closes now.
   final String lastDeliveryDate;
+
+  /// Issued bills not paid yet, oldest first.
+  final List<UnpaidBill> unpaidBills;
   final int unpaidPaise;
 
   /// Delivered, not billed yet (an estimate).
@@ -426,6 +453,10 @@ class ClosingInfo {
     openPlans: json['open_plans'] as int,
     canClose: json['can_close'] as bool,
     lastDeliveryDate: json['last_delivery_date'] as String,
+    unpaidBills: [
+      for (final b in (json['unpaid_bills'] as List?) ?? const [])
+        UnpaidBill.fromJson(b as Map<String, dynamic>),
+    ],
     unpaidPaise: json['unpaid_paise'] as int,
     soFarPaise: json['so_far_paise'] as int,
     totalPaise: json['total_paise'] as int,
