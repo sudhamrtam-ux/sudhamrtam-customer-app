@@ -63,6 +63,7 @@ class ComboOffer {
     required this.fullPaise,
     required this.pricePaise,
     required this.savingsPaise,
+    this.tileColour,
   });
 
   factory ComboOffer.fromJson(Map<String, dynamic> json) => ComboOffer(
@@ -79,6 +80,7 @@ class ComboOffer {
     fullPaise: json['full_paise'] as int,
     pricePaise: json['price_paise'] as int,
     savingsPaise: json['savings_paise'] as int,
+    tileColour: json['tile_colour'] as String?,
   );
 
   final String id;
@@ -97,6 +99,9 @@ class ComboOffer {
   final int fullPaise;
   final int pricePaise;
   final int savingsPaise;
+
+  /// Home tile colour '#RRGGBB'; null = the occasion's (2026-11-26).
+  final String? tileColour;
 
   String get productId => comboProductId(id);
 

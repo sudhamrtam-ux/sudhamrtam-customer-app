@@ -19,7 +19,7 @@ import '../../models/milk_subscription_manager.dart';
 import '../account/customer_name.dart';
 import 'account_status.dart';
 import 'address_details_card.dart';
-import 'combo_cards.dart';
+import 'offer_tiles_row.dart';
 import 'even_row.dart';
 import 'glance_cards.dart';
 import 'offer_ticker.dart';
@@ -51,6 +51,13 @@ typedef OffersLoader = Future<List<String>> Function();
 
 OffersLoader? _defaultOffersLoader() =>
     apiBaseUrl.isEmpty ? null : OfferApiClient(baseUrl: apiBaseUrl).fetchOffers;
+
+/// The offers with their tile colours and the owner's tiles-per-row
+/// (2026-11-26); one request also feeds the offer line.
+typedef OfferTilesLoader = Future<OfferTiles> Function();
+
+OfferTilesLoader? _defaultOfferTilesLoader() =>
+    apiBaseUrl.isEmpty ? null : OfferApiClient(baseUrl: apiBaseUrl).fetchTiles;
 
 /// The customer's name from their profile; null without one.
 
@@ -84,11 +91,13 @@ class HomeScreen extends StatefulWidget {
     this.milkPlans,
     OrderRulesLoader? loadRules,
     OffersLoader? loadOffers,
+    OfferTilesLoader? loadOfferTiles,
     DateTime Function()? clock,
     this.loadCustomerName = savedCustomerName,
     this.footer,
   }) : loadRules = loadRules ?? _defaultRulesLoader(),
        loadOffers = loadOffers ?? _defaultOffersLoader(),
+       loadOfferTiles = loadOfferTiles ?? _defaultOfferTilesLoader(),
        clock = clock ?? DateTime.now;
 
   /// Opens the Shop tab, filtered to [category] (null: all).
@@ -111,6 +120,9 @@ class HomeScreen extends StatefulWidget {
 
   /// Null when the app has no server: no offer line.
   final OffersLoader? loadOffers;
+
+  /// Offer tiles; used instead of [loadOffers] when set.
+  final OfferTilesLoader? loadOfferTiles;
   final DateTime Function() clock;
 
   /// The customer's name for the greeting; tests replace it.
@@ -126,6 +138,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   OrderRules? _rules;
   List<String> _offers = const [];
+
+  /// Text offers as tiles, and how many tiles share the row.
+  OfferTiles _tiles = const OfferTiles();
   Timer? _ticker;
 
   /// Bumped on pull-to-refresh: reloads tomorrow's milk.
@@ -159,11 +174,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadOffers() async {
+    final loadTiles = widget.loadOfferTiles;
     final load = widget.loadOffers;
-    if (load == null) return;
     try {
-      final offers = await load();
-      if (mounted) setState(() => _offers = offers);
+      if (loadTiles != null) {
+        final tiles = await loadTiles();
+        if (mounted) {
+          setState(() {
+            _tiles = tiles;
+            _offers = [for (final o in tiles.offers) o.message];
+          });
+        }
+      } else if (load != null) {
+        final offers = await load();
+        if (mounted) setState(() => _offers = offers);
+      }
     } catch (_) {
       // Offline: keep what is shown (nothing on first load).
     }
@@ -274,10 +299,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 _HeroCard(onShopNow: () => widget.onOpenShop?.call(null)),
                 // Festive and combo offers next (owner decision 2026-11-15
                 // and request 2026-11-25).
-                if (_combos.combos.isNotEmpty) ...[
+                // As tiles with gift pictures (owner request 2026-11-26).
+                if (_combos.combos.isNotEmpty || _tiles.offers.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  ComboCards(
+                  OfferTilesRow(
                     combos: _combos.combos,
+                    textOffers: _tiles.offers,
+                    perRow: _tiles.perRow,
                     cart: _cart,
                     onOpenCart: widget.onOpenCart,
                   ),

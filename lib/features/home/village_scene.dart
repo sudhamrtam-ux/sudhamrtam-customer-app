@@ -181,10 +181,7 @@ class _ScenePainter extends CustomPainter {
     double midY(double x) =>
         h * 0.76 + math.sin(x / w * math.pi * 1.6 + 1.2) * h * 0.03;
     canvas.drawPath(_hill(w, h, midY), Paint()..color = _midHill);
-    canvas.drawRect(
-      Rect.fromLTRB(0, h * 0.84, w, h),
-      Paint()..color = _ground,
-    );
+    canvas.drawRect(Rect.fromLTRB(0, h * 0.84, w, h), Paint()..color = _ground);
     // The earth path the animals walk on.
     canvas.drawRect(
       Rect.fromLTRB(0, h * 0.87, w, h * 0.95),
@@ -242,7 +239,12 @@ class _ScenePainter extends CustomPainter {
         ..moveTo(base.dx - 1.2 * s, base.dy)
         ..quadraticBezierTo(base.dx, base.dy - 10 * s, top.dx - 1 * s, top.dy)
         ..lineTo(top.dx + 1 * s, top.dy)
-        ..quadraticBezierTo(base.dx + 2 * s, base.dy - 10 * s, base.dx + 1.2 * s, base.dy)
+        ..quadraticBezierTo(
+          base.dx + 2 * s,
+          base.dy - 10 * s,
+          base.dx + 1.2 * s,
+          base.dy,
+        )
         ..close(),
       Paint()..color = _trunk,
     );
@@ -251,7 +253,13 @@ class _ScenePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.2 * s
       ..strokeCap = StrokeCap.round;
-    for (final (dx, dy) in const [(-9.0, 3.0), (9.0, 3.0), (-6.0, -4.0), (6.0, -4.0), (0.0, -6.0)]) {
+    for (final (dx, dy) in const [
+      (-9.0, 3.0),
+      (9.0, 3.0),
+      (-6.0, -4.0),
+      (6.0, -4.0),
+      (0.0, -6.0),
+    ]) {
       canvas.drawPath(
         Path()
           ..moveTo(top.dx, top.dy)
@@ -305,7 +313,12 @@ class _ScenePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     final swing = math.sin(phase) * 2.2;
     // Legs, front and back pairs out of step.
-    for (final (x, sign) in const [(-8.0, 1.0), (-5.0, -1.0), (6.0, -1.0), (9.0, 1.0)]) {
+    for (final (x, sign) in const [
+      (-8.0, 1.0),
+      (-5.0, -1.0),
+      (6.0, -1.0),
+      (9.0, 1.0),
+    ]) {
       canvas.drawLine(Offset(x, -6), Offset(x + swing * sign, 0), legs);
     }
     // Tail.
@@ -347,7 +360,13 @@ class _ScenePainter extends CustomPainter {
   }
 
   /// Two bullocks pulling a cart with a farmer, facing right.
-  void _bullockCart(Canvas canvas, Offset foot, double s, double t, double moved) {
+  void _bullockCart(
+    Canvas canvas,
+    Offset foot,
+    double s,
+    double t,
+    double moved,
+  ) {
     // Cart behind the bullocks.
     canvas.save();
     canvas.translate(foot.dx, foot.dy);
@@ -372,7 +391,11 @@ class _ScenePainter extends CustomPainter {
       const Rect.fromLTRB(-14, -28, -9, -20),
       Paint()..color = const Color(0xFFF5F0E6),
     );
-    canvas.drawCircle(const Offset(-11.5, -30), 2.6, Paint()..color = const Color(0xFF8D5B3A));
+    canvas.drawCircle(
+      const Offset(-11.5, -30),
+      2.6,
+      Paint()..color = const Color(0xFF8D5B3A),
+    );
     canvas.drawOval(
       const Rect.fromLTRB(-14.5, -34, -8.5, -30.5),
       Paint()..color = const Color(0xFFF28C28),
@@ -399,8 +422,22 @@ class _ScenePainter extends CustomPainter {
     canvas.restore();
 
     // The two bullocks, one a little behind the other.
-    _cow(canvas, foot + Offset(26 * s, -1.5 * s), s * 0.95, t * 4 + 1, const Color(0xFFD8CBB8), false);
-    _cow(canvas, foot + Offset(22 * s, 0), s, t * 4, const Color(0xFFEDE4D6), false);
+    _cow(
+      canvas,
+      foot + Offset(26 * s, -1.5 * s),
+      s * 0.95,
+      t * 4 + 1,
+      const Color(0xFFD8CBB8),
+      false,
+    );
+    _cow(
+      canvas,
+      foot + Offset(22 * s, 0),
+      s,
+      t * 4,
+      const Color(0xFFEDE4D6),
+      false,
+    );
   }
 
   @override

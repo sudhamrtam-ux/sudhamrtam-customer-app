@@ -27,6 +27,22 @@ const Map<String, String> productImageAssets = {
 
 const String sudhamrtamLogoAsset = 'assets/images/logo.jpg';
 
+/// A product's photo as an image (the owner's from the server first,
+/// else the bundled one, else another size's); null when it has none.
+/// For the gift picture on offer tiles (2026-11-26).
+ImageProvider? productImageProvider(String productId) {
+  bool hasPhoto(String id) =>
+      productImageAssets.containsKey(id) || productPhotoUrls.containsKey(id);
+  final id = hasPhoto(productId)
+      ? productId
+      : productOtherSizes[productId]?.where(hasPhoto).firstOrNull;
+  if (id == null) return null;
+  final url = productPhotoUrls[id];
+  if (url != null) return NetworkImage(url);
+  final asset = productImageAssets[id];
+  return asset == null ? null : AssetImage(asset);
+}
+
 /// A product's photo, or its [icon] when there is no photo.
 ///
 /// The whole photo is always shown, scaled to fit the space and
