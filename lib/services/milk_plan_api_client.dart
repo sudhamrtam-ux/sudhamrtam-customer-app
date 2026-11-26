@@ -157,6 +157,7 @@ class MilkPlanApiClient implements MilkPlanRemote {
       ),
       approval: json['approval'] as String?,
       rejectReason: json['reject_reason'] as String?,
+      approvalNote: json['approval_note'] as String?,
     );
   }
 

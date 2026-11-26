@@ -108,6 +108,10 @@ class MilkSubscription {
   final String? approval;
   final String? rejectReason;
 
+  /// Sudhamrtam's note when approving (owner request 2026-11-26), e.g.
+  /// why milk starts later than asked.
+  final String? approvalNote;
+
   const MilkSubscription({
     required this.id,
     required this.productId,
@@ -124,6 +128,7 @@ class MilkSubscription {
     this.vacationDates = const [],
     this.approval,
     this.rejectReason,
+    this.approvalNote,
   });
 
   /// Vacation days from [today] on.
@@ -143,6 +148,16 @@ class MilkSubscription {
   /// A new plan Sudhamrtam has not approved yet: no milk comes.
   bool get isWaitingForApproval =>
       approval == 'pending' && status != MilkSubscriptionStatus.cancelled;
+
+  /// Sudhamrtam's approval note, shown until a week after milk starts.
+  String? approvalNoteOn(DateTime today) {
+    final note = approvalNote?.trim();
+    if (note == null || note.isEmpty || approval != 'approved') return null;
+    final until = startDate.add(const Duration(days: 7));
+    return DateTime(today.year, today.month, today.day).isAfter(until)
+        ? null
+        : note;
+  }
 
   /// Sudhamrtam did not approve this plan; see [rejectReason].
   bool get isRejected => approval == 'rejected';
@@ -217,6 +232,7 @@ class MilkSubscription {
       vacationDates: vacationDates ?? this.vacationDates,
       approval: approval,
       rejectReason: rejectReason,
+      approvalNote: approvalNote,
     );
   }
 }

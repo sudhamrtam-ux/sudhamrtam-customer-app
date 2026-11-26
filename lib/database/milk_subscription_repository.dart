@@ -94,6 +94,7 @@ class MilkSubscriptionRepository {
       ]),
       'approval': subscription.approval,
       'reject_reason': subscription.rejectReason,
+      'approval_note': subscription.approvalNote,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     // Replacing the parent row may cascade-delete old shifts; explicitly
@@ -196,6 +197,7 @@ class MilkSubscriptionRepository {
             ]),
             approval: row['approval'] as String?,
             rejectReason: row['reject_reason'] as String?,
+            approvalNote: row['approval_note'] as String?,
           );
         })
         .toList(growable: false);

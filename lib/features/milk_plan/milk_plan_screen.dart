@@ -693,6 +693,38 @@ class _SavedSubscriptionCardState extends State<_SavedSubscriptionCard> {
           ),
           const SizedBox(height: 8),
         ],
+        if (subscription.approvalNoteOn(DateTime.now()) case final note?) ...[
+          Container(
+            key: Key('approvalMessage_${subscription.id}'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF3DE),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.chat_bubble_outline,
+                  size: 18,
+                  color: Color(0xFF3F6A14),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Note from Sudhamrtam: $note',
+                    style: const TextStyle(
+                      color: Color(0xFF3F6A14),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (subscription.isOnVacation(DateTime.now())) ...[
           Container(
             key: const Key('vacationNote'),

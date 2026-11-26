@@ -33,7 +33,7 @@ class MilkDatabaseService {
   static const String checkoutReconciliationsTable = 'checkout_reconciliations';
   static final MilkDatabaseService instance = MilkDatabaseService._();
   static const String databaseName = 'sudhamrtam_milk.db';
-  static const int databaseVersion = 23;
+  static const int databaseVersion = 24;
   static const String orderRefsTable = 'order_refs';
   static const String catalogCacheTable = 'catalog_cache';
   static const String appSettingsTable = 'app_settings';
@@ -155,6 +155,7 @@ class MilkDatabaseService {
     await _addOrderDeliveryDateColumn(db);
     await _createOrderRefsTable(db);
     await _addBillingColumns(db);
+    await _addPlanApprovalNoteColumn(db);
   }
 
   /// Upgrade older database versions without deleting
@@ -271,6 +272,22 @@ class MilkDatabaseService {
     if (oldVersion < 23) {
       await _addBillingColumns(db);
     }
+
+    if (oldVersion < 24) {
+      await _addPlanApprovalNoteColumn(db);
+    }
+  }
+
+  /// Version 24 (owner request 2026-11-26): Sudhamrtam's note when it
+  /// approved a plan; nullable.
+  Future<void> _addPlanApprovalNoteColumn(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info($subscriptionsTable)');
+    if (columns.isEmpty || columns.any((c) => c['name'] == 'approval_note')) {
+      return;
+    }
+    await db.execute(
+      'ALTER TABLE $subscriptionsTable ADD COLUMN approval_note TEXT',
+    );
   }
 
   /// Version 23 (owner request 2026-11-26): who an order is billed to

@@ -251,6 +251,78 @@ void main() {
       expect(rejected.rejectReason, 'We do not deliver there yet.');
     });
 
+    test('approval note: from the server, never sent back, shown a week', () {
+      final json = MilkPlanApiClient.planToJson(plan('p8', [morning(500)]));
+      expect(json.containsKey('approval_note'), isFalse);
+      final approved = MilkPlanApiClient.planFromJson({
+        ...json,
+        'approval': 'approved',
+        'approval_note': 'Our route reaches your area from 10 Nov.',
+      });
+      expect(approved.approvalNote, 'Our route reaches your area from 10 Nov.');
+      expect(
+        MilkPlanApiClient.planToJson(approved).containsKey('approval_note'),
+        isFalse,
+      );
+      final starts = approved.startDate;
+      expect(
+        approved.approvalNoteOn(starts.subtract(const Duration(days: 3))),
+        'Our route reaches your area from 10 Nov.',
+      );
+      expect(
+        approved.approvalNoteOn(starts.add(const Duration(days: 7))),
+        isNotNull,
+      );
+      expect(
+        approved.approvalNoteOn(starts.add(const Duration(days: 8))),
+        isNull,
+      );
+      // Waiting or rejected plans show no note.
+      final waiting = MilkPlanApiClient.planFromJson({
+        ...json,
+        'approval': 'pending',
+        'approval_note': 'x',
+      });
+      expect(waiting.approvalNoteOn(starts), isNull);
+    });
+
+    test(
+      'approval note: from the server, shown until a week after the start',
+      () {
+        final json = MilkPlanApiClient.planToJson(plan('p8', [morning(500)]));
+        expect(json.containsKey('approval_note'), isFalse);
+        final approved = MilkPlanApiClient.planFromJson({
+          ...json,
+          'approval': 'approved',
+          'approval_note': 'Our route reaches you from this day.',
+        });
+        final begins = approved.startDate;
+        expect(
+          approved.approvalNoteOn(begins.subtract(const Duration(days: 2))),
+          'Our route reaches you from this day.',
+        );
+        expect(
+          approved.approvalNoteOn(begins.add(const Duration(days: 7))),
+          isNotNull,
+        );
+        expect(
+          approved.approvalNoteOn(begins.add(const Duration(days: 8))),
+          isNull,
+        );
+        // Kept through copies (pause, change).
+        expect(
+          approved.copyWith(status: MilkSubscriptionStatus.paused).approvalNote,
+          'Our route reaches you from this day.',
+        );
+        // No note, or not approved: nothing shown.
+        expect(
+          MilkPlanApiClient.planFromJson({...json, 'approval': 'approved'})
+              .approvalNoteOn(begins),
+          isNull,
+        );
+      },
+    );
+
     test('a cancelled subscription from the server keeps its cancel date', () {
       final back = MilkPlanApiClient.planFromJson({
         ...MilkPlanApiClient.planToJson(
