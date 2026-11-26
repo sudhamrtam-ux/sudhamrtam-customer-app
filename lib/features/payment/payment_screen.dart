@@ -37,6 +37,7 @@ class PaymentScreen extends StatefulWidget {
     PaymentLauncher? launcher,
     this.confirmDelay = const Duration(seconds: 2),
     this.autoStart = true,
+    this.payLater = false,
   }) : api = api ?? OrderDestination.server,
        launcher = launcher ?? CashfreePaymentLauncher();
 
@@ -51,6 +52,10 @@ class PaymentScreen extends StatefulWidget {
 
   /// Opens the payment screen at once.
   final bool autoStart;
+
+  /// A Cash on Delivery order paid online later (2026-11-26): not
+  /// paying leaves it Cash on Delivery, with Try Again.
+  final bool payLater;
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
@@ -198,6 +203,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (mounted) setState(() => _payBy = status.paymentDueAt);
 
     if (status.isPaid) {
+      // Keep the order on this phone in step with the server.
+      await OrderDatabaseService.instance.updatePaymentMethod(
+        _orderId,
+        OrderPaymentMethod.online,
+      );
       _show(_Phase.paid);
     } else if (status.isCashOnDelivery) {
       // Keep the order on this phone in step with the server.
@@ -234,6 +244,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       case 'ORDER_CANCELLED':
       case 'PAYMENT_WINDOW_CLOSED':
         _show(_Phase.closed, error.message);
+      case 'PAY_LATER_CLOSED':
+        _show(_Phase.cashOnDelivery, error.message);
       default:
         _show(_Phase.notPaid, error.message);
     }
@@ -332,6 +344,35 @@ class _PaymentScreenState extends State<PaymentScreen> {
           actions: [_primary('View Order', _viewOrder)],
         );
       case _Phase.cashOnDelivery:
+        if (widget.payLater) {
+          final closed = _message != null;
+          return _result(
+            key: 'paymentCod',
+            icon: Icons.payments_outlined,
+            color: Colors.orange,
+            title: closed ? 'Pay on delivery' : 'Not paid online',
+            detail:
+                _message ??
+                'Nothing was charged. Your order stays Cash on Delivery: '
+                    'pay the delivery partner in cash or UPI, or try paying '
+                    'online again until 9 PM the day before delivery.',
+            actions: [
+              if (!closed && onlinePaymentWorksHere) ...[
+                _primary('Try Again', _pay),
+                const SizedBox(height: 12),
+              ],
+              OutlinedButton(
+                onPressed: _viewOrder,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _green,
+                  side: const BorderSide(color: _green),
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                child: const Text('View Order'),
+              ),
+            ],
+          );
+        }
         return _result(
           key: 'paymentCod',
           icon: Icons.payments_outlined,

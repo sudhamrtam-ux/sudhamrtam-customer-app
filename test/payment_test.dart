@@ -222,8 +222,9 @@ void main() {
   group('PaymentScreen', () {
     Future<void> pumpScreen(
       WidgetTester tester,
-      PaymentLauncher launcher,
-    ) async {
+      PaymentLauncher launcher, {
+      bool payLater = false,
+    }) async {
       tester.view.physicalSize = const Size(1080, 3000);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
@@ -235,6 +236,7 @@ void main() {
             api: api,
             launcher: launcher,
             confirmDelay: const Duration(milliseconds: 10),
+            payLater: payLater,
           ),
         ),
       );
@@ -251,6 +253,61 @@ void main() {
       }
       expect(finder, findsOneWidget);
     }
+
+    testWidgets('a Cash on Delivery order paid later: not paid leaves it '
+        'Cash on Delivery, with Try Again (2026-11-26)', (tester) async {
+      server
+        ..paymentMethod = 'cash_on_delivery'
+        ..paymentStatus = 'due_on_delivery';
+      final launcher = FakeLauncher(
+        const PaymentLaunchFailed('Payment cancelled by user'),
+      );
+      await pumpScreen(tester, launcher, payLater: true);
+      await waitFor(tester, find.byKey(const Key('paymentCod')));
+      expect(find.text('Not paid online'), findsOneWidget);
+      expect(find.textContaining('stays Cash on Delivery'), findsOneWidget);
+      expect(find.text('Try Again'), findsOneWidget);
+      // No "switch to Cash on Delivery": it already is.
+      expect(find.byKey(const Key('payByCash')), findsNothing);
+      expect(server.calls, isNot(contains(endsWith('cash-on-delivery'))));
+    });
+
+    testWidgets('a Cash on Delivery order paid later: success, and the '
+        "phone's copy says Online Payment", (tester) async {
+      server
+        ..paymentMethod = 'cash_on_delivery'
+        ..paymentStatus = 'due_on_delivery'
+        ..paidAfterChecks = 1;
+      await pumpScreen(
+        tester,
+        FakeLauncher(const PaymentLaunchFinished()),
+        payLater: true,
+      );
+      await waitFor(tester, find.byKey(const Key('paymentPaid')));
+      final saved = await tester.runAsync(
+        () => OrderDatabaseService.instance.getOrderById(orderId),
+      );
+      expect(saved!.paymentMethod, OrderPaymentMethod.online);
+    });
+
+    testWidgets('too late to pay online: pay on delivery', (tester) async {
+      server
+        ..paymentMethod = 'cash_on_delivery'
+        ..paymentStatus = 'due_on_delivery'
+        ..nextStart = http.Response(
+          '{"error":"PAY_LATER_CLOSED","message":"This order can no longer '
+          'be paid online. Please pay the delivery partner."}',
+          409,
+        );
+      await pumpScreen(
+        tester,
+        FakeLauncher(const PaymentLaunchFinished()),
+        payLater: true,
+      );
+      await waitFor(tester, find.byKey(const Key('paymentCod')));
+      expect(find.text('Pay on delivery'), findsOneWidget);
+      expect(find.text('Try Again'), findsNothing);
+    });
 
     testWidgets('a confirmed payment shows success', (tester) async {
       server.paidAfterChecks = 1;

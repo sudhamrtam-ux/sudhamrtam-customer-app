@@ -90,6 +90,10 @@ class OrderPaymentStatus {
   /// before delivery (server's rule, 2026-11-25).
   final bool canCancel;
 
+  /// A Cash on Delivery order the customer may still pay online, until
+  /// its delivery list is fixed (server's rule, 2026-11-26).
+  final bool canPayOnline;
+
   const OrderPaymentStatus({
     required this.paymentMethod,
     required this.paymentStatus,
@@ -97,6 +101,7 @@ class OrderPaymentStatus {
     this.paymentDueAt,
     this.orderRef,
     this.canCancel = false,
+    this.canPayOnline = false,
   });
 
   bool get isPaid => paymentStatus == 'paid_online';
@@ -116,6 +121,7 @@ class OrderPaymentStatus {
       orderRef: order['order_ref'] as String?,
       paymentDueAt: due == null ? null : DateTime.parse(due),
       canCancel: order['can_cancel'] as bool? ?? false,
+      canPayOnline: order['can_pay_online'] as bool? ?? false,
     );
   }
 }

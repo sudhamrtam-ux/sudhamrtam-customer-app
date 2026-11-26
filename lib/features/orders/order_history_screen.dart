@@ -12,6 +12,7 @@ import '../../models/order_item.dart';
 import '../../models/product.dart';
 import '../../services/order_api_client.dart';
 import '../checkout/order_destination.dart';
+import '../payment/payment_screen.dart';
 import '../shop/product_image.dart';
 import '../../services/support_api_client.dart';
 import '../support/help_support_screen.dart';
@@ -686,6 +687,17 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
   /// Asks, then cancels the order on the server (owner decision
   /// 2026-11-25: unpaid orders, before 9 PM the day before delivery).
+  /// Pays a Cash on Delivery order online (owner request 2026-11-26).
+  Future<void> _payOnline(CustomerOrder order) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            PaymentScreen(order: order, api: widget.api, payLater: true),
+      ),
+    );
+    if (mounted) await _refreshOrders();
+  }
+
   Future<void> _cancel(CustomerOrder order) async {
     final api = widget.api;
     if (api == null) return;
@@ -737,6 +749,17 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       side: const BorderSide(color: _border),
     );
     return [
+      if (_payments[order.id]?.canPayOnline ?? false)
+        FilledButton.icon(
+          key: Key('pay-online-${order.id}'),
+          onPressed: () => _payOnline(order),
+          style: FilledButton.styleFrom(
+            backgroundColor: _brandGreen,
+            shape: const StadiumBorder(),
+          ),
+          icon: const Icon(Icons.credit_card, size: 18),
+          label: const Text('Pay online now'),
+        ),
       OutlinedButton(
         key: Key('details-button-${order.id}'),
         onPressed: () => _openOrderDetails(order),

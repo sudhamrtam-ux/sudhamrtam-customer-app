@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/widgets/site_layout.dart';
+import '../checkout/order_destination.dart';
 
 import '../../models/combo_offer.dart';
 import '../../models/customer_order.dart';
@@ -19,7 +20,12 @@ class OrderDetailsScreen extends StatelessWidget {
   const OrderDetailsScreen({super.key, required this.order});
 
   static const Color _brandGreen = Color(0xFF82B440);
-  static const Color _line = Color(0xFFE3EAD6);
+  static const Color _line = Color(0xFFD6E0C8);
+  static const Color _heading = Color(0xFF4F7A1F);
+
+  static const _shadow = [
+    BoxShadow(color: Color(0x0F2F4A14), blurRadius: 12, offset: Offset(0, 4)),
+  ];
 
   String _formatDate(DateTime date) {
     final local = date.toLocal();
@@ -64,31 +70,56 @@ class OrderDetailsScreen extends StatelessWidget {
     }
   }
 
-  /// A white card with a small heading.
-  Widget _card(String title, List<Widget> children, {Key? key}) {
+  /// A white card with a border, an icon and heading, and a line under
+  /// the heading (owner request 2026-11-26: proper borders).
+  Widget _card(String title, IconData icon, List<Widget> children, {Key? key}) {
     return Container(
       key: key,
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _line),
+        boxShadow: _shadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF4F7A1F),
-              letterSpacing: 0.3,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF6F9F1),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+              border: Border(bottom: BorderSide(color: _line)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: _heading),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _heading,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          ...children,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
+            ),
+          ),
         ],
       ),
     );
@@ -193,6 +224,7 @@ class OrderDetailsScreen extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _line),
+        boxShadow: _shadow,
       ),
       child: Row(
         children: [
@@ -225,22 +257,27 @@ class OrderDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _products() =>
-      _card('ORDERED PRODUCTS', key: const Key('order-details-products'), [
-        ...order.items.map(_buildOrderItem),
-        const Divider(height: 12),
-        _detailRow('Total Quantity', '${order.totalQuantity}'),
-        _detailRow(
-          'Product Subtotal',
-          '₹${order.subtotal.toStringAsFixed(2)}',
-          strong: true,
-        ),
-      ]);
+  Widget _products() => _card(
+    'ORDERED PRODUCTS',
+    Icons.shopping_basket_outlined,
+    key: const Key('order-details-products'),
+    [
+      ...order.items.map(_buildOrderItem),
+      const Divider(height: 12),
+      _detailRow('Total Quantity', '${order.totalQuantity}'),
+      _detailRow(
+        'Product Subtotal',
+        '₹${order.subtotal.toStringAsFixed(2)}',
+        strong: true,
+      ),
+    ],
+  );
 
   Widget _delivery() {
     final notes = order.notes?.trim();
     return _card(
       'DELIVERY / PICKUP',
+      Icons.local_shipping_outlined,
       key: const Key('order-details-delivery'),
       [
         _detailRow('Method', _formatFulfillment(order.fulfillmentMethod)),
@@ -260,12 +297,19 @@ class OrderDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _payment() =>
-      _card('PAYMENT INFORMATION', key: const Key('order-details-payment'), [
-        _detailRow('Method', _formatPayment(order.paymentMethod)),
-        if (order.paymentMethod == OrderPaymentMethod.online)
-          OrderPaymentStatusView(order: order),
-      ]);
+  Widget _payment() => _card(
+    'PAYMENT INFORMATION',
+    Icons.account_balance_wallet_outlined,
+    key: const Key('order-details-payment'),
+    [
+      // With a server: the method, status and Pay online from there
+      // (a Cash on Delivery order can be paid online later).
+      if (OrderDestination.server == null)
+        _detailRow('Method', _formatPayment(order.paymentMethod))
+      else
+        OrderPaymentStatusView(order: order),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {

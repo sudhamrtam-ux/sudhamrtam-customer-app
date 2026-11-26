@@ -318,6 +318,7 @@ void main() {
       'payment_method': 'cash_on_delivery',
       'payment_status': 'due_on_delivery',
       'can_cancel': cancellable && status == 'pending',
+      'can_pay_online': cancellable && status == 'pending',
     };
     final api = OrderApiClient(
       baseUrl: 'http://api.test',
@@ -354,6 +355,12 @@ void main() {
       find.byKey(const Key('cancel-order-aaaa0000aaaa0000aaaa0000aaaa0002')),
       findsNothing,
     );
+    // Pay online now (2026-11-26), also only where the server says so.
+    expect(find.byKey(const Key('pay-online-$one')), findsOneWidget);
+    expect(
+      find.byKey(const Key('pay-online-aaaa0000aaaa0000aaaa0000aaaa0002')),
+      findsNothing,
+    );
 
     await tester.ensureVisible(find.byKey(const Key('cancel-order-$one')));
     await tester.tap(find.byKey(const Key('cancel-order-$one')));
@@ -366,6 +373,7 @@ void main() {
     expect(calls, contains('POST /v1/orders/$one/cancel'));
     expect(find.text('Cancelled'), findsOneWidget);
     expect(find.byKey(const Key('cancel-order-$one')), findsNothing);
+    expect(find.byKey(const Key('pay-online-$one')), findsNothing);
   });
 
   testWidgets("the server's Cancelled and Not delivered are shown and kept", (
