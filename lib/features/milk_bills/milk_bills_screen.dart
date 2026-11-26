@@ -10,6 +10,7 @@ import '../../services/order_api_client.dart' show onlinePaymentWorksHere;
 import '../payment/payment_launcher.dart';
 import 'bill_pdf.dart';
 import 'milk_calendar.dart';
+import 'settle_and_close.dart';
 import '../../core/widgets/page_app_bar.dart';
 
 const _green = Color(0xFF4E8A1E);
@@ -221,6 +222,9 @@ class MilkBillsScreen extends StatefulWidget {
 class _MilkBillsScreenState extends State<MilkBillsScreen> {
   List<MilkBill>? _bills;
 
+  /// Bumped on every load, so the closing card reloads with the bills.
+  int _loads = 0;
+
   /// How far back the bills go (owner request 2026-11-26).
   Period _period = Period.all;
   String? _error;
@@ -242,7 +246,12 @@ class _MilkBillsScreenState extends State<MilkBillsScreen> {
     setState(() => _error = null);
     try {
       final bills = await api.fetchBills();
-      if (mounted) setState(() => _bills = bills);
+      if (mounted) {
+        setState(() {
+          _bills = bills;
+          _loads++;
+        });
+      }
     } on MilkBillException catch (error) {
       if (mounted) setState(() => _error = error.message);
     }
@@ -348,6 +357,20 @@ class _MilkBillsScreenState extends State<MilkBillsScreen> {
                     for (final bill in bills)
                       if (_billShown(bill.month))
                         _BillCard(bill: bill, onTap: () => _open(bill)),
+                    // Settle bill and close subscription (2026-11-26).
+                    SettleAndCloseCard(
+                      key: ValueKey('closing-$_loads'),
+                      api: _api!,
+                      onClosed: _load,
+                      onOpenBill: (id) {
+                        for (final b in bills) {
+                          if (b.id == id) {
+                            _open(b);
+                            return;
+                          }
+                        }
+                      },
+                    ),
                   ],
                 ),
               ),

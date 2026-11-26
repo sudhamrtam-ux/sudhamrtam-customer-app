@@ -372,6 +372,66 @@ class MilkDeliveryMonth {
   }
 }
 
+/// Settle bill and close subscription (owner request 2026-11-26):
+/// what closing means now, and the latest closing.
+class SubscriptionClosing {
+  const SubscriptionClosing({
+    required this.status,
+    required this.lastDeliveryDate,
+    this.billIds = const [],
+  });
+
+  /// 'waiting' (final bill not made yet), 'billed' or 'nothing_to_bill'.
+  final String status;
+  final String lastDeliveryDate;
+  final List<String> billIds;
+
+  bool get isWaiting => status == 'waiting';
+
+  factory SubscriptionClosing.fromJson(Map<String, dynamic> json) =>
+      SubscriptionClosing(
+        status: json['status'] as String,
+        lastDeliveryDate: json['last_delivery_date'] as String,
+        billIds: [for (final id in json['bill_ids'] as List? ?? []) id as String],
+      );
+}
+
+class ClosingInfo {
+  const ClosingInfo({
+    this.closing,
+    required this.openPlans,
+    required this.canClose,
+    required this.lastDeliveryDate,
+    required this.unpaidPaise,
+    required this.soFarPaise,
+    required this.totalPaise,
+  });
+
+  final SubscriptionClosing? closing;
+  final int openPlans;
+  final bool canClose;
+
+  /// The last delivery day if the customer closes now.
+  final String lastDeliveryDate;
+  final int unpaidPaise;
+
+  /// Delivered, not billed yet (an estimate).
+  final int soFarPaise;
+  final int totalPaise;
+
+  factory ClosingInfo.fromJson(Map<String, dynamic> json) => ClosingInfo(
+    closing: json['closing'] == null
+        ? null
+        : SubscriptionClosing.fromJson(json['closing'] as Map<String, dynamic>),
+    openPlans: json['open_plans'] as int,
+    canClose: json['can_close'] as bool,
+    lastDeliveryDate: json['last_delivery_date'] as String,
+    unpaidPaise: json['unpaid_paise'] as int,
+    soFarPaise: json['so_far_paise'] as int,
+    totalPaise: json['total_paise'] as int,
+  );
+}
+
 /// The Sudhamrtam server's milk bill API (`/v1/milk-bills`).
 class MilkBillApiClient {
   MilkBillApiClient({
@@ -426,6 +486,15 @@ class MilkBillApiClient {
     final json = await _send('POST', 'v1/milk-bills/$billId/payment/check');
     return MilkBill.fromJson(json['bill'] as Map<String, dynamic>);
   }
+
+  /// What "Settle bill and close subscription" means now.
+  Future<ClosingInfo> fetchClosing() async =>
+      ClosingInfo.fromJson(await _send('GET', 'v1/milk-plans/closing'));
+
+  /// Stops every milk subscription; the final bill comes the morning
+  /// after the last delivery. The account stays.
+  Future<ClosingInfo> closeSubscription() async =>
+      ClosingInfo.fromJson(await _send('POST', 'v1/milk-plans/close'));
 
   Future<Map<String, dynamic>> _send(String method, String path) async {
     final session = token();
