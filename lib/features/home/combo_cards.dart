@@ -56,7 +56,11 @@ class ComboCards extends StatefulWidget {
 }
 
 class _ComboCardsState extends State<ComboCards> {
-  final _pages = PageController(viewportFraction: 0.92);
+  /// One combo: the full width, lined up with the banner and the row
+  /// below (owner request 2026-11-26); more: the next one peeks in.
+  late final _pages = PageController(
+    viewportFraction: widget.combos.length == 1 ? 1 : 0.92,
+  );
   int _page = 0;
 
   @override
@@ -94,14 +98,18 @@ class _ComboCardsState extends State<ComboCards> {
       key: const Key('combo-cards'),
       children: [
         SizedBox(
-          height: 272,
+          // Shorter on a wide screen, where the lines do not wrap.
+          height: MediaQuery.sizeOf(context).width >= 900 ? 248 : 272,
           child: PageView.builder(
             controller: _pages,
             itemCount: combos.length,
             padEnds: combos.length == 1,
             onPageChanged: (i) => setState(() => _page = i),
             itemBuilder: (context, i) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              padding: EdgeInsets.symmetric(
+                horizontal: combos.length == 1 ? 0 : 6,
+                vertical: 6,
+              ),
               child: _ComboCard(
                 combo: combos[i],
                 inCart: widget.cart.quantityFor(combos[i].productId),
@@ -194,16 +202,6 @@ class _ComboCard extends StatelessWidget {
             ),
             child: Stack(
               children: [
-                // The gift ribbon: a soft band down the card.
-                Positioned(
-                  top: 0,
-                  bottom: 0,
-                  right: 64,
-                  child: Container(
-                    width: 14,
-                    color: ribbon.withValues(alpha: 0.12),
-                  ),
-                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                   child: Column(
