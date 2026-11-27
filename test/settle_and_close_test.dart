@@ -17,11 +17,13 @@ void main() {
     int unpaid = 0,
     int soFar = 45000,
     List<Map<String, dynamic>> unpaidBills = const [],
+    String? finalBillAfter,
   }) => {
     'closing': closing,
     'open_plans': openPlans,
     'can_close': canClose,
     'last_delivery_date': '2026-11-27',
+    'final_bill_after': ?finalBillAfter,
     'unpaid_bills': unpaidBills,
     'unpaid_paise': unpaid,
     'so_far_paise': soFar,
@@ -104,6 +106,38 @@ void main() {
     );
     expect(find.byKey(const Key('closing-so-far')), findsOneWidget);
     expect(find.textContaining('about ₹450'), findsOneWidget);
+  });
+
+  testWidgets('a later phone order on the bill: the final bill waits for it '
+      '(2026-11-27)', (tester) async {
+    state = info(finalBillAfter: '2026-12-02');
+    await show(tester);
+    await tester.tap(find.byKey(const Key('settle-and-close')));
+    await tester.pumpAndSettle();
+    expect(find.text('Order on the bill'), findsOneWidget);
+    expect(find.text('2 Dec 2026'), findsOneWidget);
+    expect(find.textContaining('morning of 3 Dec 2026'), findsOneWidget);
+    await tester.tap(find.text('Back'));
+    await tester.pumpAndSettle();
+
+    state = info(
+      closing: {
+        'status': 'waiting',
+        'last_delivery_date': '2026-11-27',
+        'bill_ids': <String>[],
+      },
+      openPlans: 0,
+      canClose: false,
+      finalBillAfter: '2026-12-02',
+    );
+    await tester.pumpWidget(const SizedBox());
+    await show(tester);
+    final text = tester
+        .widget<Text>(find.byKey(const Key('closing-waiting-text')))
+        .data!;
+    expect(text, contains('Last milk delivery: 27 Nov 2026'));
+    expect(text, contains('Your order on 2 Dec 2026 still comes as booked'));
+    expect(text, contains('morning of 3 Dec 2026'));
   });
 
   testWidgets(

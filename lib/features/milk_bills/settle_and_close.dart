@@ -224,10 +224,12 @@ class _SettleAndCloseCardState extends State<SettleAndCloseCard> {
           const SizedBox(height: 6),
           Text(
             'Last milk delivery: ${billDateLabel(closing.lastDeliveryDate)}. '
+            '${info.finalBillAfter.compareTo(closing.lastDeliveryDate) > 0 ? 'Your order on ${billDateLabel(info.finalBillAfter)} still comes as booked and goes on the final bill. ' : ''}'
             'Your final bill comes as soon as your last delivery is marked, '
             'at the latest on the morning of '
-            '${billDateLabel(_dayAfter(closing.lastDeliveryDate))}; '
+            '${billDateLabel(_dayAfter(info.finalBillAfter))}; '
             'we will let you know.',
+            key: const Key('closing-waiting-text'),
           ),
           if (info.soFarPaise > 0) ...[
             const SizedBox(height: 8),
@@ -378,6 +380,11 @@ class _SettleDialog extends StatelessWidget {
               child: Column(
                 children: [
                   row('Last milk delivery', last),
+                  if (info.finalBillAfter.compareTo(info.lastDeliveryDate) > 0)
+                    row(
+                      'Order on the bill',
+                      billDateLabel(info.finalBillAfter),
+                    ),
                   if (info.unpaidPaise > 0)
                     row('Unpaid bills', billRupees(info.unpaidPaise)),
                   row(
@@ -398,7 +405,7 @@ class _SettleDialog extends StatelessWidget {
               'Your final bill, with the exact amount (including the last '
               'delivery), comes as soon as your last delivery is marked, at '
               'the latest on the morning of '
-              '${billDateLabel(_dayAfter(info.lastDeliveryDate))}. Pay it '
+              '${billDateLabel(_dayAfter(info.finalBillAfter))}. Pay it '
               'right here: online, by UPI, or in cash to our delivery partner.',
               style: const TextStyle(color: Colors.black54, fontSize: 13),
             ),

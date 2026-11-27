@@ -425,11 +425,12 @@ class ClosingInfo {
     required this.openPlans,
     required this.canClose,
     required this.lastDeliveryDate,
+    String? finalBillAfter,
     this.unpaidBills = const [],
     required this.unpaidPaise,
     required this.soFarPaise,
     required this.totalPaise,
-  });
+  }) : finalBillAfter = finalBillAfter ?? lastDeliveryDate;
 
   final SubscriptionClosing? closing;
   final int openPlans;
@@ -437,6 +438,11 @@ class ClosingInfo {
 
   /// The last delivery day if the customer closes now.
   final String lastDeliveryDate;
+
+  /// The day the final bill waits for: the last milk day, or a later
+  /// phone order on the bill, which still comes as booked (server
+  /// `final_bill_after`, 2026-11-27; older servers: the last milk day).
+  final String finalBillAfter;
 
   /// Issued bills not paid yet, oldest first.
   final List<UnpaidBill> unpaidBills;
@@ -453,6 +459,7 @@ class ClosingInfo {
     openPlans: json['open_plans'] as int,
     canClose: json['can_close'] as bool,
     lastDeliveryDate: json['last_delivery_date'] as String,
+    finalBillAfter: json['final_bill_after'] as String?,
     unpaidBills: [
       for (final b in (json['unpaid_bills'] as List?) ?? const [])
         UnpaidBill.fromJson(b as Map<String, dynamic>),
