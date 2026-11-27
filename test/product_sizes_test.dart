@@ -65,6 +65,17 @@ void main() {
           .selected,
       isTrue,
     );
+    // The chosen size stays enabled, so its text is not greyed out, and
+    // tapping it again changes nothing (2026-11-27).
+    expect(
+      tester
+          .widget<ChoiceChip>(find.byKey(const Key('size-honey_250g')))
+          .onSelected,
+      isNotNull,
+    );
+    await tester.tap(find.byKey(const Key('size-honey_250g')));
+    await tester.pumpAndSettle();
+    expect(find.text('Price: ₹150.00'), findsOneWidget);
   });
 
   testWidgets('the Shop shows honey once, with its sizes', (tester) async {

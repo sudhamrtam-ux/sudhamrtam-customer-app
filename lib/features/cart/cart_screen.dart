@@ -93,7 +93,8 @@ class CartScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '${sudhamrtamCart.totalQuantity} units selected',
+              '${sudhamrtamCart.totalQuantity} '
+              '${sudhamrtamCart.totalQuantity == 1 ? 'unit' : 'units'} selected',
               style: const TextStyle(color: Colors.black54),
             ),
             const SizedBox(height: 20),

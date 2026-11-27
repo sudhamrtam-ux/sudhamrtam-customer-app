@@ -196,9 +196,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 label: Text('${size.unit} · ₹${size.price.toStringAsFixed(0)}'),
                 selected: size.id == widget.productId,
                 selectedColor: const Color(0xFFE5F0D7),
-                onSelected: size.id == widget.productId
-                    ? null
-                    : (_) => _openSize(size),
+                // The chosen size stays enabled (a disabled chip is
+                // greyed out); tapping it again does nothing.
+                onSelected: (_) {
+                  if (size.id != widget.productId) _openSize(size);
+                },
               ),
           ],
         )

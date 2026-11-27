@@ -72,5 +72,7 @@ void main() {
       ),
       findsNothing,
     );
+    // One unit, not "1 units" (2026-11-27).
+    expect(find.text('1 unit selected'), findsOneWidget);
   });
 }
