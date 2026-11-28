@@ -10,6 +10,7 @@ import 'package:sudhamrtam_customer_app/core/widgets/site_layout.dart';
 import 'package:sudhamrtam_customer_app/database/milk_database_service.dart';
 import 'package:sudhamrtam_customer_app/features/checkout/checkout_screen.dart';
 import 'package:sudhamrtam_customer_app/features/shell/customer_shell.dart';
+import 'package:sudhamrtam_customer_app/features/tour/app_tour.dart';
 import 'package:sudhamrtam_customer_app/features/shop/product_details_screen.dart';
 import 'package:sudhamrtam_customer_app/features/shop/shop_screen.dart';
 import 'package:sudhamrtam_customer_app/services/order_api_client.dart';
@@ -320,5 +321,127 @@ void main() {
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byKey(const Key('site-footer')), findsNothing);
     await closeShell(tester);
+  });
+
+  // The first-login tour (owner request and decisions 2026-11-28): here,
+  // with the same app setup, so only one test file starts the whole shell.
+  group('first-login tour', () {
+    Finder inTour(Finder f) =>
+        find.descendant(of: find.byKey(const Key('app-tour')), matching: f);
+
+    late bool seen;
+    late int marked;
+
+    Future<void> pumpTour(
+      WidgetTester tester, {
+      bool signedIn = true,
+      Size size = const Size(412, 915),
+    }) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CustomerShell(
+            signedIn: () => signedIn,
+            tourSeen: () async => seen,
+            markTourSeen: () async {
+              seen = true;
+              marked++;
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+    }
+
+    setUp(() {
+      seen = false;
+      marked = 0;
+    });
+
+    Future<void> next(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('tour-next')));
+      await tester.pump();
+      await tester.pump();
+    }
+
+    testWidgets('after sign-in: welcome, each option lit up, Done', (
+      tester,
+    ) async {
+      await pumpTour(tester);
+      expect(find.byKey(const Key('app-tour')), findsOneWidget);
+      expect(inTour(find.text('Welcome to Sudhamrtam')), findsOneWidget);
+      expect(find.text('Show me'), findsOneWidget);
+
+      await next(tester);
+      expect(find.text('Shop'), findsWidgets);
+      expect(find.textContaining('Order by 9 PM'), findsOneWidget);
+      // No server here, so no Messages bell: that stop is passed over.
+      expect(find.text('1 of 4'), findsOneWidget);
+      await next(tester);
+      expect(find.textContaining('Pause it when you travel'), findsOneWidget);
+      expect(find.text('2 of 4'), findsOneWidget);
+      await next(tester);
+      expect(find.text('3 of 4'), findsOneWidget);
+      await next(tester);
+      expect(find.text('4 of 4'), findsOneWidget);
+      expect(find.textContaining('see this tour again'), findsOneWidget);
+      // The last stop: Done, no Skip.
+      expect(find.byKey(const Key('tour-skip')), findsNothing);
+      expect(find.text('Done'), findsOneWidget);
+      await next(tester);
+      expect(find.byKey(const Key('app-tour')), findsNothing);
+      expect(marked, 1);
+      await closeShell(tester);
+    });
+
+    testWidgets('Skip ends it; seen once, it does not come back', (
+      tester,
+    ) async {
+      await pumpTour(tester);
+      await next(tester);
+      await tester.tap(find.byKey(const Key('tour-skip')));
+      await tester.pump();
+      expect(find.byKey(const Key('app-tour')), findsNothing);
+      expect(marked, 1);
+      await closeShell(tester);
+
+      await pumpTour(tester);
+      expect(find.byKey(const Key('app-tour')), findsNothing);
+      await closeShell(tester);
+    });
+
+    testWidgets('not signed in, or the website layout: no tour', (
+      tester,
+    ) async {
+      await pumpTour(tester, signedIn: false);
+      expect(find.byKey(const Key('app-tour')), findsNothing);
+      await closeShell(tester);
+
+      await pumpTour(tester, size: const Size(1440, 900));
+      expect(find.byKey(const Key('app-tour')), findsNothing);
+      await closeShell(tester);
+    });
+
+    testWidgets('Account -> Show the app tour plays it again', (tester) async {
+      seen = true;
+      await pumpTour(tester);
+      expect(find.byKey(const Key('app-tour')), findsNothing);
+      await tester.tap(find.text('Account'));
+      await tester.pump();
+      await tester.pump();
+      final tile = find.byKey(const Key('accountShowTour'));
+      await tester.scrollUntilVisible(tile, 300);
+      await tester.ensureVisible(tile);
+      await tester.pump();
+      await tester.tap(tile);
+      await tester.pump();
+      await tester.pump();
+      expect(inTour(find.text('Welcome to Sudhamrtam')), findsOneWidget);
+      expect(appTourRequests.value, greaterThan(0));
+      await closeShell(tester);
+    });
   });
 }

@@ -16,9 +16,22 @@ import '../cart/site_cart_rail.dart';
 import '../milk_plan/milk_plan_screen.dart';
 import '../milk_plan/milk_sqlite_test_screen.dart';
 import '../account/account_screen.dart';
+import '../tour/app_tour.dart';
 
 class CustomerShell extends StatefulWidget {
-  const CustomerShell({super.key});
+  const CustomerShell({
+    super.key,
+    this.signedIn,
+    this.tourSeen = appTourSeen,
+    this.markTourSeen = markAppTourSeen,
+  });
+
+  /// Whether a customer is signed in; defaults to the app's account.
+  final bool Function()? signedIn;
+
+  /// The first-login tour's memory on this phone; tests replace it.
+  final Future<bool> Function() tourSeen;
+  final Future<void> Function() markTourSeen;
 
   @override
   State<CustomerShell> createState() => _CustomerShellState();
@@ -30,18 +43,73 @@ class _CustomerShellState extends State<CustomerShell> {
   /// Shop filter; set when Home opens a category.
   String? _shopCategory;
 
+  /// For the tour: the bottom bar and the Messages bell.
+  final _barKey = GlobalKey();
+  final _bellKey = GlobalKey();
+  bool _touring = false;
+  bool _checkingTour = false;
+
+  bool get _signedIn => widget.signedIn?.call() ?? sudhamrtamAccount.isSignedIn;
+
   @override
   void initState() {
     super.initState();
     homeRequests.addListener(_showHome);
     tabRequests.addListener(_showTab);
+    appTourRequests.addListener(_replayTour);
+    sudhamrtamAccount.addListener(_maybeStartTour);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartTour());
   }
 
   @override
   void dispose() {
     homeRequests.removeListener(_showHome);
     tabRequests.removeListener(_showTab);
+    appTourRequests.removeListener(_replayTour);
+    sudhamrtamAccount.removeListener(_maybeStartTour);
     super.dispose();
+  }
+
+  /// After signing in, once per phone (owner decision 2026-11-28); not
+  /// over another page (e.g. signing in during checkout): then on the
+  /// next tab tap.
+  Future<void> _maybeStartTour() async {
+    if (!mounted || _touring || _checkingTour) return;
+    if (isWideSite(context) || !_signedIn) return;
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
+    _checkingTour = true;
+    try {
+      if (await widget.tourSeen()) return;
+    } catch (_) {
+      // Only a guide: never in the way when the phone cannot remember.
+      return;
+    } finally {
+      _checkingTour = false;
+    }
+    if (mounted && !isWideSite(context)) setState(() => _touring = true);
+  }
+
+  /// Account → "Show the app tour".
+  void _replayTour() {
+    if (mounted && !isWideSite(context)) setState(() => _touring = true);
+  }
+
+  void _endTour() {
+    setState(() => _touring = false);
+    widget.markTourSeen().catchError((_) {});
+  }
+
+  /// Where bottom-bar tab [tab] is on screen.
+  Rect? _slot(int tab) {
+    final bar = rectOf(_barKey);
+    if (bar == null) return null;
+    final width = bar.width / 5;
+    return Rect.fromLTWH(
+      bar.left + tab * width,
+      bar.top,
+      width,
+      bar.height,
+    ).deflate(4);
   }
 
   /// A page's Home button: the Home tab again.
@@ -78,6 +146,8 @@ class _CustomerShellState extends State<CustomerShell> {
     if (index == 0 || index == 2) {
       unawaited(sudhamrtamMilkSync.refresh());
     }
+    // Signed in on another page: the tour comes now.
+    unawaited(_maybeStartTour());
   }
 
   /// The website's footer, on Home and Shop on a wide screen.
@@ -137,7 +207,7 @@ class _CustomerShellState extends State<CustomerShell> {
         ),
       );
     }
-    return Scaffold(
+    final phone = Scaffold(
       appBar: AppBar(
         // Away from Home: an arrow back to it.
         leading: _selectedIndex == 0
@@ -171,7 +241,7 @@ class _CustomerShellState extends State<CustomerShell> {
         // Temporary button for SQLite testing.
         actions: [
           // Messages from Sudhamrtam; hidden without a server.
-          const MessagesBell(),
+          KeyedSubtree(key: _bellKey, child: const MessagesBell()),
           // A developer tool: only in debug builds.
           if (kDebugMode)
             IconButton(
@@ -193,6 +263,7 @@ class _CustomerShellState extends State<CustomerShell> {
 
       // Bottom navigation.
       bottomNavigationBar: NavigationBar(
+        key: _barKey,
         selectedIndex: _selectedIndex,
         onDestinationSelected: _select,
         destinations: [
@@ -229,6 +300,22 @@ class _CustomerShellState extends State<CustomerShell> {
           ),
         ],
       ),
+    );
+    // Always the same Stack, so the page keeps its state under the tour.
+    return Stack(
+      children: [
+        phone,
+        if (_touring)
+          Positioned.fill(
+            child: AppTourOverlay(
+              steps: customerTourSteps(
+                slot: _slot,
+                bell: () => rectOf(_bellKey),
+              ),
+              onEnd: _endTour,
+            ),
+          ),
+      ],
     );
   }
 

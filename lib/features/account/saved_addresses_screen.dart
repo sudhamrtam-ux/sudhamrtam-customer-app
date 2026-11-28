@@ -58,8 +58,13 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
   String _reason(Object error) =>
       error is AccountApiException ? error.message : '$error';
 
+  /// Bumped by every load: an older load that finishes late must not
+  /// put back the list from before a change.
+  int _loadCount = 0;
+
   Future<void> _loadAddresses() async {
     if (!mounted) return;
+    final load = ++_loadCount;
 
     setState(() {
       _isLoading = true;
@@ -71,14 +76,14 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
         _customerId,
       );
 
-      if (!mounted) return;
+      if (!mounted || load != _loadCount) return;
 
       setState(() {
         _addresses = addresses;
         _isLoading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || load != _loadCount) return;
 
       setState(() {
         _errorMessage = error.toString();

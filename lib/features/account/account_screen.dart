@@ -15,6 +15,7 @@ import 'delete_account_screen.dart';
 import 'evening_reminder_tile.dart';
 import '../feedback/feedback_screen.dart';
 import '../support/help_support_screen.dart';
+import '../tour/app_tour.dart';
 import '../milk_bills/milk_bills_screen.dart';
 import '../orders/order_history_screen.dart';
 import 'customer_profile_screen.dart';
@@ -293,6 +294,18 @@ class AccountScreen extends StatelessWidget {
             subtitle: 'Call us, email us or raise a query',
             onTap: () => _openHelpSupport(context),
           ),
+
+          // The first-login tour again (phone app only, like the tour).
+          if (!isWideSite(context))
+            KeyedSubtree(
+              key: const Key('accountShowTour'),
+              child: _buildAccountTile(
+                icon: Icons.tour_outlined,
+                title: 'Show the app tour',
+                subtitle: 'A quick look at Shop, Subscriptions and more',
+                onTap: () => appTourRequests.value++,
+              ),
+            ),
         ]),
 
         const SizedBox(height: 20),
