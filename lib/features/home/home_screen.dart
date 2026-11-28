@@ -13,6 +13,7 @@ import '../../services/offer_api_client.dart';
 import '../../services/order_api_client.dart';
 import '../checkout/order_destination.dart';
 import '../milk_bills/milk_bills_screen.dart';
+import '../milk_plan/not_approved_card.dart';
 import '../shop/product_image.dart';
 import '../../models/milk_subscription.dart';
 import '../../models/milk_subscription_manager.dart';
@@ -337,6 +338,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 // applies.
                 // An address without its map spot or details.
                 const AddressDetailsCard(),
+                // A new subscription Sudhamrtam did not approve, and why.
+                const NotApprovedCard(),
                 // A milk bill to pay.
                 const MilkBillsReminder(unpaidOnly: true),
                 // New messages from Sudhamrtam.

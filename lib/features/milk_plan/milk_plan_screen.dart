@@ -11,6 +11,7 @@ import '../../models/milk_plan_merge.dart';
 import '../../models/subscription_products.dart';
 import 'milk_plan_merge_dialog.dart';
 import 'milk_subscription_setup_screen.dart';
+import 'not_approved_card.dart';
 import 'vacation_days_screen.dart';
 
 // ============================================================
@@ -290,6 +291,8 @@ class MilkPlanScreen extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(16, wide ? 24 : 16, 16, 24),
             children: [
               const MilkBillsReminder(),
+              // A new subscription Sudhamrtam did not approve, and why.
+              const NotApprovedCard(),
               heading,
               const SizedBox(height: 18),
               if (wide)

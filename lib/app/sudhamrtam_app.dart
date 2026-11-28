@@ -196,6 +196,14 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
       navigator.popUntil((route) => route.isFirst);
       return;
     }
+    // A new subscription approved or not (owner decision 2026-11-28):
+    // the latest plans, on Subscriptions.
+    if (tap.type == 'plan' && navigator != null) {
+      unawaited(sudhamrtamMilkSync.refresh(force: true));
+      navigator.popUntil((route) => route.isFirst);
+      tabRequests.value = 2;
+      return;
+    }
     // A bill is ready or due: open the milk bills.
     if (tap.type == 'bill' && navigator != null) {
       navigator.push(
@@ -214,7 +222,12 @@ class _SudhamrtamAppState extends State<SudhamrtamApp> {
   void _arrived(PushArrival arrival) {
     // "Milk delivered" (or why not), or a bill: a note while the app
     // is open; a bill can be opened from it.
+    // An answer to a new subscription: the plans update at once.
+    if (arrival.tap.type == 'plan') {
+      unawaited(sudhamrtamMilkSync.refresh(force: true));
+    }
     if (arrival.tap.type == 'delivery' ||
+        arrival.tap.type == 'plan' ||
         arrival.tap.type == 'bill' ||
         arrival.tap.type == 'tomorrow' ||
         arrival.tap.type == 'support_reply') {
