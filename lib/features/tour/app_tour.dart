@@ -119,7 +119,7 @@ class _AppTourOverlayState extends State<AppTourOverlay> {
         ? overlayBox.localToGlobal(Offset.zero)
         : Offset.zero;
     final target = step.target?.call()?.shift(-origin);
-    final hole = target?.inflate(6);
+    final around = target?.inflate(6);
     final visible = [
       for (final s in widget.steps)
         if (_shown(s)) s,
@@ -135,6 +135,9 @@ class _AppTourOverlayState extends State<AppTourOverlay> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
+        // Kept inside the screen, so the outline shows all round (the
+        // bottom bar reaches the screen's edge).
+        final hole = around?.intersect((Offset.zero & size).deflate(3));
         final cardWidth = (size.width - 32).clamp(0.0, 380.0);
         final card = _TourCard(
           key: Key('tour-step-$_index'),
